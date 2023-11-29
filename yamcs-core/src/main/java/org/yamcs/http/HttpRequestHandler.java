@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
@@ -64,6 +65,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
@@ -277,6 +279,13 @@ public class HttpRequestHandler extends ChannelInboundHandlerAdapter {
             // set custom authorization headers. It'd be interesting if we communicate the
             // access token via the websocket subprotocol instead (e.g. via temp. route).
             String accessToken = getAccessTokenFromCookie(req);
+            if (accessToken != null) {
+                return handleAccessToken(ctx, req, accessToken);
+            }
+
+            // Last Last resort
+            // Get token from Query parameters
+            accessToken = getAccessTokenFromQueryParams(req);
             if (accessToken != null) {
                 return handleAccessToken(ctx, req, accessToken);
             }
@@ -530,6 +539,15 @@ public class HttpRequestHandler extends ChannelInboundHandlerAdapter {
                     return c.value();
                 }
             }
+        }
+        return null;
+    }
+
+    private String getAccessTokenFromQueryParams(HttpRequest req) {
+        QueryStringDecoder decoder = new QueryStringDecoder(req.uri());
+        List<String> accessTokenQueryParameters = decoder.parameters().get("access_token");
+        if (accessTokenQueryParameters != null) {
+            return accessTokenQueryParameters.get(0);
         }
         return null;
     }
