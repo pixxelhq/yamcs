@@ -12,6 +12,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/Hydrogen'
+
+      - name: Install dependencies and build frontend
+        run: |
+          cd yamcs-web/src/main/webapp
+          npm install
+          npm run build
+        working-directory: yamcs-web/src/main/webapp
+        
       - name: Set up Java 11
         uses: actions/setup-java@v1
         with:
