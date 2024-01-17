@@ -18,6 +18,7 @@ jobs:
         with:
           node-version: 'lts/Hydrogen'
 
+      # Do npm install and build steps for YAMCS webapp.
       - name: Install dependencies and build frontend
         run: |
           echo ${{ github.workspace }}
@@ -33,7 +34,6 @@ jobs:
           settings-path: ${{ github.workspace }} # location for the settings.xml file
 
       - name: Build with Maven
-        # run: mvn -B package --file pom.xml
         run: mvn clean install -DskipTests
 
       - name: Publish to GitHub Packages Apache Maven
