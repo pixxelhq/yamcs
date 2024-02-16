@@ -28,6 +28,7 @@ public class ServiceTwenty implements PusService {
 
     @Override
     public void initializeSubServices() {
+        pusSubServices.put(1, new SubServiceOne(yamcsInstance, config.getConfigOrEmpty("one")));
         pusSubServices.put(3, new SubServiceThree(yamcsInstance, config.getConfigOrEmpty("three")));
     }
 
