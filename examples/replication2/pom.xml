@@ -5,7 +5,7 @@
   <parent>
     <groupId>org.yamcs.examples</groupId>
     <artifactId>examples</artifactId>
-    <version>5.8.9-Pixxel.SNAPSHOT-2.7.5</version>
+    <version>5.9.7-Pixxel.SNAPSHOT-2.8.0</version>
   </parent>
 
   <artifactId>replication2</artifactId>
@@ -27,11 +27,13 @@
       <groupId>org.yamcs</groupId>
       <artifactId>yamcs-core</artifactId>
       <version>${project.version}</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.yamcs</groupId>
       <artifactId>yamcs-web</artifactId>
       <version>${project.version}</version>
+      <scope>provided</scope>
     </dependency>
   </dependencies>
 </project>

@@ -5,7 +5,7 @@
   <parent>
     <groupId>org.yamcs</groupId>
     <artifactId>yamcs</artifactId>
-    <version>5.8.9-Pixxel.SNAPSHOT-2.7.5</version>
+    <version>5.9.7-Pixxel.SNAPSHOT-2.8.0</version>
   </parent>
 
   <groupId>org.yamcs.examples</groupId>
@@ -97,7 +97,26 @@
                   <goal>bundle</goal>
                 </goals>
                 <configuration>
+                  <classifier>bundle</classifier>
                   <attach>false</attach>
+                  <includeDefaultWrappers>true</includeDefaultWrappers>
+                  <scope>compile</scope>
+                  <formats>
+                    <format>tar.gz</format>
+                  </formats>
+                </configuration>
+              </execution>
+              <execution>
+                <id>bundle-dropin</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>bundle</goal>
+                </goals>
+                <configuration>
+                  <classifier>dropin</classifier>
+                  <attach>false</attach>
+                  <includeDefaultWrappers>false</includeDefaultWrappers>
+                  <scope>runtime</scope>
                   <formats>
                     <format>tar.gz</format>
                   </formats>
