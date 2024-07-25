@@ -45,6 +45,11 @@ public class SubServiceThree implements PusSubService {
         int eventId = (int) ByteArrayUtils.decodeCustomInteger(dataField, 0, ServiceFive.eventIdSize);
 
         Pair<String, Map<Integer, Triple<Integer, String, Map<Integer, Pair<Integer, String>>>>> eventMap = ServiceFive.eventIds.get(new Pair<>(apid, eventId));
+        if(eventMap == null) {
+            log.error("Invalid APID, Event ID for S5,3 packet: {}, {}", apid, eventId);
+            return new ArrayList<>();
+        }
+
         Map<Integer, Triple<Integer, String, Map<Integer, Pair<Integer, String>>>> chunkMap = eventMap.getSecond();
 
         String eventDec = "EventName: " + eventMap.getFirst() + " | EventId: " + eventId;
