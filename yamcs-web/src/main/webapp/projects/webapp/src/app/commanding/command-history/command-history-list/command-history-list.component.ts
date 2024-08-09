@@ -78,6 +78,7 @@ export class CommandHistoryListComponent implements AfterViewInit, OnDestroy {
     { id: 'acknowledgments', label: 'Extra acknowledgments', visible: true },
     { id: 'completion', label: 'Completion', visible: true },
     { id: 'actions', label: '', alwaysVisible: true },
+    { id: 'rejectionReason', label: 'Rejection Reason', alwaysVisible: true },
   ];
 
   // Added dynamically based on actual commands.
