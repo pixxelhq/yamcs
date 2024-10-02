@@ -52,6 +52,9 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
     // Encryption parameters
     protected SymmetricEncryption se;
 
+    // Temporary segmentation param
+    protected boolean is_segmentation;
+
     YarchDatabaseInstance ydb;
 
     @Override
@@ -210,7 +213,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                     String rName = value.getFourth();
 
                     byte[] contention = Arrays.copyOfRange(data, offset + roffset, offset + roffset + rsize);
-                    if (Arrays.equals(mc.getKey(), contention)) {
+                    if (is_segmentation && Arrays.equals(mc.getKey(), contention)) {
                         data = Arrays.copyOfRange(data, offset + stripHeader, offset + length);
                         Tuple t = new Tuple(StandardTupleDefinitions.TM, new Object[] { null, null, timeService.getMissionTime(), null,
                                                 data, timeService.getHresMissionTime(), null, linkName, null});
@@ -220,7 +223,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                         redirectionCounters.get(rName).incrementAndGet();
                         return;
                     }
-                    else if (contention.equals(mc.getKey())) {
+                    else if (!is_segmentation && contention.equals(mc.getKey())) {
                         data = Arrays.copyOfRange(data, offset + stripHeader, offset + length);
                         Tuple t = new Tuple(StandardTupleDefinitions.TM, new Object[] { null, null, timeService.getMissionTime(), null,
                                 data, timeService.getHresMissionTime(), null, linkName, null});
