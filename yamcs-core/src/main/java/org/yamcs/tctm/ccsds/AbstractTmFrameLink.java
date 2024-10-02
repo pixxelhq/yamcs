@@ -220,6 +220,16 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                         redirectionCounters.get(rName).incrementAndGet();
                         return;
                     }
+                    else if (Arrays.equals(mc.getKey(), contention)) {
+                        data = Arrays.copyOfRange(data, offset + stripHeader, offset + length);
+                        Tuple t = new Tuple(StandardTupleDefinitions.TM, new Object[] { null, null, timeService.getMissionTime(), null,
+                                data, timeService.getHresMissionTime(), null, linkName, null});
+                        rstream.emitTuple(t);
+
+                        // Update redirection counter
+                        redirectionCounters.get(rName).incrementAndGet();
+                        return;
+                    }
                 }
             }
 
