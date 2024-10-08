@@ -24,6 +24,13 @@ service MdbApi {
     };
   }
 
+  // Get the history of changelog of the mission database
+  rpc GetMissionDatabaseHistory(GetMissionDatabaseHistoryRequest) returns (MissionDatabaseHistory) {
+    option (yamcs.api.route) = {
+      get: "/api/mdb/{instance}:history"
+    };
+  }
+
   // Export a java serialized dump of the mission database
   rpc ExportJavaMissionDatabase(ExportJavaMissionDatabaseRequest) returns (yamcs.api.HttpBody) {
     option (yamcs.api.route) = {
@@ -176,6 +183,14 @@ message MissionDatabaseVersion {
     optional string version = 2;
   }
   repeated MdbVersion mdbVersion = 1;
+}
+
+message MissionDatabaseHistory {
+  message MdbHistory {
+    optional string subsytemName = 1;
+    repeated HistoryInfo HistoryInfo = 5;
+  }
+  repeated MdbHistory mdbHistory = 1;
 }
 
 message MissionDatabase {
@@ -1189,6 +1204,11 @@ message GetMissionDatabaseRequest {
 }
 
 message GetMissionDatabaseVersionRequest {
+  // Yamcs instance name.
+  optional string instance = 1;
+}
+
+message GetMissionDatabaseHistoryRequest {
   // Yamcs instance name.
   optional string instance = 1;
 }
