@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-
 	<groupId>org.yamcs</groupId>
 	<artifactId>yamcs</artifactId>
-	<version>5.10.1-Pixxel.SNAPSHOT-3.0.0</version>
-
+	<version>5.10.3-Pixxel.SNAPSHOT-3.0.0</version>
 	<packaging>pom</packaging>
 
 	<name>Yamcs</name>
@@ -50,7 +48,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<nettyVersion>4.1.94.Final</nettyVersion>
 		<protobufVersion>3.19.6</protobufVersion>
-		<rocksdbVersion>9.4.0.6</rocksdbVersion>
+		<rocksdbVersion>9.4.0.10</rocksdbVersion>
 		<slf4jVersion>2.0.9</slf4jVersion>
 	</properties>
 
