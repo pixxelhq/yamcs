@@ -1,15 +1,14 @@
 <app-instance-page>
   <app-instance-toolbar>
-    <a mat-icon-button routerLink=".." [queryParams]="{ c: yamcs.context }" color="primary">
-      <mat-icon>arrow_back</mat-icon>
-    </a>
+    <ya-page-icon-button routerLink=".." [queryParams]="{ c: yamcs.context }" icon="arrow_back" />
     Create parameter list
   </app-instance-toolbar>
 
   <div class="form-content ya-form">
     <form [formGroup]="form" novalidate>
       <label>
-        Name<br />
+        Name
+        <br />
         <input formControlName="name" type="text" />
       </label>
       <br />
@@ -19,10 +18,9 @@
       </label>
     </form>
     <p>&nbsp;</p>
-    <button class="ya-button" (click)="showAddPatternDialog()">
-      <mat-icon>add_circle_outline</mat-icon>
+    <ya-button (click)="showAddPatternDialog()" icon="add_circle_outline">
       Add parameter or pattern
-    </button>
+    </ya-button>
 
     <p>&nbsp;</p>
     @if (patterns$ | async; as patterns) {
@@ -55,14 +53,10 @@
 
     <p>&nbsp;</p>
     <div class="action-bar">
-      <button class="ya-button" (click)="location.back()">Cancel</button>
-      <button
-        class="ya-button primary"
-        type="submit"
-        (click)="onConfirm()"
-        [disabled]="!form.valid">
+      <ya-button (click)="location.back()">Cancel</ya-button>
+      <ya-button appearance="primary" (click)="onConfirm()" [disabled]="!form.valid">
         CREATE
-      </button>
+      </ya-button>
     </div>
   </div>
 </app-instance-page>

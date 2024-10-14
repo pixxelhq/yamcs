@@ -2,9 +2,7 @@
 
 <mat-toolbar class="top">
   <mat-toolbar-row>
-    <a mat-icon-button routerLink=".." color="primary">
-      <mat-icon>arrow_back</mat-icon>
-    </a>
+    <ya-page-icon-button routerLink=".." icon="arrow_back" />
     Create an instance
   </mat-toolbar-row>
 </mat-toolbar>
@@ -15,7 +13,8 @@
   <div class="form-content ya-form">
     <form [formGroup]="form" novalidate>
       <label>
-        Instance name<br />
+        Instance name
+        <br />
         <input formControlName="name" type="text" />
       </label>
       @for (v of template?.variables; track v) {
@@ -51,14 +50,10 @@
     </form>
     <p>&nbsp;</p>
     <div class="action-bar">
-      <button class="ya-button" routerLink="/">CANCEL</button>
-      <button
-        class="ya-button primary"
-        type="submit"
-        (click)="onConfirm()"
-        [disabled]="!form.valid">
+      <ya-button routerLink="/">CANCEL</ya-button>
+      <ya-button appearance="primary" (click)="onConfirm()" [disabled]="!form.valid">
         CREATE
-      </button>
+      </ya-button>
     </div>
   </div>
 }

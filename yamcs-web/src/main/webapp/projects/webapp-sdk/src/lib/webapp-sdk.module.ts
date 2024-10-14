@@ -27,6 +27,7 @@ import { StorageUrlPipe } from '../public-api';
 import { YaBinaryInput } from './components/binary-input/binary-input.component';
 import { YaBreadcrumbTrail } from './components/breadcrumb/breadcrumb-trail.component';
 import { YaBreadcrumb } from './components/breadcrumb/breadcrumb.component';
+import { YaButton } from './components/button/button.component';
 import { YaColumnChooser } from './components/column-chooser/column-chooser.component';
 import { YaDateTimeInput } from './components/date-time-input/date-time-input.component';
 import { YaDetailPane } from './components/detail-pane/detail-pane.component';
@@ -38,6 +39,8 @@ import { YaDurationInput } from './components/duration-input/duration-input.comp
 import { YaEmptyMessage } from './components/empty-message/empty-message.component';
 import { YaErrors } from './components/errors/errors.component';
 import { YaExpirable } from './components/expirable/expirable.component';
+import { YaFilterInput } from './components/filter/filter-input.component';
+import { YaFilterTextarea } from './components/filter/filter-textarea.component';
 import { YaHelp } from './components/help/help.component';
 import { YaHelpDialog } from './components/help/help.dialog';
 import { YaHexIntegerInput } from './components/hex-integer-input/hex-integer-input.component';
@@ -51,12 +54,16 @@ import { YaMessageBar } from './components/message-bar/message-bar.component';
 import { YaMore } from './components/more/more.component';
 import { YaMultiSelect } from './components/multi-select/multi-select.component';
 import { YaOption } from './components/option/option.component';
+import { YaPageButton } from './components/page-button/page-button.component';
+import { YaPageIconButton } from './components/page-icon-button/page-icon-button.component';
 import { YaProgress } from './components/progress/progress.component';
 import { YaSearchFilter } from './components/search-filter/search-filter.component';
+import { YaSearchFilter2 } from './components/search-filter2/search-filter2.component';
 import { YaSelect } from './components/select/select.component';
 import { YaSidebarNavGroup } from './components/sidebar/sidebar-nav-group.component';
 import { YaSidebarNavItem } from './components/sidebar/sidebar-nav-item.component';
 import { YaTableToggle } from './components/table-toggle/table-toggle.component';
+import { YaTableTop } from './components/table-top/table-top.component';
 import { YaTagSelect } from './components/tag-select/tag-select.component';
 import { YaTextAction } from './components/text-action/text-action.component';
 import { YaTimezoneSelect } from './components/timezone-select/timezone-select.component';
@@ -147,6 +154,7 @@ const sharedComponents = [
   YaBinaryInput,
   YaBreadcrumb,
   YaBreadcrumbTrail,
+  YaButton,
   YaColumnChooser,
   YaDateTimeInput,
   YaDetailPane,
@@ -158,6 +166,8 @@ const sharedComponents = [
   YaEmptyMessage,
   YaErrors,
   YaExpirable,
+  YaFilterInput,
+  YaFilterTextarea,
   YaHelp,
   YaHelpDialog,
   YaHexIntegerInput,
@@ -171,13 +181,17 @@ const sharedComponents = [
   YaMore,
   YaMultiSelect,
   YaOption,
+  YaPageButton,
+  YaPageIconButton,
   YaProgress,
   YaPrintZone,
   YaSearchFilter,
+  YaSearchFilter2,
   YaSelect,
   YaSidebarNavGroup,
   YaSidebarNavItem,
   YaTableToggle,
+  YaTableTop,
   YaTagSelect,
   YaTextAction,
   YaTimezoneSelect,
