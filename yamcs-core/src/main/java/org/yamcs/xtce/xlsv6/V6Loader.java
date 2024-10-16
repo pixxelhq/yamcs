@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 import org.yamcs.YConfiguration;
 import org.yamcs.mdb.ConditionParser;
 import org.yamcs.mdb.JavaExpressionCalibratorFactory;
+import org.yamcs.mdb.Mdb;
 import org.yamcs.mdb.SpreadsheetLoadContext;
 import org.yamcs.mdb.SpreadsheetLoadException;
 import org.yamcs.utils.StringConverter;
@@ -80,6 +81,7 @@ import org.yamcs.xtce.OutputParameter;
 import org.yamcs.xtce.Parameter;
 import org.yamcs.xtce.ParameterEntry;
 import org.yamcs.xtce.ParameterInstanceRef;
+import org.yamcs.xtce.ParameterInstanceRef.InstanceRelativeTo;
 import org.yamcs.xtce.ParameterType;
 import org.yamcs.xtce.PolynomialCalibrator;
 import org.yamcs.xtce.RateInStream;
@@ -101,7 +103,6 @@ import org.yamcs.xtce.TransmissionConstraint;
 import org.yamcs.xtce.TriggerSetType;
 import org.yamcs.xtce.UnitType;
 import org.yamcs.xtce.ValueEnumeration;
-import org.yamcs.mdb.Mdb;
 import org.yamcs.xtce.util.DoubleRange;
 import org.yamcs.xtce.util.NameReference;
 import org.yamcs.xtce.util.NameReference.Type;
@@ -154,7 +155,6 @@ public class V6Loader extends V6LoaderBase {
 
     public V6Loader(YConfiguration config) {
         this(config.getString("file"));
-        enableXtceNameRestrictions = config.getBoolean("enableXtceNameRestrictions", true);
     }
 
     public V6Loader(String filename) {
@@ -1979,6 +1979,7 @@ public class V6Loader extends V6LoaderBase {
                     inputParameterRefs.add(paraRefName);
                     NameReference paramRef = getParameterReference(spaceSystem, paraRefName);
                     final ParameterInstanceRef parameterInstance = new ParameterInstanceRef();
+                    parameterInstance.setRelativeTo(InstanceRelativeTo.PACKET_START_ACROSS_PACKETS);
                     paramRef.addResolvedAction(nd -> {
                         parameterInstance.setParameter((Parameter) nd);
                     });

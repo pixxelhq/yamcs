@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.yamcs</groupId>
 	<artifactId>yamcs</artifactId>
-	<version>5.10.3-Pixxel.SNAPSHOT-3.1.1</version>
+	<version>5.10.4-Pixxel-3.1.1</version>
 	<packaging>pom</packaging>
 
 	<name>Yamcs</name>
@@ -48,7 +48,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<nettyVersion>4.1.94.Final</nettyVersion>
 		<protobufVersion>3.19.6</protobufVersion>
-		<rocksdbVersion>9.4.0.10</rocksdbVersion>
+		<rocksdbVersion>9.4.0.11</rocksdbVersion>
 		<slf4jVersion>2.0.9</slf4jVersion>
 	</properties>
 
@@ -356,7 +356,7 @@
 				<plugin>
 					<groupId>org.yamcs</groupId>
 					<artifactId>yamcs-maven-plugin</artifactId>
-					<version>1.3.2</version>
+					<version>1.3.4</version>
 				</plugin>
 			</plugins>
 		</pluginManagement>
