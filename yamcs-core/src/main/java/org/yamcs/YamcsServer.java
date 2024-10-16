@@ -1117,14 +1117,19 @@ public class YamcsServer {
             }
         });
 
-        Sentry.init(options -> {
-            options.setDsn("https://bbfa57d0760a35f3f30b1bcaef523a5e@o4504519305658368.ingest.us.sentry.io/4507882069360640");
-            // Set tracesSampleRate to 1.0 to capture 100% of transactions for tracing.
-            // We recommend adjusting this value in production.
-            options.setTracesSampleRate(1.0);
-            // When first trying Sentry it's good to see what the SDK is doing:
-            options.setDebug(true);
-        });
+        String sentryDsn = System.getenv("SENTRY_DSN"); // Get the SENTRY_DSN from environment variable
+        if (sentryDsn != null && !sentryDsn.isEmpty()) {
+            Sentry.init(options -> {
+                options.setDsn(sentryDsn);
+                // Set tracesSampleRate to 1.0 to capture 100% of transactions for tracing.
+                // We recommend adjusting this value in production.
+                options.setTracesSampleRate(1.0);
+                // When first trying Sentry it's good to see what the SDK is doing:
+                options.setDebug(true);
+            });
+        } else {
+            LOG.info("Sentry not initialized. SENTRY_DSN environment variable is not set");
+        }
     }
 
     private static void setupDefaultLogging() throws SecurityException, IOException {
