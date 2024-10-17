@@ -21,6 +21,19 @@ export interface MissionDatabaseVersion {
   mdbVersion: MdbVersion[];
 }
 
+export interface MissionDatabaseHistoryRequest {
+  numEntries: number;
+}
+
+export interface MdbHistory {
+  subsystemName: string;
+  historyInfo: HistoryInfo[];
+}
+
+export interface MissionDatabaseHistory {
+  mdbHistory: MdbHistory[];
+}
+
 export interface NameDescription {
   name: string;
   qualifiedName: string;

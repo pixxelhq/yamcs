@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Set;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -134,23 +135,31 @@ public class MdbApi extends AbstractMdbApi<Context> {
         ctx.checkSystemPrivilege(SystemPrivilege.GetMissionDatabaseHistory);
 
         String instance = InstancesApi.verifyInstance(request.getInstance());
+        int numEntries = request.getNumEntries();
         Mdb mdb = MdbFactory.getInstance(instance);
 
         MissionDatabaseHistory.Builder responseb = MissionDatabaseHistory.newBuilder();
         for (Map.Entry<String, List<History>> vm: mdb.getMdbHistory().entrySet()) {
             String ss = vm.getKey();
             List<History> history = vm.getValue();
+            ListIterator<History> historyIterator = history.listIterator(history.size());
 
+            // Fetch the bottom numEntries
             MdbHistory.Builder responsel = MdbHistory.newBuilder().setSubsytemName(ss);
-            for (History his: history) {
+            List<HistoryInfo> hisInfo = new ArrayList<>();
+            while (historyIterator.hasPrevious() && numEntries > 0) {
+                History his = historyIterator.previous();
                 HistoryInfo hi = HistoryInfo.newBuilder()
                                             .setVersion(his.getVersion())
                                             .setDate(his.getDate())
                                             .setAuthor(his.getAuthor())
                                             .setMessage(his.getMessage())
                                             .build();
+                hisInfo.add(hi);
                 responsel.addHistoryInfo(hi);
+                numEntries--;
             }
+
             responseb.addMdbHistory(responsel.build());
         }
         observer.complete(responseb.build());

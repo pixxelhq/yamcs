@@ -189,7 +189,7 @@ message MissionDatabaseVersion {
 message MissionDatabaseHistory {
   message MdbHistory {
     optional string subsytemName = 1;
-    repeated HistoryInfo HistoryInfo = 5;
+    repeated HistoryInfo historyInfo = 5;
   }
   repeated MdbHistory mdbHistory = 1;
 }
@@ -1212,6 +1212,7 @@ message GetMissionDatabaseVersionRequest {
 message GetMissionDatabaseHistoryRequest {
   // Yamcs instance name.
   optional string instance = 1;
+  optional int32 numEntries = 2;
 }
 
 message ExportJavaMissionDatabaseRequest {

@@ -52,5 +52,48 @@
         </dd> 
       </dl>
     }
+    @if (mdbH$ | async; as mdbH) {
+      <dl class="dl-horizontal no-lead">
+        <dt>MDb Changelog History:</dt>
+      </dl>
+      <div *ngFor="let v of mdbH.mdbHistory">
+        <div style="padding-left: 3em;">
+          <dl class="dl-horizontal no-lead">
+            <dt>{{ v.subsytemName }}:</dt>
+          </dl>
+          <table border="1" width="100%">
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th>Date</th>
+                <th>Message</th>
+                <th>Author</th>
+              </tr>
+            </thead>
+            <tbody>
+              <ng-container *ngFor="let history of v.historyInfo">
+                <tr>
+                  <td style="padding-left: 5px;">{{ history.version }}</td>
+                  <td style="padding-left: 5px;">{{ history.date }}</td>
+                  <td style="padding-left: 5px;">
+                    <!-- Handling URL if present -->
+                    <ng-container *ngIf="history.message.includes('http'); else formattedMessage">
+                      <a [href]="getMessageUrl(history.message)" target="_blank">
+                        <span [innerHTML]="formatMessage(history.message.split('http')[0])"></span> View Diff
+                      </a>
+                    </ng-container>
+                    <ng-template #formattedMessage>
+                      <!-- Binding the message with formatted new lines -->
+                      <span [innerHTML]="formatMessage(history.message)"></span>
+                    </ng-template>
+                  </td>
+                  <td style="padding-left: 5px;">{{ history.author }}</td>
+                </tr>
+              </ng-container>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
   </div>
 </app-instance-page>
