@@ -1,5 +1,6 @@
 import { Routes, UrlMatcher, UrlSegment } from '@angular/router';
 import { ExtensionComponent } from '../appbase/extension/extension.component';
+import { extensionMatcher } from '../appbase/extension/extension.matcher';
 import { attachContextGuardFn } from '../core/guards/AttachContextGuard';
 import { authGuardChildFn, authGuardFn } from '../core/guards/AuthGuard';
 import { mayControlCommandQueueGuardFn } from '../core/guards/MayControlCommandQueueGuard';
@@ -15,10 +16,6 @@ import { SendCommandComponent } from './command-sender/send-command/send-command
 import { QueuedCommandsTabComponent } from './queues/queued-commands-tab/queued-commands-tab.component';
 import { QueuesActionLogTabComponent } from './queues/queues-action-log-tab/queues-action-log-tab.component';
 import { QueuesListComponent } from './queues/queues-list/queues-list.component';
-import { StackFilePageDirtyGuard, stackFilePageDirtyGuardFn } from './stacks/stack-file-dirty-guard/stack-file-dirty.guard';
-import { StackFileComponent } from './stacks/stack-file/stack-file.component';
-import { StackFolderComponent } from './stacks/stack-folder/stack-folder.component';
-import { StackPageComponent } from './stacks/stack-page/stack-page.component';
 import { StacksPageComponent } from './stacks/stacks-page/stacks-page.component';
 
 const commandMatcher: UrlMatcher = url => {
@@ -101,33 +98,14 @@ export const ROUTES: Routes = [{
     }]
   }, {
     path: 'stacks',
-    pathMatch: 'full',
-    redirectTo: 'stacks/browse',
-  }, {
-    path: 'stacks/browse',
     component: StacksPageComponent,
-    children: [{
-      path: '**',
-      component: StackFolderComponent,
-    }]
-  }, {
-    path: 'stacks/files',
-    component: StackPageComponent,
-    providers: [
-      StackFilePageDirtyGuard,
-    ],
-    children: [{
-      path: '**',
-      component: StackFileComponent,
-      canDeactivate: [stackFilePageDirtyGuardFn],
-    }]
   }, {
     path: 'ext',
     canActivate: [authGuardFn, attachContextGuardFn],
     canActivateChild: [authGuardChildFn],
     runGuardsAndResolvers: 'always',
     children: [{
-      path: ':extension',
+      matcher: extensionMatcher,
       component: ExtensionComponent,
     }]
   }]

@@ -33,6 +33,7 @@ import org.yamcs.protobuf.Yamcs.Value.Type;
 import org.yamcs.tctm.AbstractTcDataLink;
 import org.yamcs.tctm.ccsds.Cop1Monitor.AlertType;
 import org.yamcs.tctm.ccsds.TcManagedParameters.TcVcManagedParameters;
+import org.yamcs.tctm.pus.tuples.Pair;
 import org.yamcs.tctm.srs3.Srs3FrameFactory;
 import org.yamcs.utils.TimeEncoding;
 import org.yamcs.utils.ValueUtility;
@@ -337,7 +338,7 @@ public class Cop1TcPacketHandler extends AbstractTcDataLink implements VcUplinkH
 
         int dataLength = 0;
         List<PreparedCommand> l = new ArrayList<>();
-
+        List<Pair<byte[], PreparedCommand>> m = new ArrayList<>();
         while ((pc = waitQueue.poll()) != null) {
             if (isBypass(pc)) {
                 sendSingleTc(pc, true);
@@ -359,7 +360,6 @@ public class Cop1TcPacketHandler extends AbstractTcDataLink implements VcUplinkH
             return null;
         }
         TcTransferFrame tf = frameFactory.makeFrame(vmp.vcId, dataLength, l.get(0).getGenerationTime());
-        tf.setCommands(l);
 
         byte[] data = tf.getData();
         int offset = tf.getDataStart();
@@ -380,6 +380,22 @@ public class Cop1TcPacketHandler extends AbstractTcDataLink implements VcUplinkH
                 }
                 return null;
             }
+
+            m.add(new Pair<byte[],PreparedCommand>(binary, pc1));
+        }
+
+        if (m.isEmpty())
+            return null;
+
+        List<PreparedCommand> n = new ArrayList<>();
+        for (Pair<byte[], PreparedCommand> pp: m) {
+            n.add(pp.getSecond());
+        }
+        tf.setCommands(n);
+        
+        for (Pair<byte[], PreparedCommand> b: m) {
+            byte[] binary = b.getFirst();
+            int length = binary.length;
             System.arraycopy(binary, 0, data, offset, length);
             offset += length;
         }

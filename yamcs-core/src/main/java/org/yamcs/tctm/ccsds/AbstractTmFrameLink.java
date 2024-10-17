@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.yamcs.ConfigurationException;
-import org.yamcs.tctm.pus.tuples.Quattro;
+import org.yamcs.tctm.pus.tuples.Penta;
 import org.yamcs.Spec;
 import org.yamcs.Spec.OptionType;
 import org.yamcs.StandardTupleDefinitions;
@@ -40,7 +40,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
     protected RawFrameEnDec rawFrameDecoder;
 
     // Redirection
-    Map<byte[], Quattro<Integer, Integer, Stream, String>> redirection;  // offset, size, stream
+    Map<byte[], Penta<Integer, Integer, Stream, String, String>> redirection;  // offset, size, stream
     protected Map<String, AtomicLong> redirectionCounters = new HashMap<>();
 
     // srs3
@@ -133,9 +133,10 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                 int size = yc.getInt("size");
                 Stream stream = ydb.getStream(yc.getString("stream"));
                 String rName = yc.getString("name");
+                String rLink = yc.getString("link", null);
 
                 redirectionCounters.put(rName, new AtomicLong(0));
-                redirection.put(header, new Quattro<>(offset, size, stream, rName));
+                redirection.put(header, new Penta<>(offset, size, stream, rName, rLink));
             }
         }
 
@@ -201,19 +202,23 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
             }
 
             if (redirection != null) {
-                for(Map.Entry<byte[], Quattro<Integer, Integer, Stream, String>> mc: redirection.entrySet()) {
-                    Quattro<Integer, Integer, Stream, String> value = mc.getValue();
+                for(Map.Entry<byte[], Penta<Integer, Integer, Stream, String, String>> mc: redirection.entrySet()) {
+                    Penta<Integer, Integer, Stream, String, String> value = mc.getValue();
 
                     int roffset = value.getFirst();
                     int rsize = value.getSecond();
                     Stream rstream = value.getThird();
                     String rName = value.getFourth();
+                    String rLink = value.getFifth();
+
+                    // Set linkName via the config if present
+                    String ll = rLink != null? rLink: linkName;
 
                     byte[] contention = Arrays.copyOfRange(data, offset + roffset, offset + roffset + rsize);
                     if (Arrays.equals(mc.getKey(), contention)) {
                         data = Arrays.copyOfRange(data, offset + stripHeader, offset + length);
-                        Tuple t = new Tuple(StandardTupleDefinitions.TM, new Object[] { null, null, timeService.getMissionTime(), null,
-                                                data, timeService.getHresMissionTime(), null, linkName, null});
+                        Tuple t = new Tuple(StandardTupleDefinitions.TM, new Object[] {timeService.getMissionTime(), 0, timeService.getMissionTime(), 0,
+                                                data, timeService.getHresMissionTime(), null, ll, null});
                         rstream.emitTuple(t);
 
                         // Update redirection counter

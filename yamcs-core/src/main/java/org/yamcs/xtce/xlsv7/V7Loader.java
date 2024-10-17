@@ -1,8 +1,5 @@
 package org.yamcs.xtce.xlsv7;
 
-import static org.yamcs.mdb.Mdb.YAMCS_CMDARG_SPACESYSTEM_NAME;
-import static org.yamcs.mdb.Mdb.YAMCS_CMDHIST_SPACESYSTEM_NAME;
-import static org.yamcs.mdb.Mdb.YAMCS_CMD_SPACESYSTEM_NAME;
 import static org.yamcs.xtce.XtceDb.YAMCS_CMDARG_SPACESYSTEM_NAME;
 import static org.yamcs.xtce.XtceDb.YAMCS_CMDHIST_SPACESYSTEM_NAME;
 import static org.yamcs.xtce.XtceDb.YAMCS_CMD_SPACESYSTEM_NAME;
@@ -108,6 +105,7 @@ import org.yamcs.xtce.OutputParameter;
 import org.yamcs.xtce.Parameter;
 import org.yamcs.xtce.ParameterEntry;
 import org.yamcs.xtce.ParameterInstanceRef;
+import org.yamcs.xtce.ParameterInstanceRef.InstanceRelativeTo;
 import org.yamcs.xtce.ParameterType;
 import org.yamcs.xtce.PathElement;
 import org.yamcs.xtce.PolynomialCalibrator;
@@ -204,7 +202,6 @@ public class V7Loader extends V7LoaderBase {
 
     public V7Loader(YConfiguration config) {
         this(config.getString("file"));
-        enableXtceNameRestrictions = config.getBoolean("enableXtceNameRestrictions", true);
     }
 
     public V7Loader(String filename) {
@@ -743,7 +740,7 @@ public class V7Loader extends V7LoaderBase {
             memberList = parseAggregateExpr(engtype);
         } catch (org.yamcs.utils.parser.ParseException e) {
             throw new SpreadsheetLoadException(ctx,
-                    "Cannot parse aggregate type '" + engtype+"'");
+                    "Cannot parse aggregate type '" + engtype + "'");
         }
         for (AggrMember m : memberList) {
             validateNameType(m.name());
@@ -2163,6 +2160,7 @@ public class V7Loader extends V7LoaderBase {
                         algorithm.setScope(Algorithm.Scope.COMMAND_VERIFICATION);
                     }
                     final ParameterInstanceRef parameterInstance = new ParameterInstanceRef();
+                    parameterInstance.setRelativeTo(InstanceRelativeTo.PACKET_START_ACROSS_PACKETS);
 
                     if (refName.startsWith(YAMCS_CMDARG_SPACESYSTEM_NAME)) {
                         // make a temporary parameter. The algorithm will be duplicated for each command and the

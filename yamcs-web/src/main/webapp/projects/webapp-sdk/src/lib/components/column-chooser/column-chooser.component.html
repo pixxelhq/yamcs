@@ -1,6 +1,10 @@
-<button [matMenuTriggerFor]="colMenu" class="ya-button">
-  Columns <mat-icon class="icon12">arrow_drop_down</mat-icon>
-</button>
+<ya-button
+  [matMenuTriggerFor]="colMenu"
+  [appearance]="appearance()"
+  [icon]="icon()"
+  dropdown="true">
+  Columns
+</ya-button>
 
 <mat-menu #colMenu="matMenu" yPosition="below" class="ya-menu" [overlapTrigger]="false">
   <ng-template matMenuContent>

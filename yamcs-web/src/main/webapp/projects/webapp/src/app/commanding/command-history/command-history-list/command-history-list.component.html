@@ -3,26 +3,20 @@
     Command history &nbsp;&nbsp;&nbsp;
 
     @if (!(dataSource.streaming$ | async)) {
-      <button mat-button color="primary" (click)="startStreaming()">
-        <mat-icon>play_arrow</mat-icon>
-        Start streaming
-      </button>
+      <ya-page-button (click)="startStreaming()" icon="play_arrow">Start streaming</ya-page-button>
     }
 
     @if (dataSource.streaming$ | async) {
-      <button
-        mat-button
-        matTooltip="Pause streaming commands"
-        color="primary"
-        (click)="stopStreaming()">
-        <mat-icon>pause</mat-icon>
+      <ya-page-button matTooltip="Pause streaming commands" (click)="stopStreaming()" icon="pause">
         Stop streaming
-      </button>
+      </ya-page-button>
     }
 
-    <button mat-button matTooltip="Jump to now" color="primary" class="icon" (click)="jumpToNow()">
-      <mat-icon>refresh</mat-icon>
-    </button>
+    <ya-page-icon-button
+      matTooltip="Jump to now"
+      color="primary"
+      (click)="jumpToNow()"
+      icon="refresh" />
   </app-instance-toolbar>
 
   <ya-detail-pane>
@@ -34,12 +28,11 @@
           <br />
           <mat-divider />
           <br />
-          <button
-            class="ya-button"
+          <ya-button
             [routerLink]="'/commanding/send' + selectedRecord?.commandName"
             [queryParams]="{ c: yamcs.context, template: selectedRecord?.id }">
             Resend
-          </button>
+          </ya-button>
         }
         <p>&nbsp;</p>
       </div>
@@ -59,14 +52,15 @@
             <div style="flex: 1 1 auto"></div>
 
             @if (showCommandExports()) {
-              <button
-                class="ya-button primary"
-                style="margin-right: 0"
+              <ya-button
+                appearance="primary"
+                class="no-margin"
                 [matMenuTriggerFor]="exportMenu"
-                [disabled]="!(dataSource.records$ | async)?.length">
-                <mat-icon>download</mat-icon>
-                Export ▾
-              </button>
+                [disabled]="!(dataSource.records$ | async)?.length"
+                dropdown="true"
+                icon="download">
+                Export
+              </ya-button>
             }
 
             <mat-menu
@@ -98,7 +92,7 @@
               }
             </ya-select>
             <ya-select icon="access_time" formControlName="interval">
-              <ya-option id="" label="Last hour" />
+              <ya-option id="PT1H" label="Last hour" />
               <ya-option id="PT6H" label="Last 6 hours" />
               <ya-option id="P1D" label="Last 24 hours" />
               <ya-option id="NO_LIMIT" label="No limit" />
@@ -107,15 +101,12 @@
             @if (filterForm.value["interval"] === "CUSTOM") {
               <ya-date-time-input formControlName="customStart" />
               <ya-date-time-input formControlName="customStop" />
-              <button
-                (click)="applyCustomDates()"
-                class="ya-button"
-                [disabled]="filterForm.invalid">
+              <ya-button (click)="applyCustomDates()" [disabled]="filterForm.invalid">
                 Apply
-              </button>
+              </ya-button>
             }
             @if (filterForm.value["interval"] !== "CUSTOM") {
-              <button class="ya-button" (click)="jumpToNow()">Jump to now</button>
+              <ya-button (click)="jumpToNow()">Jump to now</ya-button>
             }
 
             @if (dataSource.loading$ | async) {
@@ -125,7 +116,7 @@
             @if (dataSource.streaming$ | async) {
               <div style="text-align: right; flex: 1 1 150px">
                 Listening for commands
-                <ya-dots fontSize="16px" color="#1b61b9" />
+                <ya-dots fontSize="16px" />
               </div>
             }
           </div>
@@ -456,9 +447,9 @@
 
         <mat-toolbar>
           <span style="flex: 1 1 auto"></span>
-          <button [disabled]="!dataSource.hasMore()" class="ya-button" (click)="loadMoreData()">
-            Load More
-          </button>
+          <ya-button [disabled]="!dataSource.hasMore()" (click)="loadMoreData()">
+            Load more
+          </ya-button>
           <span style="flex: 1 1 auto"></span>
         </mat-toolbar>
       </div>

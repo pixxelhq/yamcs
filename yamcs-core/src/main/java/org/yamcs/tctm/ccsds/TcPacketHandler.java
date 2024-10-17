@@ -11,6 +11,7 @@ import org.yamcs.ConfigurationException;
 import org.yamcs.commanding.PreparedCommand;
 import org.yamcs.tctm.AbstractTcDataLink;
 import org.yamcs.tctm.ccsds.TcManagedParameters.TcVcManagedParameters;
+import org.yamcs.tctm.pus.tuples.Pair;
 import org.yamcs.tctm.srs3.Srs3FrameFactory;
 import org.yamcs.utils.TimeEncoding;
 
@@ -88,6 +89,7 @@ public class TcPacketHandler extends AbstractTcDataLink implements VcUplinkHandl
 
         int dataLength = 0;
         List<PreparedCommand> l = new ArrayList<>();
+        List<Pair<byte[], PreparedCommand>> m = new ArrayList<>();
         PreparedCommand pc;
         while ((pc = commandQueue.peek()) != null) {
             int pcLength = cmdPostProcessor.getBinaryLength(pc);
@@ -111,7 +113,6 @@ public class TcPacketHandler extends AbstractTcDataLink implements VcUplinkHandl
         }
         TcTransferFrame tf = frameFactory.makeFrame(vmp.vcId, dataLength);
         tf.setBypass(true);
-        tf.setCommands(l);
 
         byte[] data = tf.getData();
         int offset = tf.getDataStart();
@@ -120,6 +121,31 @@ public class TcPacketHandler extends AbstractTcDataLink implements VcUplinkHandl
             if (binary == null) {
                 continue;
             }
+            int length = binary.length;
+            if (offset + length > data.length) {
+                log.error("TC of length " + length + " does not fit into the frame of length " + data.length
+                        + " at offset " + offset);
+                if (length != cmdPostProcessor.getBinaryLength(pc1)) {
+                    log.error(
+                            "Command postprocessor {} getBinaryLength() returned {} but the binary command length returned by process() is {}",
+                            cmdPostProcessor.getClass().getName(), cmdPostProcessor.getBinaryLength(pc1), length);
+                }
+                return null;
+            }
+            m.add(new Pair<byte[],PreparedCommand>(binary, pc1));
+        }
+
+        if (m.isEmpty())
+            return null;
+
+        List<PreparedCommand> n = new ArrayList<>();
+        for (Pair<byte[], PreparedCommand> pp: m) {
+            n.add(pp.getSecond());
+        }
+        tf.setCommands(n);
+
+        for (Pair<byte[], PreparedCommand> b: m) {
+            byte[] binary = b.getFirst();
             int length = binary.length;
             System.arraycopy(binary, 0, data, offset, length);
             offset += length;
