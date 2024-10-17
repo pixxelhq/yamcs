@@ -22,6 +22,7 @@ import org.yamcs.xtce.EnumeratedArgumentType;
 import org.yamcs.xtce.EnumeratedParameterType;
 import org.yamcs.xtce.FloatArgumentType;
 import org.yamcs.xtce.FloatParameterType;
+import org.yamcs.xtce.History;
 import org.yamcs.xtce.IntegerArgumentType;
 import org.yamcs.xtce.IntegerParameterType;
 import org.yamcs.xtce.NameDescription;
@@ -44,6 +45,7 @@ public class Mdb extends XtceDb {
     final Map<String, SpaceSystemWriter> subsystemWriters;
 
     Map<String, String> mdbVersion = new HashMap<>();
+    Map<String, List<History>> mdbHistory = new HashMap<>();
 
     public Mdb(SpaceSystem spaceSystem, Map<String, SpaceSystemWriter> susbsystemWriters) {
         super(spaceSystem);
@@ -51,35 +53,47 @@ public class Mdb extends XtceDb {
             // writer for the /yamcs doesn't write to disk
         });
         this.subsystemWriters = susbsystemWriters;
-        populateMdbVersion(spaceSystem);
+        populateMdbHistoryAndVersion(spaceSystem);
     }
 
     public Map<String, String> getMdbVersion() {
         return mdbVersion;
     }
 
-    public void populateMdbVersion(SpaceSystem spaceSystem) {
+    public Map<String, List<History>> getMdbHistory() {
+        return mdbHistory;
+    }
+
+    public void populateMdbHistoryAndVersion(SpaceSystem spaceSystem) {
         if (spaceSystem == null)
             return;
 
         String version, name;
+        List<History> history;
+
         if (spaceSystem.getHeader() != null) {
             version = spaceSystem.getHeader().getVersion();
+            history = spaceSystem.getHeader().getHistoryList();
             name = spaceSystem.getName();
+
             if (version != null)
                 mdbVersion.put(name, version);
+            if (history != null)
+                mdbHistory.put(name, history);
         }
 
         for (SpaceSystem ss: spaceSystem.getSubSystems()) {
             if (ss.getHeader() != null) {
                 version = ss.getHeader().getVersion();
                 name = ss.getName();
+                history = ss.getHeader().getHistoryList();
+
                 if (version != null)
                     mdbVersion.put(name, version);
-                
+                if (history != null)
+                    mdbHistory.put(name, history);
             }
-
-            populateMdbVersion(ss);
+            populateMdbHistoryAndVersion(ss);
         }
     }
 

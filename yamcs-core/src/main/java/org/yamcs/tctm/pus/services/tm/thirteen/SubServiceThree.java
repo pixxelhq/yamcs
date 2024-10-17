@@ -34,8 +34,8 @@ public class SubServiceThree implements PusSubService {
 
         byte[] dataField = pkt.getDataField();
         
-        int largePacketTransactionId = (int) ByteArrayUtils.decodeCustomInteger(dataField, 0, ServiceThirteen.largePacketTransactionIdSize);
-        int partSequenceNumber = (int) ByteArrayUtils.decodeCustomInteger(dataField, ServiceThirteen.largePacketTransactionIdSize, ServiceThirteen.partSequenceNumberSize);
+        long largePacketTransactionId = (int) ByteArrayUtils.decodeCustomInteger(dataField, 0, ServiceThirteen.largePacketTransactionIdSize);
+        long partSequenceNumber = (int) ByteArrayUtils.decodeCustomInteger(dataField, ServiceThirteen.largePacketTransactionIdSize, ServiceThirteen.partSequenceNumberSize);
         byte[] filePart = Arrays.copyOfRange(dataField, ServiceThirteen.largePacketTransactionIdSize + ServiceThirteen.partSequenceNumberSize, dataField.length);
         String packetType = PacketType.LAST.getText();
 

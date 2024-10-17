@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Set;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -39,6 +40,7 @@ import org.yamcs.protobuf.Mdb.AlgorithmInfo;
 import org.yamcs.protobuf.Mdb.BatchGetParametersRequest;
 import org.yamcs.protobuf.Mdb.BatchGetParametersResponse;
 import org.yamcs.protobuf.Mdb.BatchGetParametersResponse.GetParameterResponse;
+import org.yamcs.protobuf.Mdb.MissionDatabaseHistory.MdbHistory;
 import org.yamcs.protobuf.Mdb.MissionDatabaseVersion.MdbVersion;
 import org.yamcs.protobuf.Mdb.CommandInfo;
 import org.yamcs.protobuf.Mdb.ContainerInfo;
@@ -50,11 +52,13 @@ import org.yamcs.protobuf.Mdb.ExportXtceRequest;
 import org.yamcs.protobuf.Mdb.GetAlgorithmRequest;
 import org.yamcs.protobuf.Mdb.GetCommandRequest;
 import org.yamcs.protobuf.Mdb.GetContainerRequest;
+import org.yamcs.protobuf.Mdb.GetMissionDatabaseHistoryRequest;
 import org.yamcs.protobuf.Mdb.GetMissionDatabaseRequest;
 import org.yamcs.protobuf.Mdb.GetMissionDatabaseVersionRequest;
 import org.yamcs.protobuf.Mdb.GetParameterRequest;
 import org.yamcs.protobuf.Mdb.GetParameterTypeRequest;
 import org.yamcs.protobuf.Mdb.GetSpaceSystemRequest;
+import org.yamcs.protobuf.Mdb.HistoryInfo;
 import org.yamcs.protobuf.Mdb.ListAlgorithmsRequest;
 import org.yamcs.protobuf.Mdb.ListAlgorithmsResponse;
 import org.yamcs.protobuf.Mdb.ListCommandsRequest;
@@ -68,6 +72,7 @@ import org.yamcs.protobuf.Mdb.ListParametersResponse;
 import org.yamcs.protobuf.Mdb.ListSpaceSystemsRequest;
 import org.yamcs.protobuf.Mdb.ListSpaceSystemsResponse;
 import org.yamcs.protobuf.Mdb.MissionDatabase;
+import org.yamcs.protobuf.Mdb.MissionDatabaseHistory;
 import org.yamcs.protobuf.Mdb.MissionDatabaseItem;
 import org.yamcs.protobuf.Mdb.MissionDatabaseVersion;
 import org.yamcs.protobuf.Mdb.ParameterInfo;
@@ -91,6 +96,7 @@ import org.yamcs.xtce.ContainerEntry;
 import org.yamcs.xtce.DataSource;
 import org.yamcs.xtce.EnumeratedParameterType;
 import org.yamcs.xtce.FloatParameterType;
+import org.yamcs.xtce.History;
 import org.yamcs.xtce.IntegerParameterType;
 import org.yamcs.xtce.MetaCommand;
 import org.yamcs.xtce.NameDescription;
@@ -123,6 +129,43 @@ public class MdbApi extends AbstractMdbApi<Context> {
         observer.complete(converted);
     }
 
+    @Override
+    public void getMissionDatabaseHistory(Context ctx, GetMissionDatabaseHistoryRequest request,
+            Observer<MissionDatabaseHistory> observer) {
+        ctx.checkSystemPrivilege(SystemPrivilege.GetMissionDatabaseHistory);
+
+        String instance = InstancesApi.verifyInstance(request.getInstance());
+        int numEntries = request.getNumEntries();
+        Mdb mdb = MdbFactory.getInstance(instance);
+
+        MissionDatabaseHistory.Builder responseb = MissionDatabaseHistory.newBuilder();
+        for (Map.Entry<String, List<History>> vm: mdb.getMdbHistory().entrySet()) {
+            String ss = vm.getKey();
+            List<History> history = vm.getValue();
+            ListIterator<History> historyIterator = history.listIterator(history.size());
+
+            // Fetch the bottom numEntries
+            MdbHistory.Builder responsel = MdbHistory.newBuilder().setSubsytemName(ss);
+            List<HistoryInfo> hisInfo = new ArrayList<>();
+            while (historyIterator.hasPrevious() && numEntries > 0) {
+                History his = historyIterator.previous();
+                HistoryInfo hi = HistoryInfo.newBuilder()
+                                            .setVersion(his.getVersion())
+                                            .setDate(his.getDate())
+                                            .setAuthor(his.getAuthor())
+                                            .setMessage(his.getMessage())
+                                            .build();
+                hisInfo.add(hi);
+                responsel.addHistoryInfo(hi);
+                numEntries--;
+            }
+
+            responseb.addMdbHistory(responsel.build());
+        }
+        observer.complete(responseb.build());
+    }
+
+    @Override
     public void getMissionDatabaseVersion(Context ctx, GetMissionDatabaseVersionRequest request,
             Observer<MissionDatabaseVersion> observer) {
         ctx.checkSystemPrivilege(SystemPrivilege.GetMissionDatabaseVersion);
