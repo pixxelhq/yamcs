@@ -1,5 +1,6 @@
 package org.yamcs.tctm.ccsds;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -95,6 +96,18 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
             }
             lastFrameSeq = frame.getVcFrameSeq();
             idleFrameCount++;
+
+            // Set Earth Reception time
+            ertime = frame.getEarthRceptionTime();
+            if (isIdleVcid) {
+                /*
+                 * Do not attempt to parse the idle frames through the packetDecoders
+                 * Instead, directly send it to the handlePacket func
+                 */
+                int frameHeaderLength = 6;
+                handlePacket(Arrays.copyOfRange(frame.getData(), frame.getDataStart() - frameHeaderLength, frame.getDataEnd()));
+            }
+
             return;
         }
 
@@ -237,7 +250,10 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
             log.trace("VC {}, SEQ {} decoded packet of length {}", vmp.vcId, lastFrameSeq, p.length);
         }
 
-        numPackets++;
+        // Increment only for non-idle vcId's
+        if (!isIdleVcid)
+            numPackets++;
+
         TmPacket pwt = new TmPacket(timeService.getMissionTime(), p);
         pwt.setEarthReceptionTime(ertime);
 
