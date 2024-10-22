@@ -41,13 +41,13 @@ public class SubServiceEight implements PusSubService {
 
         try {
             eventProducer.sendCritical(TC_COMPLETION_EXECUTION_FAILED,
-                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + ServiceOne.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: "
+                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + PusTmManager.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: "
                         + tcCcsdsSeqCount
                         + ") has failed to complete execution | Error Code: " + ServiceOne.FailureCode.fromValue((int) errorCode).toString()
             );
         } catch (Exception e) {
             eventProducer.sendCritical(TC_COMPLETION_EXECUTION_FAILED,
-                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + ServiceOne.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: "
+                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + PusTmManager.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: "
                         + tcCcsdsSeqCount
                         + ") has failed to complete execution | Error Code: " + errorCode + " (No enumeration found)"
             );

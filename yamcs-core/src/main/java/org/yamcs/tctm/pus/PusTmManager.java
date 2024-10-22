@@ -46,6 +46,41 @@ import org.yamcs.tctm.pus.services.tm.thirteen.ServiceThirteen;
 
 
 public class PusTmManager extends AbstractYamcsService implements StreamSubscriber {
+    public enum CcsdsApid {
+        GROUND(0),
+        AOCS(3),
+        PROPULSION(4),
+        SBAND(6),
+        XBAND(7),
+        EPS(12),
+        AVIONICS(13),
+        THERMAL(24),
+        PAYLOAD(48),
+        FSW_OBC(96),
+        FSW_ARBITRATOR(97),
+        FSW_TIC(98),
+        IDLE(127);
+
+        private final int value;
+
+        CcsdsApid(int value) {
+            this.value = value;
+        }
+
+        public static CcsdsApid fromValue(int value) {
+            for (CcsdsApid enumValue : CcsdsApid.values()) {
+                if (enumValue.value == value) {
+                    return enumValue;
+                }
+            }
+            return null;
+        }
+
+        public int getValue() {
+            return value;
+        }
+    }
+
     Log log;
     String yamcsInstance;
 

@@ -41,13 +41,13 @@ public class SubServiceTwo implements PusSubService {
 
         try {
             eventProducer.sendCritical(TC_ACCEPTANCE_FAILED,
-                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + ServiceOne.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: "
+                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + PusTmManager.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: "
                         + tcCcsdsSeqCount
                         + ") has been rejected | Error Code: " + ServiceOne.FailureCode.fromValue((int) errorCode).toString()
             );
         } catch (Exception e) {
             eventProducer.sendCritical(TC_ACCEPTANCE_FAILED,
-                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + ServiceOne.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: "
+                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + PusTmManager.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: "
                         + tcCcsdsSeqCount
                         + ") has been rejected | Error Code: " + errorCode + " (No enumeration found)"
             );

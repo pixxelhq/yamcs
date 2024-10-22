@@ -35,7 +35,7 @@ public class SubServiceOne implements PusSubService {
             return null;
 
         eventProducer.sendInfo(TC_ACCEPTANCE_SUCCESS,
-                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + ServiceOne.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: " + tcCcsdsSeqCount + ") has been accepted");
+                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + PusTmManager.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: " + tcCcsdsSeqCount + ") has been accepted");
         
         ArrayList<TmPacket> pktList = new ArrayList<>();
         pktList.add(tmPacket);

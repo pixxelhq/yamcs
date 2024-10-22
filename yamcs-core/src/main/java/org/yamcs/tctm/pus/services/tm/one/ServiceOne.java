@@ -14,42 +14,6 @@ import org.yamcs.tctm.pus.services.tm.PusTmCcsdsPacket;
 
 public class ServiceOne implements PusService {
 
-    public enum CcsdsApid {
-        GROUND(0),
-        AOCS(3),
-        PROPULSION(4),
-        SBAND(6),
-        XBAND(7),
-        EPS(12),
-        AVIONICS(13),
-        THERMAL(24),
-        PAYLOAD(48),
-        FSW_OBC(96),
-        FSW_ARBITRATOR(97),
-        FSW_TIC(98),
-        IDLE(127);
-
-        private final int value;
-
-        CcsdsApid(int value) {
-            this.value = value;
-        }
-
-        public static CcsdsApid fromValue(int value) {
-            for (CcsdsApid enumValue : CcsdsApid.values()) {
-                if (enumValue.value == value) {
-                    return enumValue;
-                }
-            }
-            return null;
-        }
-
-        public int getValue() {
-            return value;
-        }
-    }
-
-
     protected enum FailureCode {
         BUTLER_TC_EXC_STATUS_SUCCESS(0),
         BUTLER_TC_EXC_STATUS_NULL_PTR_DETECTED(1),

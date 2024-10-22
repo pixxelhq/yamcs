@@ -14,6 +14,7 @@ import org.yamcs.cmdhistory.CommandHistoryPublisher.AckStatus;
 import org.yamcs.commanding.PreparedCommand;
 import org.yamcs.protobuf.Commanding.CommandId;
 import org.yamcs.tctm.CommandPostprocessor;
+import org.yamcs.tctm.pus.PusTmManager.CcsdsApid;
 import org.yamcs.tctm.pus.services.tc.PusTcCcsdsPacket;
 import org.yamcs.time.TimeService;
 import org.yamcs.utils.TimeEncoding;
@@ -78,7 +79,7 @@ public class PusCommandPostprocessor implements CommandPostprocessor {
             commandHistoryListener.publish(
                 pc.getCommandId(),
                 CommandHistoryPublisher.Timetagged_CommandApid_KEY,
-                pc.getSignedIntegerAttribute(CommandHistoryPublisher.Timetagged_CommandApid_KEY)
+                CcsdsApid.fromValue(pc.getSignedIntegerAttribute(CommandHistoryPublisher.Timetagged_CommandApid_KEY)).name()
             );
             commandHistoryListener.publish(
                 pc.getCommandId(),
@@ -100,7 +101,7 @@ public class PusCommandPostprocessor implements CommandPostprocessor {
         commandHistoryListener.publish(
             pc.getCommandId(),
             CommandHistoryPublisher.Apid_KEY,
-            PusTcCcsdsPacket.getAPID(pc.getBinary())
+            CcsdsApid.fromValue(PusTcCcsdsPacket.getAPID(pc.getBinary())).name()
         );
         commandHistoryListener.publish(
             pc.getCommandId(),
