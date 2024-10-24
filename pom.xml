@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.yamcs</groupId>
 	<artifactId>yamcs</artifactId>
-	<version>5.10.4-Pixxel-3.4.1</version>
+	<version>5.10.4-Pixxel-3.6.0</version>
 	<packaging>pom</packaging>
 
 	<name>Yamcs</name>
