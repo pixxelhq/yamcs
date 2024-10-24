@@ -52,6 +52,7 @@ export class MultipleParameterTableComponent implements OnInit, OnChanges, OnDes
     'severity',
     'name',
     'generationTime',
+    'receptionTime',
     'rawValue',
     'engValue',
     'acquisitionStatus',
