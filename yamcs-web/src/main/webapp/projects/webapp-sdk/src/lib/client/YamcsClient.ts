@@ -1164,6 +1164,11 @@ export default class YamcsClient implements HttpHandler {
     return url + this.queryString(options);
   }
 
+  getPacketsDownloadCsvURL(instance: string, options: DownloadPacketsOptions = {}) {
+    const url = `${this.apiUrl}/archive/${instance}/packets:exportCsv`;
+    return url + this.queryString(options);
+  }
+
   getPacketDownloadURL(instance: string, pname: string, gentime: string, seqnum: number) {
     const encodedName = encodeURIComponent(pname);
     return `${this.apiUrl}/archive/${instance}/packets/${encodedName}/${gentime}/${seqnum}:export`;

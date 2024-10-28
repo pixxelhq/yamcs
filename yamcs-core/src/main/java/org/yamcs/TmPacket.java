@@ -1,8 +1,5 @@
 package org.yamcs;
 
-import java.util.ArrayList;
-
-import org.apache.commons.lang3.tuple.Pair;
 import org.yamcs.archive.XtceTmRecorder;
 import org.yamcs.time.Instant;
 import org.yamcs.utils.TimeEncoding;
