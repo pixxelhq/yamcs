@@ -2,6 +2,9 @@ package org.yamcs.http.api;
 
 import static org.yamcs.StandardTupleDefinitions.GENTIME_COLUMN;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -11,6 +14,8 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import org.yamcs.Processor;
 import org.yamcs.ProcessorConfig;
@@ -52,6 +57,7 @@ import org.yamcs.protobuf.TmPacketData;
 import org.yamcs.protobuf.Yamcs.NamedObjectId;
 import org.yamcs.security.ObjectPrivilegeType;
 import org.yamcs.security.User;
+import org.yamcs.utils.StringConverter;
 import org.yamcs.utils.TimeEncoding;
 import org.yamcs.utils.ValueUtility;
 import org.yamcs.xtce.SequenceContainer;
@@ -67,6 +73,9 @@ import org.yamcs.yarch.protobuf.Db.Event;
 import com.google.common.collect.BiMap;
 import com.google.gson.Gson;
 import com.google.protobuf.ByteString;
+
+import com.csvreader.CsvWriter;
+import com.google.protobuf.util.Timestamps;
 
 public class PacketsApi extends AbstractPacketsApi<Context> {
 
@@ -593,6 +602,125 @@ public class PacketsApi extends AbstractPacketsApi<Context> {
         public String encodeAsString() {
             String json = new Gson().toJson(this);
             return Base64.getUrlEncoder().withoutPadding().encodeToString(json.getBytes());
+        }
+    }
+
+    @Override
+    public void listPacketsCsv(Context ctx, ListPacketsRequest request, Observer<HttpBody> observer) {
+        String instance = InstancesApi.verifyInstance(request.getInstance());
+        boolean desc = !request.getOrder().equals("asc");
+
+        ctx.checkObjectPrivileges(ObjectPrivilegeType.ReadPacket, request.getNameList());
+        Set<String> nameSet = new HashSet<>(request.getNameList());
+        if (nameSet.isEmpty()) {
+            nameSet.addAll(getTmPacketNames(instance, ctx.user));
+        }
+
+        SqlBuilder sqlb = new SqlBuilder(XtceTmRecorder.TABLE_NAME);
+
+        if (request.hasStart()) {
+            sqlb.whereColAfterOrEqual(GENTIME_COLUMN, request.getStart());
+        }
+        if (request.hasStop()) {
+            sqlb.whereColBefore(GENTIME_COLUMN, request.getStop());
+        }
+
+        if (!nameSet.isEmpty()) {
+            sqlb.whereColIn("pname", nameSet);
+        }
+        if (request.hasLink()) {
+            sqlb.where("link = ?", request.getLink());
+        }
+
+        sqlb.descend(desc);
+        String sql = sqlb.toString();
+
+        char delimiter = ',';
+
+        CsvPacketStreamer streamer = new CsvPacketStreamer(ctx, observer, delimiter);
+        StreamFactory.stream(instance, sql, sqlb.getQueryArguments(), streamer);
+    }
+
+
+    private static class CsvPacketStreamer implements StreamSubscriber {
+        Context ctx;
+        Observer<HttpBody> observer;
+        char columnDelimiter;
+
+        CsvPacketStreamer(Context ctx, Observer<HttpBody> observer, char columnDelimiter) {
+            this.ctx = ctx;
+            this.observer = observer;
+            this.columnDelimiter = columnDelimiter;
+
+            String[] rec = new String[13];
+            int i = 0;
+            rec[i++] = "Packet Name";
+            rec[i++] = "Generation Time";
+            rec[i++] = "Earth Reception Time";
+            rec[i++] = "Reception";
+            rec[i++] = "Sequence Number";
+            rec[i++] = "Link";
+            rec[i++] = "Size";
+            rec[i++] = "Packet";
+
+            String dateString = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new Date());
+            String filename = "packets_" + dateString + ".csv";
+
+            HttpBody metadata = HttpBody.newBuilder()
+                    .setContentType(MediaType.CSV.toString())
+                    .setFilename(filename)
+                    .setData(toByteString(rec))
+                    .build();
+
+            observer.next(metadata);
+        }
+
+        @Override
+        public void onTuple(Stream stream, Tuple tuple) {
+            if (observer.isCancelled()) {
+                stream.close();
+                return;
+            }
+
+            TmPacketData pdata = GPBHelper.tupleToTmPacketData(tuple);
+            if (!ctx.user.hasObjectPrivilege(ObjectPrivilegeType.ReadPacket, pdata.getId().getName())) {
+                return;
+            }
+
+            String[] rec = new String[8];
+            int i = 0;
+            rec[i++] = pdata.getId().getName();
+            rec[i++] = Timestamps.toString(pdata.getGenerationTime());
+            rec[i++] = Timestamps.toString(pdata.getEarthReceptionTime());
+            rec[i++] = Timestamps.toString(pdata.getReceptionTime());
+            rec[i++] = String.valueOf(pdata.getSequenceNumber());
+            rec[i++] = pdata.getLink();
+            rec[i++] = String.valueOf(pdata.getSize());
+            rec[i++] = StringConverter.arrayToHexString(pdata.getPacket().toByteArray());
+
+            HttpBody body = HttpBody.newBuilder()
+                    .setData(toByteString(rec))
+                    .build();
+            observer.next(body);
+        }
+
+        private ByteString toByteString(String[] rec) {
+            ByteString.Output bout = ByteString.newOutput();
+            CsvWriter writer = new CsvWriter(bout, columnDelimiter, StandardCharsets.UTF_8);
+            try {
+                writer.writeRecord(rec);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            } finally {
+                writer.close();
+            }
+
+            return bout.toByteString();
+        }
+
+        @Override
+        public void streamClosed(Stream stream) {
+            observer.complete();
         }
     }
 }

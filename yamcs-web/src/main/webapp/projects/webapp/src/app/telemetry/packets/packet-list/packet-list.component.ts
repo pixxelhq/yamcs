@@ -76,6 +76,7 @@ export class PacketListComponent {
   ];
 
   downloadURL$ = new BehaviorSubject<string | null>(null);
+  downloadURLCsv$ = new BehaviorSubject<string | null>(null);
 
   // Would prefer to use formGroup, but when using valueChanges this
   // only is updated after the callback...
@@ -199,189 +200,6 @@ export class PacketListComponent {
     }
   }
 
-  // exportCSV() {
-  //   const options = {}; // Add necessary options for loadEntries
-
-  //   // Fetch the packets first
-  //   this.dataSource.loadEntries('realtime', options).then(() => {
-  //     // Assuming packets are stored in `this.packets$` or some similar observable
-  //     const packets = this.dataSource.packets$.getValue(); // Ensure packets are accessible here
-  //     if (!packets || !packets.length) {
-  //       console.error('No packets available for export');
-  //       return;
-  //     }
-
-  //     const headers = ['Packet name', 'Generation time', 'Earth reception time', 'Reception time', 'Sequence number', 'Link', 'Size'];
-  //     const csvData = packets.map(packet => [
-  //       packet.generationTime,
-  //       packet.earthReceptionTime,
-  //       packet.receptionTime,
-  //       packet.sequenceNumber,
-  //       packet.link,
-  //       packet.size
-  //     ].join(','));
-
-  //     const csvContent = [headers.join(','), ...csvData].join('\n');
-  //     const blob = new Blob([csvContent], { type: 'text/csv' });
-  //     const url = window.URL.createObjectURL(blob);
-  //     const a = document.createElement('a');
-  //     a.setAttribute('hidden', '');
-  //     a.setAttribute('href', url);
-  //     a.setAttribute('download', 'packet_data.csv');
-  //     document.body.appendChild(a);
-  //     a.click();
-  //     document.body.removeChild(a);
-  //   }).catch(error => {
-  //     console.error('Error loading packets:', error);
-  //   });
-  // }
-
-  // exportCSV() {
-  //   const options = {}; // Add necessary options for loadEntries
-
-  //   this.yamcs.yamcsClient.getPackets(this.yamcs.instance!, {
-  //     ...options,
-  //     fields: [ // Everything except the packet binary
-  //       'id',
-  //       'generationTime',
-  //       'earthReceptionTime',
-  //       'receptionTime',
-  //       'sequenceNumber',
-  //       'link',
-  //       'size',
-  //     ],
-  //   }).then(page => {
-  //     console.log(page)
-  //   });
-
-  //   // // Fetch the packets first
-  //   // this.dataSource.loadEntries('realtime', options).then(() => {
-  //   //   // Assuming packets are stored in `this.packets$` or some similar observable
-  //   //   const packets = this.dataSource.packets$.getValue(); // Ensure packets are accessible here
-  //   //   if (!packets || !packets.length) {
-  //   //     console.error('No packets available for export');
-  //   //     return;
-  //   //   }
-
-  //   //   const headers = ['Packet name', 'Generation time', 'Earth reception time', 'Reception time', 'Sequence number', 'Link', 'Size'];
-  //   //   const csvData = packets.map(packet => [
-  //   //     packet.generationTime,
-  //   //     packet.earthReceptionTime,
-  //   //     packet.receptionTime,
-  //   //     packet.sequenceNumber,
-  //   //     packet.link,
-  //   //     packet.size
-  //   //   ].join(','));
-
-  //   //   const csvContent = [headers.join(','), ...csvData].join('\n');
-  //   //   const blob = new Blob([csvContent], { type: 'text/csv' });
-  //   //   const url = window.URL.createObjectURL(blob);
-  //   //   const a = document.createElement('a');
-  //   //   a.setAttribute('hidden', '');
-  //   //   a.setAttribute('href', url);
-  //   //   a.setAttribute('download', 'packet_data.csv');
-  //   //   document.body.appendChild(a);
-  //   //   a.click();
-  //   //   document.body.removeChild(a);
-  //   // }).catch(error => {
-  //   //   console.error('Error loading packets:', error);
-  //   // });
-  // }
-
-
-  exportCSV() {
-    const options = {}; // Add necessary options for loadEntries
-    const allPackets: any[] = [];
-
-    const fetchPackets = (continuationToken?: string) => {
-
-      const options: GetPacketsOptions = {};
-      if (this.validStart) {
-        options.start = this.validStart.toISOString();
-      }
-      if (this.validStop) {
-        options.stop = this.validStop.toISOString();
-      }
-      if (this.name) {
-        options.name = this.name;
-      }
-      if (this.link) {
-        options.link = this.link;
-      }
-
-      options.fields = [
-          'id',
-          'generationTime',
-          'earthReceptionTime',
-          'receptionTime',
-          'sequenceNumber',
-          'link',
-          'size',
-          'packet'
-      ]
-
-      options.limit = 1000
-
-      if (continuationToken) {
-        options.next = continuationToken;  // Add continuation token if present
-      }
-
-      // Fetch packets from Yamcs client
-      this.yamcs.yamcsClient.getPackets(this.yamcs.instance!, options).then(page => {
-        if (page.packet && Array.isArray(page.packet)) {
-          allPackets.push(...page.packet); // Add fetched packets to the array
-        }
-
-        // If there's a continuationToken, fetch more packets recursively
-        if (page.continuationToken) {
-          fetchPackets(page.continuationToken);
-        } else {
-          // No more packets, generate CSV
-          console.log(allPackets)
-          this.generateCSV(allPackets);
-        }
-      }).catch(error => {
-        console.error('Error fetching packets:', error);
-      });
-    };
-
-    // Start the fetching process
-    fetchPackets();
-  }
-
-  private generateCSV(packets: any[]) {
-    if (!packets.length) {
-      console.error('No packets available for export');
-      return;
-    }
-
-    const headers = ['Packet name', 'Generation time', 'Earth reception time', 'Reception time', 'Sequence number', 'Link', 'Size', 'Packet Data'];
-    const csvData = packets.map(packet => [
-      packet.id.name,
-      packet.generationTime,
-      packet.earthReceptionTime,
-      packet.receptionTime,
-      packet.sequenceNumber,
-      packet.link,
-      packet.size,
-      utils.convertBase64ToHex(packet.packet ?? '')
-    ].join(','));
-
-    const csvContent = [headers.join(','), ...csvData].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('hidden', '');
-    a.setAttribute('href', url);
-    a.setAttribute('download', 'packet_data.csv');
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
-
-
-
-
   // Used in table trackBy to prevent continuous row recreation
   // tableTrackerFn = (index: number, entry: CommandHistoryEntry) => ;
 
@@ -424,7 +242,10 @@ export class PacketListComponent {
 
     this.dataSource.loadEntries('realtime', options).then(packets => {
       const downloadURL = this.yamcs.yamcsClient.getPacketsDownloadURL(this.yamcs.instance!, dlOptions);
+      const downloadURLCsv = this.yamcs.yamcsClient.getPacketsDownloadCsvURL(this.yamcs.instance!, dlOptions);
+
       this.downloadURL$.next(downloadURL);
+      this.downloadURLCsv$.next(downloadURLCsv);
     });
   }
 
