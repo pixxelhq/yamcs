@@ -3,6 +3,7 @@
     Packets &nbsp;&nbsp;&nbsp;
     <mat-menu #exportMenu="matMenu" class="ya-menu">
       <ya-download-menu-item [link]="downloadURL$ | async">Raw dump</ya-download-menu-item>
+      <ya-download-menu-item [link]="downloadURLCsv$ | async">Csv dump</ya-download-menu-item>
     </mat-menu>
     <ya-page-button
       [matMenuTriggerFor]="exportMenu"
@@ -11,8 +12,6 @@
       Export
     </ya-page-button>
     <ya-page-icon-button matTooltip="Jump to now" (click)="jumpToNow()" icon="refresh" />
-    <ya-page-button matTooltip="Export as CSV" (click)="exportCSV()" icon="save_alt"> Export as CSV</ya-page-button>
-
   </app-instance-toolbar>
 
   <ya-detail-pane>
