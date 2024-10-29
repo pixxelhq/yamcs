@@ -1,9 +1,18 @@
 package org.yamcs.tctm.ccsds;
 
+import static org.yamcs.parameter.SystemParametersService.getNewPv;
+import static org.yamcs.parameter.SystemParametersService.getPV;
+import static org.yamcs.utils.ValueUtility.getUint64Value;
+import static org.yamcs.utils.ValueUtility.getSint64Value;
+
+
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.yamcs.ConfigurationException;
 import org.yamcs.TmPacket;
@@ -14,14 +23,25 @@ import org.yamcs.events.EventProducerFactory;
 import org.yamcs.logging.Log;
 import org.yamcs.tctm.AggregatedDataLink;
 import org.yamcs.tctm.PacketPreprocessor;
+import org.yamcs.parameter.AggregateValue;
+import org.yamcs.parameter.ParameterValue;
+import org.yamcs.parameter.SystemParametersProducer;
+import org.yamcs.parameter.SystemParametersService;
 import org.yamcs.tctm.TcTmException;
 import org.yamcs.tctm.TmPacketDataLink;
 import org.yamcs.tctm.TmSink;
+import org.yamcs.protobuf.Pvalue.AcquisitionStatus;
+import org.yamcs.protobuf.Yamcs.Value.Type;
 import org.yamcs.tctm.ccsds.VcDownlinkManagedParameters.TMDecoder;
 import org.yamcs.time.Instant;
 import org.yamcs.time.TimeService;
 import org.yamcs.utils.StringConverter;
 import org.yamcs.utils.YObjectLoader;
+import org.yamcs.xtce.AggregateParameterType;
+import org.yamcs.xtce.Member;
+import org.yamcs.xtce.Parameter;
+import org.yamcs.xtce.UnitType;
+import org.yamcs.utils.DataRateMeter;
 
 /**
  * Handles packets from one VC
@@ -29,18 +49,25 @@ import org.yamcs.utils.YObjectLoader;
  * @author nm
  *
  */
-public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
+public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, SystemParametersProducer {
+    public static String LINK_NAMESPACE = "links/";
+    
     TmSink tmSink;
-    private long numPackets;
+    final Log log;
+
     volatile boolean disabled = false;
     long lastFrameSeq = -1;
     EventProducer eventProducer;
-    int packetLostCount;
-    private final Log log;
+
     PacketDecoder packetDecoder;
     PixxelPacketDecoder pPacketDecoder;
     PixxelPacketMultipleDecoder pMultipleDecoder;
-    long idleFrameCount = 0;
+
+    protected AtomicLong idleFrameCount = new AtomicLong();
+    protected AtomicLong packetCount = new AtomicLong();
+    DataRateMeter idleFrameCountRateMeter = new DataRateMeter();
+    DataRateMeter packetCountRateMeter = new DataRateMeter();
+
     PacketPreprocessor packetPreprocessor;
     final String name;
     final VcDownlinkManagedParameters vmp;
@@ -50,6 +77,14 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
     private Instant ertime;
 
     boolean isIdleVcid;
+
+    // Create as systemParameters for data collection
+    private AggregateParameterType vcDeltaType;
+    private Parameter spDataInCount, spDataInRate, vcDelta;
+
+    // List of published vcDelta's
+    private ArrayList<ParameterValue> vcDeltas = new ArrayList<>();    
+
 
     public VcTmPacketHandler(String yamcsInstance, String name, VcDownlinkManagedParameters vmp) {
         this.vmp = vmp;
@@ -83,6 +118,26 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
         }
     }
 
+    public synchronized void publishVcDelta(long prevCount, long currentCount, int vcDifference) throws InterruptedException {
+        long time = timeService.getMissionTime();
+        AggregateValue v = new AggregateValue(vcDeltaType.getMemberNames());
+
+        v.setMemberValue("prevCount", getUint64Value(prevCount));
+        v.setMemberValue("currentCount", getUint64Value(currentCount));
+        v.setMemberValue("vcDifference", getSint64Value(vcDifference));
+
+        // Create a parameterValue to be publushed
+        ParameterValue pv = getNewPv(vcDelta, time);
+        pv.setAcquisitionStatus(AcquisitionStatus.ACQUIRED);
+        pv.setEngValue(v);
+
+        while (Thread.holdsLock(vcDeltas)) {
+            wait();
+        }
+
+        vcDeltas.add(pv);
+    }
+
     @Override
     public void handle(DownlinkTransferFrame frame) {
         if (disabled) {
@@ -90,19 +145,32 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
             return;
         }
 
+        int frameLoss = frame.lostFramesCount(lastFrameSeq);
+        long prevFrameSeq = lastFrameSeq;
+        lastFrameSeq = frame.getVcFrameSeq();
+
+        // Publish the vcDelta
+        try {
+            if (frameLoss != 0)
+                publishVcDelta(prevFrameSeq, lastFrameSeq, frameLoss);
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         if (frame.containsOnlyIdleData()) {
             if (log.isTraceEnabled()) {
                 log.trace("Dropping idle frame for VC {}, SEQ {}", frame.getVirtualChannelId(), frame.getVcFrameSeq());
             }
             lastFrameSeq = frame.getVcFrameSeq();
-            idleFrameCount++;
+            idleFrameIn(1, frame.getDataEnd() - frame.getDataStart());
 
             // Set Earth Reception time
             ertime = frame.getEarthRceptionTime();
             if (isIdleVcid) {
                 /*
                  * Do not attempt to parse the idle frames through the packetDecoders
-                 * Instead, directly send it to the handlePacket func
+                 * Instead, directly send it to the handlePacket handler function
                  */
                 int frameHeaderLength = 6;
                 handlePacket(Arrays.copyOfRange(frame.getData(), frame.getDataStart() - frameHeaderLength, frame.getDataEnd()));
@@ -124,9 +192,6 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
 
         if (vmp.tmDecoder == TMDecoder.CCSDS) {     // Multiple packets from frame | With Segmentation
             try {
-                int frameLoss = frame.lostFramesCount(lastFrameSeq);
-                lastFrameSeq = frame.getVcFrameSeq();
-
                 if (packetDecoder.hasIncompletePacket()) {
                     if (frameLoss != 0) {
                         log.warn("Incomplete packet dropped because of frame loss ");
@@ -153,10 +218,7 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
             }
 
         } else if (vmp.tmDecoder == TMDecoder.SINGLE) {     // Single packet per frame | No Segmentation
-            try {   
-                int frameLoss = frame.lostFramesCount(lastFrameSeq);
-                lastFrameSeq = frame.getVcFrameSeq();
-
+            try {
                 if (frameLoss != 0) {
                     log.warn("Frames have been dropped in transit, sigh");
                 }
@@ -179,9 +241,6 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
             }
         } else {    // Multiple packets per frame | No segmentation
             try {
-                int frameLoss = frame.lostFramesCount(lastFrameSeq);
-                lastFrameSeq = frame.getVcFrameSeq();
-
                 if (frameLoss != 0) {
                     log.warn("Frames have been dropped in transit, sigh");
                 }
@@ -252,7 +311,7 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
 
         // Increment only for non-idle vcId's
         if (!isIdleVcid)
-            numPackets++;
+            packetCountIn(1, p.length);
 
         TmPacket pwt = new TmPacket(timeService.getMissionTime(), p);
         pwt.setEarthReceptionTime(ertime);
@@ -285,7 +344,11 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
 
     @Override
     public long getDataInCount() {
-        return isIdleVcid? idleFrameCount: numPackets;
+        return isIdleVcid? idleFrameCount.get(): packetCount.get();
+    }
+
+    public double getDataInCountRate() {
+        return isIdleVcid? idleFrameCountRateMeter.getFiveSecondsRate(): packetCountRateMeter.getFiveSecondsRate();
     }
 
     @Override
@@ -295,8 +358,8 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
 
     @Override
     public void resetCounters() {
-        numPackets = 0;
-        idleFrameCount = 0;
+        packetCount.set(0);
+        idleFrameCount.set(0);
     }
 
     @Override
@@ -327,8 +390,8 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
     @Override
     public Map<String, Object> getExtraInfo() {
         var extra = new LinkedHashMap<String, Object>();
-        extra.put("Idle CCSDS Frames", idleFrameCount);
-        extra.put("Valid CCSDS Packets", numPackets);
+        extra.put("Idle CCSDS Frames", idleFrameCount.get());
+        extra.put("Valid CCSDS Packets", packetCount.get());
         extra.put("Is Idle vcId link?", isIdleVcid);
         return extra;
     }
@@ -343,8 +406,86 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler {
             return "DISABLED";
 
         } else {
-            return String.format("Idle CCSDS Frames: %d%n | Valid CCSDS Packets: %d%n", idleFrameCount, numPackets);
+            return String.format("Idle CCSDS Frames: %d%n | Valid CCSDS Packets: %d%n", idleFrameCount.get(), packetCount.get());
         }
     }
 
+    @Override
+    public void setupSystemParameters(SystemParametersService sysParamService) {
+        UnitType bps = new UnitType("Bps");
+        spDataInCount = sysParamService.createSystemParameter(LINK_NAMESPACE + name + "/dataInCount", Type.UINT64,
+                "The total number of items (e.g. telemetry packets) that have been received through this link");
+
+        spDataInRate = sysParamService.createSystemParameter(LINK_NAMESPACE + name + "/dataInRate", Type.DOUBLE,
+                bps, "The number of incoming bytes per second computed over a five second interval");
+    
+        // Create an aggregated systemParameter
+
+        Member prevCount = new Member("prevCount", sysParamService.getBasicType(Type.UINT64));
+        prevCount.setShortDescription("Value of the virtual channel counter of the previous frame");
+        Member currentCount = new Member("currentCount", sysParamService.getBasicType(Type.UINT64));
+        currentCount.setShortDescription("Value of the virtual channel counter of the current frame");
+        Member vcDifference = new Member("vcDifference", sysParamService.getBasicType(Type.SINT64));
+        vcDifference.setShortDescription("Difference in the virtual channel counter between two successively received frames");
+
+        vcDeltaType = new AggregateParameterType.Builder().setName("vcDelta")
+                .addMember(prevCount)
+                .addMember(currentCount)
+                .addMember(vcDifference)
+                .build();
+
+        vcDelta = sysParamService.createSystemParameter(LINK_NAMESPACE + name + "/virtualCounterDelta", vcDeltaType,
+                "The delta of the virual channel frame counter between successive frames received by the MCS");
+    }
+
+
+    public synchronized void consumeVcDelta(List<ParameterValue> list) throws InterruptedException {
+        list.addAll(vcDeltas);
+        vcDeltas.clear();
+
+        notify();
+    }
+
+    @Override
+    public Collection<ParameterValue> getSystemParameters(long time) {
+        ArrayList<ParameterValue> list = new ArrayList<>();
+        try {
+            collectSystemParameters(time, list);
+            synchronized (vcDeltas) {
+                if (!vcDeltas.isEmpty())
+                    consumeVcDelta(list);
+            }
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+
+        } catch (Exception e) {
+            log.error("Exception caught when collecting link system parameters", e);
+        }
+        return list;
+    }
+
+    /**
+     * adds system parameters link status and data in/out to the list.
+     * <p>
+     * The inheriting classes should call super.collectSystemParameters and then add their own parameters to the list
+     * 
+     * @param time
+     * @param list
+     */
+    protected void collectSystemParameters(long time, List<ParameterValue> list) {
+        list.add(getPV(spDataInCount, time, getDataInCount()));
+        list.add(getPV(spDataInRate, time, getDataInCountRate()));
+    }
+
+
+    protected void idleFrameIn(long inCount, long size) {
+        idleFrameCount.addAndGet(inCount);
+        idleFrameCountRateMeter.mark(size);
+    }
+
+    protected void packetCountIn(long inCount, long size) {
+        packetCount.addAndGet(inCount);
+        packetCountRateMeter.mark(size);
+    }
 }

@@ -22,7 +22,6 @@ import org.yamcs.protobuf.Commanding.CommandHistoryEntry;
 import org.yamcs.protobuf.Commanding.CommandId;
 import org.yamcs.protobuf.Commanding.VerifierConfig;
 import org.yamcs.protobuf.Yamcs.Value.Type;
-import org.yamcs.tctm.pus.services.tc.PusTcCcsdsPacket;
 import org.yamcs.utils.StringConverter;
 import org.yamcs.utils.ValueHelper;
 import org.yamcs.utils.ValueUtility;

@@ -81,7 +81,14 @@ service PacketsApi {
       get: "/api/archive/{instance}:exportPackets"
     };
   }
-  
+
+  // List packets
+  rpc ListPacketsCsv(ListPacketsRequest) returns (stream yamcs.api.HttpBody) {
+    option (yamcs.api.route) = {
+      get: "/api/archive/{instance}/packets:exportCsv"
+    };
+  }
+
   // Subscribe to packets
   //
   // This subscription is performed at stream or processor level.
