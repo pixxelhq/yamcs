@@ -2,7 +2,6 @@ package org.yamcs.tctm.ccsds;
 
 import static org.yamcs.parameter.SystemParametersService.getNewPv;
 import static org.yamcs.parameter.SystemParametersService.getPV;
-import static org.yamcs.utils.ValueUtility.getUint64Value;
 import static org.yamcs.utils.ValueUtility.getSint64Value;
 
 
@@ -122,8 +121,8 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
         long time = timeService.getMissionTime();
         AggregateValue v = new AggregateValue(vcDeltaType.getMemberNames());
 
-        v.setMemberValue("prevCount", getUint64Value(prevCount));
-        v.setMemberValue("currentCount", getUint64Value(currentCount));
+        v.setMemberValue("prevCount", getSint64Value(prevCount));
+        v.setMemberValue("currentCount", getSint64Value(currentCount));
         v.setMemberValue("vcDifference", getSint64Value(vcDifference));
 
         // Create a parameterValue to be publushed
@@ -421,9 +420,9 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
     
         // Create an aggregated systemParameter
 
-        Member prevCount = new Member("prevCount", sysParamService.getBasicType(Type.UINT64));
+        Member prevCount = new Member("prevCount", sysParamService.getBasicType(Type.SINT64));
         prevCount.setShortDescription("Value of the virtual channel counter of the previous frame");
-        Member currentCount = new Member("currentCount", sysParamService.getBasicType(Type.UINT64));
+        Member currentCount = new Member("currentCount", sysParamService.getBasicType(Type.SINT64));
         currentCount.setShortDescription("Value of the virtual channel counter of the current frame");
         Member vcDifference = new Member("vcDifference", sysParamService.getBasicType(Type.SINT64));
         vcDifference.setShortDescription("Difference in the virtual channel counter between two successively received frames");
