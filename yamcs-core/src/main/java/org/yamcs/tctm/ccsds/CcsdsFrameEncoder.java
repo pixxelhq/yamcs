@@ -146,7 +146,7 @@ public class CcsdsFrameEncoder implements RawFrameEnDec {
                 throw new IllegalArgumentException("Bad length " + length + " (expected " + encodedFrameLength + ")");
             }
     
-            byte[] rsBlock = new byte[rs.getnn()];
+            byte[] rsBlock = new byte[rs.blockSize()];
             for (int i = 0; i < interleavingDepth; i++) {
                 // Copy the interleaved data from the original buffer
                 for (int j = 0; j < encodedFrameLength / interleavingDepth; j++) {
@@ -154,11 +154,11 @@ public class CcsdsFrameEncoder implements RawFrameEnDec {
                 }
 
                 byte[] parity = new byte[rs.nroots()];
-                byte[] cRsBlock = Arrays.copyOfRange(rsBlock, 0, rs.getnn()-rs.nroots());
+                byte[] cRsBlock = Arrays.copyOfRange(rsBlock, 0, rs.blockSize()-rs.nroots());
 
                 /* Convert data from dual basis to conventional */
                 if (dualBasis) {
-                    for (int l = 0; l < rs.getnn()-rs.nroots(); l++)
+                    for (int l = 0; l < rs.blockSize()-rs.nroots(); l++)
                         cRsBlock[l] = Tal1tab[Byte.toUnsignedInt(rsBlock[l])];
                 }
 
@@ -171,7 +171,7 @@ public class CcsdsFrameEncoder implements RawFrameEnDec {
                         parity[l] = Taltab[Byte.toUnsignedInt(parity[l])];
                 }
 
-                byte[] lRsBlock = new byte[rs.getnn()];
+                byte[] lRsBlock = new byte[rs.blockSize()];
                 System.arraycopy(rsBlock, 0, lRsBlock, 0, cRsBlock.length);
                 System.arraycopy(parity, 0, lRsBlock, cRsBlock.length, parity.length);
                 cRsBlock = lRsBlock;
