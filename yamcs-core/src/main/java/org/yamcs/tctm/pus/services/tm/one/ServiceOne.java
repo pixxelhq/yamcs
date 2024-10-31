@@ -27,7 +27,8 @@ public class ServiceOne implements PusService {
         FSW_OBC(96),
         FSW_ARBITRATOR(97),
         FSW_TIC(98),
-        IDLE(127);
+        IDLE(127),
+        UNDEFINED(128);
 
         private final int value;
 
@@ -41,7 +42,7 @@ public class ServiceOne implements PusService {
                     return enumValue;
                 }
             }
-            return null;
+            return UNDEFINED;
         }
 
         public int getValue() {
