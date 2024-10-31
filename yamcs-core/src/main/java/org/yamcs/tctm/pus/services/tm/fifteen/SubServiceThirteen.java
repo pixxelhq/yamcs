@@ -63,10 +63,8 @@ public class SubServiceThirteen implements PusSubService {
         packetStoreSummaryReportBucket = PusTmManager.reports;
 
         try {
-            for (Map.Entry<Integer, String> folder: packetStoreMap.entrySet()) {
+            for (Map.Entry<Integer, String> folder: packetStoreMap.entrySet())
                 packetStoreSummaryReportBucket.putObject(yamcsInstance + "/packetStoreSummaryReport/" + folder.getValue() + "/", "application/octet-stream", new HashMap<>(), new byte[0]);
-
-            }
 
         } catch (IOException e) {
             log.error("Unable to create a directory `" + packetStoreSummaryReportBucket.getName() + "/packetStoreSummaryReport` for (Service - 15 | SubService - 13)", e);
