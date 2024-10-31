@@ -23,6 +23,7 @@ import org.yamcs.tctm.pus.PusTcManager;
 import org.yamcs.tctm.pus.PusTmManager;
 import org.yamcs.tctm.pus.services.PusSubService;
 import org.yamcs.tctm.pus.services.tm.PusTmCcsdsPacket;
+import org.yamcs.tctm.pus.services.tm.one.ServiceOne.CcsdsApid;
 import org.yamcs.utils.ByteArrayUtils;
 import org.yamcs.yarch.Bucket;
 import org.yamcs.yarch.YarchException;
@@ -45,6 +46,7 @@ public class SubServiceThirteen implements PusSubService {
     protected int reportCountSize;
 
     Bucket timetagScheduleSummaryReportBucket;
+    Map<Integer, String> folders = new HashMap<>();
 
     public SubServiceThirteen(String yamcsInstance, YConfiguration config) {
         this.yamcsInstance = yamcsInstance;
@@ -55,10 +57,16 @@ public class SubServiceThirteen implements PusSubService {
         reportCountSize = config.getInt("reportCountSize", DEFAULT_REPORT_COUNT_SIZE);
 
         requestIdSize = ServiceEleven.sourceIdSize + ServiceEleven.apidSize + ServiceEleven.seqCountSize;
+
+        for(YConfiguration cc: config.getConfigList("folders")) {
+            folders.put(cc.getInt("apid"), cc.getString("name"));
+        }
+
         timetagScheduleSummaryReportBucket = PusTmManager.reports;
 
         try {
-            timetagScheduleSummaryReportBucket.putObject(yamcsInstance + "/timetagScheduleSummaryReport/", "application/octet-stream", new HashMap<>(), new byte[0]);
+            for (Map.Entry<Integer, String> folderN: folders.entrySet())
+                timetagScheduleSummaryReportBucket.putObject(yamcsInstance + "/timetagScheduleSummaryReport/" + folderN.getValue() + "/", "application/octet-stream", new HashMap<>(), new byte[0]);
 
         } catch (IOException e) {
             log.error("Unable to create a directory `" + timetagScheduleSummaryReportBucket.getName() + "/timetagScheduleSummaryReport` for (Service - 11 | SubService - 13)", e);
@@ -83,7 +91,7 @@ public class SubServiceThirteen implements PusSubService {
         return null;
     }
 
-    public void generateTimetagScheduleSummaryReport(long gentime, Map<Long, ArrayList<Integer>> requestTcPacketsMap, Map<String, Integer> props, ObjectProperties foundObject) {
+    public void generateTimetagScheduleSummaryReport(long gentime, Map<Long, ArrayList<Integer>> requestTcPacketsMap, Map<String, Integer> props, ObjectProperties foundObject, int apid) {
         long missionTime = PusTmManager.timeService.getMissionTime();
 
         String filename;
@@ -91,7 +99,7 @@ public class SubServiceThirteen implements PusSubService {
         Map<String, String> metadata;
 
         if (foundObject == null) {
-            filename = yamcsInstance + "/timetagScheduleSummaryReport/" + LocalDateTime.ofInstant(
+            filename = yamcsInstance + "/timetagScheduleSummaryReport/" + folders.get(apid) + "/" + LocalDateTime.ofInstant(
                 Instant.ofEpochSecond(gentime),
                 ZoneId.of("GMT")
             ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")) + ".csv";
@@ -179,7 +187,7 @@ public class SubServiceThirteen implements PusSubService {
                 ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"));
 
                 int sourceId = requestId.get(0);
-                int commandApid = requestId.get(1);
+                String commandApid = CcsdsApid.fromValue(requestId.get(1)).name();
                 int commandCcsdsSeqCount = requestId.get(2);
 
                 writer.write(timetagStr + "," + sourceId + "," + commandApid + "," + commandCcsdsSeqCount);
@@ -205,6 +213,8 @@ public class SubServiceThirteen implements PusSubService {
         PusTmCcsdsPacket pPkt = new PusTmCcsdsPacket(tmPacket.getPacket());
         byte[] dataField = pPkt.getDataField();
         byte[] spareField = pPkt.getSpareField();
+
+        int apid = pPkt.getAPID();
 
         Map<String, Integer> props = new HashMap<>();
         int uniqueSignature = (int) ByteArrayUtils.decodeCustomInteger(spareField, PusTmManager.spareOffsetForFractionTime, uniqueSignatureSize);
@@ -234,7 +244,7 @@ public class SubServiceThirteen implements PusSubService {
             long generationTime = ByteArrayUtils.decodeCustomInteger(pPkt.getGenerationTime(), 0, PusTmManager.absoluteTimeLength);
 
             // Generate the report
-            generateTimetagScheduleSummaryReport(generationTime, requestTcPacketsMap, props, foundObject);
+            generateTimetagScheduleSummaryReport(generationTime, requestTcPacketsMap, props, foundObject, apid);
 
         } catch (IOException e) {
             throw new UncheckedIOException("S(11, 13) | Unable to find object with UniqueSignature: " + uniqueSignature + " in bucket: " + (timetagScheduleSummaryReportBucket != null ? " -> " + timetagScheduleSummaryReportBucket.getName() : ""), e);
