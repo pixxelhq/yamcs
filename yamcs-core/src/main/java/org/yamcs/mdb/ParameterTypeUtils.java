@@ -36,8 +36,6 @@ import com.google.common.primitives.UnsignedLongs;
 
 /**
  * Contains various static methods to help work with XTCE {@link ParameterType}
- * 
- * @author nm
  *
  */
 public class ParameterTypeUtils {
@@ -262,4 +260,5 @@ public class ParameterTypeUtils {
             return ValueUtility.getDoubleValue(doubleValue);
         }
     }
+
 }
