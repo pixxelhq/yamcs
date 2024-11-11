@@ -3,6 +3,7 @@ package org.yamcs.http.api;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,7 @@ import org.yamcs.actions.Action;
 import org.yamcs.actions.ActionHelper;
 import org.yamcs.api.Observer;
 import org.yamcs.cfdp.CfdpFileTransfer;
+import org.yamcs.cfdp.CfdpService;
 import org.yamcs.cfdp.CfdpTransactionId;
 import org.yamcs.client.storage.ObjectId;
 import org.yamcs.filetransfer.FileActionIdentifier;
@@ -52,9 +54,9 @@ import org.yamcs.protobuf.TransferDirection;
 import org.yamcs.protobuf.TransferInfo;
 import org.yamcs.protobuf.TransferState;
 import org.yamcs.security.SystemPrivilege;
-import org.yamcs.security.User;
 import org.yamcs.tctm.pus.services.filetransfer.thirteen.S13FileTransfer;
 import org.yamcs.tctm.pus.services.filetransfer.thirteen.S13TransactionId;
+import org.yamcs.tctm.pus.tuples.Triple;
 import org.yamcs.utils.TimeEncoding;
 import org.yamcs.yarch.Bucket;
 import org.yamcs.yarch.YarchDatabase;
@@ -155,12 +157,11 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
             throw new BadRequestException("Direction not specified");
         }
 
-        String bucketName = request.getBucket();
-        BucketsApi.checkReadBucketPrivilege(bucketName, ctx.user);
+        YarchDatabaseInstance yarch = YarchDatabase.getInstance(YamcsServer.GLOBAL_INSTANCE);
 
         String objectName = request.getObjectName();
-
-        YarchDatabaseInstance yarch = YarchDatabase.getInstance(YamcsServer.GLOBAL_INSTANCE);
+        String bucketName = request.getBucket();
+        BucketsApi.checkReadBucketPrivilege(bucketName, ctx.user);
 
         Bucket bucket;
         try {
@@ -169,7 +170,54 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
             throw new InternalServerErrorException("Error while resolving bucket", e);
         }
         if (bucket == null) {
-            throw new BadRequestException("No bucket by name '" + bucketName + "'");
+            if(!ftService.getCapabilities().hasFileProxyOperations())
+                throw new BadRequestException("No bucket by name: " + bucketName + " | " + request.getServiceName() + " does not support File Proxy Operations");
+            
+            // Start FPO operation
+            if (request.getDirection() == TransferDirection.UPLOAD) {
+                TransferOptions transferOptions = new TransferOptions();
+                transferOptions.setOverwrite(true);
+                transferOptions.setCreatePath(true);
+                transferOptions.putExtraOptions(GpbWellKnownHelper.toJava(request.getOptions()));
+
+                List<Triple<String, String, String>> fssrrr = request.getFileProxyOperationOptionsList().stream()
+                        .map(fp -> new Triple<>(fp.getFilestoreRequestAction(), fp.getFilestoreRequestFirstFileName(), fp.getFilestoreRequestSecondFileName()))
+                        .collect(Collectors.toList());
+                
+                transferOptions.putFileProxyOperations(fssrrr);
+
+                if (transferOptions.isReliable() && transferOptions.isClosureRequested()) {
+                    throw new BadRequestException("Cannot set both reliable and closureRequested options");
+                }
+
+                String source = request.hasSource() ? request.getSource() : null;
+                String destination = request.hasDestination() ? request.getDestination() : null;
+
+                CfdpService cfdpFtService = (CfdpService) ftService;
+                try {
+                    FileTransfer transfer = cfdpFtService.startFsr(source, destination, transferOptions);
+                    var auditMessage = new StringBuilder("Upload ")
+                            .append("FPO ")
+                            .append(fssrrr.stream()
+                                .map(fsr ->  "Action: " + fsr.getFirst() + " , FirstFileName: " + fsr.getSecond() + " , SecondFileName: " + fsr.getThird())
+                                .collect(Collectors.joining())
+                            );
+                    if (request.hasServiceName()) {
+                        auditMessage.append(String.format(" (%s, %s → %s)", request.getServiceName(), source, destination));
+                    } else {
+                        auditMessage.append(String.format(" (%s → %s)", source, destination));
+                    }
+                    auditLog.addRecord(ctx, request, auditMessage.toString());
+                    observer.complete(toTransferInfo(cfdpFtService, transfer));
+                    return;
+
+                } catch (InvalidRequestException e) {
+                    throw new BadRequestException(e.getMessage());
+                }
+            } else {
+                throw new BadRequestException("Unexpected direction '" + request.getDirection() + "'");
+
+            }
         }
 
         if (request.getDirection() == TransferDirection.UPLOAD) {
@@ -177,6 +225,11 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
             transferOptions.setOverwrite(true);
             transferOptions.setCreatePath(true);
             transferOptions.putExtraOptions(GpbWellKnownHelper.toJava(request.getOptions()));
+
+            List<Triple<String, String, String>> fssrrr = request.getFileProxyOperationOptionsList().stream()
+                    .map(fp -> new Triple<>(fp.getFilestoreRequestAction(), fp.getFilestoreRequestFirstFileName(), fp.getFilestoreRequestSecondFileName()))
+                    .collect(Collectors.toList());
+            transferOptions.putFileProxyOperations(fssrrr);
 
             if (transferOptions.isReliable() && transferOptions.isClosureRequested()) {
                 throw new BadRequestException("Cannot set both reliable and closureRequested options");
@@ -262,12 +315,15 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
         observer.complete(Empty.getDefaultInstance());
 
         if (transaction.getDirection() == TransferDirection.UPLOAD) {
-            var auditMessage = new StringBuilder("Pausing upload of ")
-                    .append(ObjectId.of(transaction.getBucketName(), transaction.getObjectName()))
-                    .append(" to '")
-                    .append(transaction.getRemotePath())
-                    .append("'");
-            auditLog.addRecord(ctx, request, auditMessage.toString());
+            // Handle FPO
+            if (transaction.getBucketName() != null) {
+                var auditMessage = new StringBuilder("Pausing upload of ")
+                        .append(ObjectId.of(transaction.getBucketName(), transaction.getObjectName()))
+                        .append(" to '")
+                        .append(transaction.getRemotePath())
+                        .append("'");
+                auditLog.addRecord(ctx, request, auditMessage.toString());
+            }
         } else if (transaction.getDirection() == TransferDirection.DOWNLOAD) {
             var auditMessage = new StringBuilder("Pausing download of '")
                     .append(transaction.getRemotePath())
@@ -292,12 +348,15 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
         observer.complete(Empty.getDefaultInstance());
 
         if (transaction.getDirection() == TransferDirection.UPLOAD) {
-            var auditMessage = new StringBuilder("Cancelling upload of ")
-                    .append(ObjectId.of(transaction.getBucketName(), transaction.getObjectName()))
-                    .append(" to '")
-                    .append(transaction.getRemotePath())
-                    .append("'");
-            auditLog.addRecord(ctx, request, auditMessage.toString());
+            // Handle FPO
+            if (transaction.getBucketName() != null) {
+                var auditMessage = new StringBuilder("Pausing upload of ")
+                        .append(ObjectId.of(transaction.getBucketName(), transaction.getObjectName()))
+                        .append(" to '")
+                        .append(transaction.getRemotePath())
+                        .append("'");
+                auditLog.addRecord(ctx, request, auditMessage.toString());
+            }
         } else if (transaction.getDirection() == TransferDirection.DOWNLOAD) {
             var auditMessage = new StringBuilder("Cancelling download of '")
                     .append(transaction.getRemotePath())
@@ -322,12 +381,15 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
         observer.complete(Empty.getDefaultInstance());
 
         if (transaction.getDirection() == TransferDirection.UPLOAD) {
-            var auditMessage = new StringBuilder("Resuming upload of ")
-                    .append(ObjectId.of(transaction.getBucketName(), transaction.getObjectName()))
-                    .append(" to '")
-                    .append(transaction.getRemotePath())
-                    .append("'");
-            auditLog.addRecord(ctx, request, auditMessage.toString());
+            // Handle FPO
+            if (transaction.getBucketName() != null) {
+                var auditMessage = new StringBuilder("Pausing upload of ")
+                        .append(ObjectId.of(transaction.getBucketName(), transaction.getObjectName()))
+                        .append(" to '")
+                        .append(transaction.getRemotePath())
+                        .append("'");
+                auditLog.addRecord(ctx, request, auditMessage.toString());
+            }
         } else if (transaction.getDirection() == TransferDirection.DOWNLOAD) {
             var auditMessage = new StringBuilder("Resuming download of '")
                     .append(transaction.getRemotePath())
@@ -454,6 +516,10 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
         infob.addAllRemoteEntities(service.getRemoteEntities());
         infob.setCapabilities(service.getCapabilities());
         infob.addAllTransferOptions(service.getFileTransferOptions());
+
+        // FIXME: TempFix
+        if (service.getCapabilities().getFileProxyOperations())
+            infob.setFileProxyOperationOption(service.getFileProxyOperationOptions());
         return infob.build();
     }
 

@@ -45,6 +45,7 @@ import org.yamcs.filetransfer.RemoteFileListMonitor;
 import org.yamcs.filetransfer.TransferMonitor;
 import org.yamcs.filetransfer.TransferOptions;
 import org.yamcs.protobuf.EntityInfo;
+import org.yamcs.protobuf.FileProxyOperationOption;
 import org.yamcs.protobuf.FileTransferCapabilities;
 import org.yamcs.protobuf.FileTransferOption;
 import org.yamcs.protobuf.ListFilesResponse;
@@ -837,5 +838,9 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
         }
     }
 
-
+    @Override
+    public FileProxyOperationOption getFileProxyOperationOptions() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getFileProxyOperationOptions'");
+    }
 }

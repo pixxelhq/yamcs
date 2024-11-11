@@ -175,6 +175,9 @@ message FileTransferCapabilities {
   // Whether the transfer service supports pause/resume
   optional bool pauseResume = 9;
 
+  // Whether the transfer service supports file proxy operations
+  optional bool fileProxyOperations = 10;
+
   // Additional columns to show in a file listing, where id
   // is a key of ``RemoteFile.extra``
   repeated ExtraColumnInfo fileListExtraColumns = 7;
@@ -194,11 +197,18 @@ message FileTransferServiceInfo {
 
   // File transfer service name
   optional string name = 2;
- 
+
   repeated EntityInfo localEntities = 3;
   repeated EntityInfo remoteEntities = 4;
   optional FileTransferCapabilities capabilities = 5;
   repeated FileTransferOption transferOptions = 6;
+  optional FileProxyOperationOption fileProxyOperationOption = 7;
+}
+
+message FileProxyOperationOption {
+  optional FileTransferOption action = 1;
+  optional FileTransferOption firstFileName = 2;
+  optional FileTransferOption secondFileName = 3;
 }
 
 message EntityInfo {
@@ -277,6 +287,14 @@ message CreateTransferRequest {
 
   // Options for the transfer
   optional google.protobuf.Struct options = 11;
+
+  repeated FileProxyOperationValue fileProxyOperationOptions = 12;
+}
+
+message FileProxyOperationValue {
+  optional string filestoreRequestAction = 1;
+  optional string filestoreRequestFirstFileName = 2;
+  optional string filestoreRequestSecondFileName = 3;
 }
 
 message PauseTransferRequest {

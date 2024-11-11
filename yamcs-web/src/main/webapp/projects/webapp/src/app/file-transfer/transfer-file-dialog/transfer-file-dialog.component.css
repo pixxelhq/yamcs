@@ -20,7 +20,7 @@
 .grid-container {
   display: grid;
   grid-auto-flow: column;
-  grid-template-rows: [header] min-content [tables] auto [footer] min-content [options-footer] min-content;
+  grid-template-rows: [header] min-content [tables] auto [footer] min-content [options-footer-o] min-content [options-footer-f] min-content [options-footer-a] min-content;
   grid-template-columns: [buckets] 140px [local] auto [remote] auto;
   column-gap: 8px;
   flex: 1;
@@ -52,8 +52,34 @@
   font-family: Roboto, sans-serif;
 }
 
-.options-footer {
-  grid-row: options-footer;
+.options-footer-o {
+  grid-row: options-footer-o;
+  grid-column: local / span 2;
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: stretch;
+  gap: 8px;
+  height: fit-content;
+  font-family: Roboto, sans-serif;
+}
+
+.options-footer-f {
+  grid-row: options-footer-f;
+  grid-column: local / span 2;
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: stretch;
+  gap: 8px;
+  height: fit-content;
+  font-family: Roboto, sans-serif;
+}
+
+.options-footer-a {
+  grid-row: options-footer-a;
   grid-column: local / span 2;
   margin-top: 8px;
   display: flex;
@@ -179,4 +205,26 @@ table.ya-data-table {
 
 .checkbox-label input {
   margin: 0 3px 0 4px;
+}
+
+.field-set-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px; /* Space between rows */
+}
+
+.field-set-row .form-group {
+  margin-right: 15px; /* Space between columns */
+  display: flex;
+  flex-direction: column; /* Label above input */
+}
+
+.field-set-row .form-group label {
+  margin-bottom: 5px;
+}
+
+.field-set-row .form-group select,
+.field-set-row .form-group input {
+  padding: 5px;
+  min-width: 150px; /* Set a minimum width for inputs */
 }

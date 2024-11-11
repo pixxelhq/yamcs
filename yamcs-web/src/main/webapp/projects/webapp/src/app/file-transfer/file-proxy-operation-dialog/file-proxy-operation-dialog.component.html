@@ -1,0 +1,154 @@
+<div class="transfer-files">
+  <form [formGroup]="form" class="ya-form">
+    <h2>
+      <button mat-icon-button class="close-button" mat-dialog-close>
+        <mat-icon>close</mat-icon>
+      </button>
+      New File Proxy Operation
+    </h2>
+
+    <div class="grid-container">
+      <!-- LOCAL COLUMN -->
+      <div class="local-column header">
+        <label class="table-caption">
+          Local {{ service.localEntities && service.localEntities.length ? "Entity" : "" }}
+          <select
+            formControlName="localEntity"
+            [ngStyle]="
+              !(service.localEntities && service.localEntities.length) && { visibility: 'hidden' }
+            ">
+            @for (entity of service.localEntities; track entity) {
+              <option [value]="entity.name">{{ entity.name }} [id={{ entity.id }}]</option>
+            }
+          </select>
+        </label>
+      </div>
+
+      <!-- REMOTE COLUMN -->
+      @if (
+        (service.remoteEntities && service.remoteEntities.length)
+      ) {
+        <div class="remote-column header">
+          <label class="table-caption">
+            Remote {{ service.remoteEntities && service.remoteEntities.length ? "Entity" : "" }}
+            <select
+              formControlName="remoteEntity"
+              [ngStyle]="
+                !(service.remoteEntities && service.remoteEntities.length) && {
+                  visibility: 'hidden',
+                }
+              ">
+              @for (entity of service.remoteEntities; track entity) {
+                <option [value]="entity.name">{{ entity.name }} [id={{ entity.id }}]</option>
+              }
+            </select>
+          </label>
+        </div>
+      }
+
+      <div class="options-footer-o">
+        @for (option of service.transferOptions; track option; let i = $index) {
+          <div [title]="option.description || ''">
+            <label>{{ option.title || option.name }}</label>
+            <!-- Boolean option type -->
+            @if (option.type === "BOOLEAN") {
+              <label class="checkbox-label">
+                <input type="checkbox" [formControlName]="getControlName(option, i)" />
+                {{ option.associatedText }}
+              </label>
+            }
+            <!-- Double and string option type-->
+            <div style="display: flex; column-gap: 8px; flex-wrap: wrap">
+              @if ((option.type === "DOUBLE" || option.type === "STRING") && option.values) {
+                <select [formControlName]="getControlName(option, i) + DROPDOWN_SUFFIX">
+                  @if (option.allowCustomOption) {
+                    <option [value]="CUSTOM_OPTION_VALUE">Custom</option>
+                  }
+                  @for (value of option.values; track value) {
+                    <option [value]="value.value">
+                      {{ value.verboseName != null ? value.verboseName : value.value }}
+                    </option>
+                  }
+                </select>
+              }
+              @if (
+                (option.type === "DOUBLE" || option.type === "STRING") &&
+                ((option.allowCustomOption &&
+                  form.get(getControlName(option, i) + DROPDOWN_SUFFIX)?.value ===
+                    CUSTOM_OPTION_VALUE) ||
+                  !option.values)
+              ) {
+                <input
+                  [formControlName]="getControlName(option, i)"
+                  [type]="option.type === 'DOUBLE' ? 'number' : 'text'"
+                  [placeholder]="option.associatedText || ''"
+                  style="width: 120px" />
+              }
+            </div>
+          </div>
+        }
+      </div>
+      <div class="options-footer-f">
+        <div formArrayName="fileProxyOps">
+          <div *ngFor="let op of fileProxyOps.controls; let i = index" [formGroupName]="i" class="field-set-row">
+            
+            <div style="display: flex; column-gap: 8px; flex-wrap: wrap">
+              <!-- Dynamic fields -->
+              <div class="form-group">
+                <label>{{ fpo.action.title }}:</label>
+                <select formControlName="{{ fpo.action.name }}">
+                  <!-- Populate the dropdown options dynamically -->
+                  <option *ngFor="let option of fpoActions" [value]="option.value">
+                    {{ option.verboseName || option.value }}  <!-- Display verboseName if available, otherwise the value -->
+                  </option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>{{ fpo.firstFileName.title }}:</label>
+                <input 
+                  formControlName="{{ fpo.firstFileName.name }}" 
+                  type="text"
+                  [placeholder]="fpo.firstFileName.associatedText || ''" />
+              </div>
+
+              <div class="form-group">
+                <label>{{ fpo.secondFileName.title }}:</label>
+                <input 
+                  formControlName="{{ fpo.secondFileName.name }}" 
+                  type="text"
+                  [placeholder]="fpo.secondFileName.associatedText || ''" />
+              </div>
+
+              <!-- Remove button -->
+              <div class="form-group" style="margin-top: 22px;">
+                <ya-button appearance="primary" type="button" (click)="removeFieldSet(i)">
+                  Remove FPO
+                </ya-button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="options-footer-a">
+        <ya-button appearance="primary" color="primary" type="button" (click)="addFieldSet()">
+          Add Field Set
+        </ya-button>
+      </div>
+
+      <div class="options-footer-u">
+        @if (service.capabilities.upload) {
+          <ya-button
+            appearance="primary"
+            [disabled]="!formIsValid"
+            (click)="startUpload()"
+            icon="chevron_right">
+            UPLOAD
+          </ya-button>
+        }
+      </div>
+    </div>
+  </form>
+</div>
