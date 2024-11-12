@@ -2,8 +2,6 @@ package org.yamcs.cfdp.pdu;
 
 import java.nio.ByteBuffer;
 
-import org.yamcs.utils.StringConverter;
-
 import com.google.common.primitives.Bytes;
 
 /**
@@ -95,6 +93,6 @@ public class FileStoreRequest extends TLV {
 
     @Override
     public String toString() {
-        return "FSR [type=" + ft.name() + ", f1=" + firstFileName + ", f2=" + secondFileName + "]\n";
+        return "FileStoreRequest [type=" + ft.name() + ", f1=" + firstFileName + ", f2=" + secondFileName + "]\n";
     }
 }

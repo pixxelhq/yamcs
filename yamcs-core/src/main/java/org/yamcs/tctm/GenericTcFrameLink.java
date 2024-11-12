@@ -196,7 +196,6 @@ public abstract class GenericTcFrameLink extends AbstractTcDataLink implements R
             System.arraycopy(pcBinary, 0, srs3Frame, dataStart.get() + srs3Offset, length);
             dataEnd.set(dataEnd.get() + length + frameFactory.getPaddingLength(length));
     
-            dataOut(1, srs3Frame.length);
             return frameFactory.encodeFrame(srs3Frame, dataStart, dataEnd, length + frameFactory.getCspHeaderLength());
         }
 

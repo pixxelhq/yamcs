@@ -208,7 +208,7 @@
         }
       </div>
 
-      <div class="options-footer">
+      <div class="options-footer-o">
         @for (option of service.transferOptions; track option; let i = $index) {
           <div [title]="option.description || ''">
             <label>{{ option.title || option.name }}</label>
@@ -250,6 +250,48 @@
           </div>
         }
       </div>
+      @if (service.capabilities.fileProxyOperations) {
+        <div class="options-footer-f">
+          <div formArrayName="fileProxyOps">
+            <div *ngFor="let op of fileProxyOps.controls; let i = index" [formGroupName]="i" class="field-set-row">
+              <div style="display: flex; column-gap: 8px; flex-wrap: wrap">
+                <!-- Dynamic fields -->
+                <div class="form-group">
+                  <label>{{ fpo.action.title }}:</label>
+                  <select formControlName="{{ fpo.action.name }}">
+                    <!-- Populate the dropdown options dynamically -->
+                    <option *ngFor="let option of fpoActions" [value]="option.value">
+                      {{ option.verboseName || option.value }}  <!-- Display verboseName if available, otherwise the value -->
+                    </option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label>{{ fpo.firstFileName.title }}:</label>
+                  <input 
+                    formControlName="{{ fpo.firstFileName.name }}" 
+                    type="text"
+                    [placeholder]="fpo.firstFileName.associatedText || ''" />
+                </div>
+
+                <div class="form-group">
+                  <label>{{ fpo.secondFileName.title }}:</label>
+                  <input 
+                    formControlName="{{ fpo.secondFileName.name }}" 
+                    type="text"
+                    [placeholder]="fpo.secondFileName.associatedText || ''" />
+                </div>
+                <div class="form-group" style="margin-top: 22px;">
+                  <ya-button appearance="primary" (click)="removeFieldSet(i)">Remove FPO</ya-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="options-footer-a">
+          <ya-button appearance="primary" (click)="addFieldSet()">Add Field Set</ya-button>
+        </div>
+      }
     </div>
   </form>
 </div>

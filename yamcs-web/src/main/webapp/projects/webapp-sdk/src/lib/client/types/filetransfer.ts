@@ -12,6 +12,7 @@ export interface FileTransferService {
   remoteEntities: Entity[];
   capabilities: FileTransferCapabilities;
   transferOptions: FileTransferOption[];
+  fileProxyOperationOption: FileProxyOperationOption;
 }
 
 export interface FileTransferOption {
@@ -25,6 +26,18 @@ export interface FileTransferOption {
   allowCustomOption?: boolean;
 }
 
+export interface FileProxyOperationValue {
+  filestoreRequestAction: string;
+  filestoreRequestFirstFileName: string
+  filestoreRequestSecondFileName: string
+}
+
+export interface FileProxyOperationOption {
+  action: FileTransferOption;
+  firstFileName: FileTransferOption;
+  secondFileName: FileTransferOption;
+}
+
 export interface FileTransferCapabilities {
   upload: boolean;
   download: boolean;
@@ -33,6 +46,7 @@ export interface FileTransferCapabilities {
   hasTransferType: boolean;
   pauseResume: boolean;
   fileList: boolean;
+  fileProxyOperations: boolean;
   fileListExtraColumns?: FileListExtraColumnInfo[];
   fileActions?: ActionInfo[];
 }
@@ -83,6 +97,7 @@ export interface CreateTransferRequest {
   source: string;
   destination: string;
   options: { [key: string]: boolean | number | string; };
+  fileProxyOperationOptions: FileProxyOperationValue[]
 }
 
 export interface TransfersPage {
