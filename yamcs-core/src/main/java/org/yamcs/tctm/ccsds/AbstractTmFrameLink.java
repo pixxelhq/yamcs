@@ -45,6 +45,8 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
 
     // srs3
     int stripHeader;
+    int rhLength;
+    byte[] spacecraftIdSrs;
 
     // which error detection algorithm to use (null = no checksum)
     protected ErrorDetectionWordCalculator crc;
@@ -106,6 +108,8 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
         if (config.containsKey("srs3")) {
             YConfiguration srs3 = config.getConfig("srs3");
             crc = AbstractPacketPreprocessor.getErrorDetectionWordCalculator(srs3);
+            rhLength = srs3.getInt("rhLength");
+            spacecraftIdSrs = srs3.getBinary("spacecraftIdSrs");
 
             if (srs3.containsKey("stripHeaders")) {
                 YConfiguration sc = srs3.getConfig("stripHeaders");
@@ -186,19 +190,28 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
 
                 // Reduce length by removing CRC
                 length -= crcSize;
+                dataEnd -= crcSize;
             }
 
             if (se != null) {
                 try {
-                    data = se.decrypt(Arrays.copyOfRange(data, offset, offset + length));
+                    data = se.decrypt(Arrays.copyOfRange(data, offset, dataEnd));
 
                     // Update frame offset and length
                     offset = 0;
                     length = data.length;
+                    dataEnd = data.length;
                 
                 } catch (Exception e) {
                     throw new CorruptedFrameException("Bad decyrption: " + e.toString());
                 }
+            }
+
+            // Check radio SCID
+            byte[] scId = Arrays.copyOfRange(data, offset + rhLength, offset + rhLength + spacecraftIdSrs.length);
+            if (!Arrays.equals(scId, spacecraftIdSrs)) {
+                errFrameCount++;
+                return;
             }
 
             if (redirection != null) {
@@ -250,6 +263,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
         super.resetCounters();
         validFrameCount.set(0);
         invalidFrameCount.set(0);
+        errFrameCount = 0;
     }
 
 }
