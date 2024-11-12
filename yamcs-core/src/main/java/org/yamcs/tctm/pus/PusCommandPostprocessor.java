@@ -20,17 +20,9 @@ import org.yamcs.utils.TimeEncoding;
 
 public class PusCommandPostprocessor implements CommandPostprocessor {
     static Logger log = LoggerFactory.getLogger(PusCommandPostprocessor.class);
-    
+
     protected CommandHistoryPublisher commandHistoryListener;
     protected TimeService timeService;
-
-    public PusCommandPostprocessor(String yamcsInstance) {
-        this(yamcsInstance, null);
-    }
-
-    public PusCommandPostprocessor(String yamcsInstance, YConfiguration config) {
-        timeService = YamcsServer.getTimeService(yamcsInstance);
-    }
 
     protected long getCurrentTime() {
         if (timeService != null) {
@@ -48,6 +40,10 @@ public class PusCommandPostprocessor implements CommandPostprocessor {
 
         commandHistoryListener.publishAck(commandId, CommandHistoryPublisher.AcknowledgeSent_KEY, currentTime, AckStatus.NOK, reason);
         commandHistoryListener.commandFailed(commandId, currentTime, reason);
+    }
+
+    public void init(String yamcsInstance, YConfiguration config) {
+        timeService = YamcsServer.getTimeService(yamcsInstance);
     }
 
     @Override

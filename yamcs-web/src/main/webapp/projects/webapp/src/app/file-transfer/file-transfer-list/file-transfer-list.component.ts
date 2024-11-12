@@ -10,6 +10,7 @@ import { InstancePageTemplateComponent } from '../../shared/instance-page-templa
 import { InstanceToolbarComponent } from '../../shared/instance-toolbar/instance-toolbar.component';
 import { FileTransferTabsComponent } from '../file-transfer-tabs/file-transfer-tabs.component';
 import { TransferFileDialogComponent } from '../transfer-file-dialog/transfer-file-dialog.component';
+import { FileProxyOperationDialogComponent } from '../file-proxy-operation-dialog/file-proxy-operation-dialog.component';
 import { FileTransferIconComponent } from './file-transfer-icon.component';
 import { FileTransferDataSource } from './file-transfer.datasource';
 
@@ -263,6 +264,19 @@ export class FileTransferListComponent implements OnInit {
 
   mayControlFileTransfers() {
     return this.authService.getUser()!.hasSystemPrivilege('ControlFileTransfers');
+  }
+
+  showCreateFileProxyOperationDialog(service: FileTransferService) {
+    this.dialog.open(FileProxyOperationDialogComponent, {
+      width: '70%',
+      height: '70%',
+      autoFocus: false,
+      position: {
+        right: '100',
+      },
+      panelClass: 'dialog-full-size',
+      data: { service, }
+    });
   }
 
   showCreateTransferDialog(service: FileTransferService) {

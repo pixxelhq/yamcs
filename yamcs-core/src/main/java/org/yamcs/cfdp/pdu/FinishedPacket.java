@@ -1,7 +1,9 @@
 package org.yamcs.cfdp.pdu;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import org.yamcs.cfdp.FileDirective;
@@ -20,6 +22,8 @@ public class FinishedPacket extends CfdpPacket implements FileDirective {
     private boolean dataComplete; // Delivery Code
     private FileStatus fileStatus;
     private TLV faultLocation = null;
+
+    private List<FileStoreResponse> filestoreResponses = new ArrayList<>();
 
     public enum FileStatus {
         DELIBERATELY_DISCARDED((byte) 0x00),
@@ -54,6 +58,7 @@ public class FinishedPacket extends CfdpPacket implements FileDirective {
         this.dataComplete = dataComplete;
         this.fileStatus = status;
         this.faultLocation = faultLocation;
+        // ToDo: Support filestoreResponses for incoming transfers
     }
 
     FinishedPacket(ByteBuffer buffer, CfdpHeader header) {
@@ -68,8 +73,11 @@ public class FinishedPacket extends CfdpPacket implements FileDirective {
         while (buffer.hasRemaining()) {
             TLV tempTLV = TLV.readTLV(buffer);
             switch (tempTLV.getType()) {
-            case 6:
+            case TLV.TYPE_ENTITY_ID:
                 this.faultLocation = tempTLV;
+                break;
+            case TLV.TYPE_FILE_STORE_RESPONSE:
+                filestoreResponses.add(FileStoreResponse.fromValue(tempTLV.getValue()));
                 break;
             default:
                 log.debug("Ignoring unknown TLV: {} ", tempTLV);
@@ -88,6 +96,7 @@ public class FinishedPacket extends CfdpPacket implements FileDirective {
         if (faultLocation != null) {
             faultLocation.writeToBuffer(buffer);
         }
+        // ToDo: Support filestoreResponses for incoming transfers
     }
 
     @Override
@@ -96,6 +105,7 @@ public class FinishedPacket extends CfdpPacket implements FileDirective {
         if (faultLocation != null) {
             toReturn += 2 + faultLocation.getValue().length;
         }
+        // ToDo: Support filestoreResponses for incoming transfers
         return toReturn;
     }
 
@@ -116,10 +126,14 @@ public class FinishedPacket extends CfdpPacket implements FileDirective {
         return fileStatus;
     }
 
+    public List<FileStoreResponse> getFileStoreResponses() {
+        return filestoreResponses;
+    }
+
     @Override
     public String toString() {
         return "FinishedPacket [conditionCode=" + conditionCode + ", generatedByEndSystem=" + generatedByEndSystem
-                + ", dataComplete=" + dataComplete + ", fileStatus=" + fileStatus + ", faultLocation="
+                + ", dataComplete=" + dataComplete + ", fileStatus=" + fileStatus + ", fileStoreResponses=" + filestoreResponses + ", faultLocation="
                 + faultLocation + "]";
     }
 }
