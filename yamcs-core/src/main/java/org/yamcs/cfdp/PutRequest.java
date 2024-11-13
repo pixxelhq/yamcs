@@ -12,6 +12,7 @@ import org.yamcs.cfdp.pdu.ConditionCode;
 import org.yamcs.cfdp.pdu.FileStoreRequest;
 import org.yamcs.cfdp.pdu.MessageToUser;
 import org.yamcs.cfdp.pdu.MetadataPacket;
+import org.yamcs.cfdp.pdu.TLV;
 
 /**
  * Put.request (destination CFDP entity ID, [source file name], [destination file name], [segmentation control], [fault
@@ -77,14 +78,15 @@ public class PutRequest extends CfdpRequest {
 
     // Constructor for messages to user
     protected PutRequest(long destinationCfdpEntityId, CfdpPacket.TransmissionMode transmissionMode,
-            List<MessageToUser> messagesToUser) {
+            List<MessageToUser> messagesToUser, List<FileStoreRequest> fileStoreRequests) {
         this(destinationCfdpEntityId);
         this.transmissionMode = transmissionMode;
         this.messagesToUser = messagesToUser;
+        this.fileStoreRequests = fileStoreRequests;
     }
 
     /**
-     * Generate relevant header and metadata the put request (Only implemented for Messages To User currently)
+     * Generate relevant header and metadata for the put request (Only implemented for Messages To User currently)
      *
      * @param initiatorEntityId
      * @param sequenceNumber
@@ -114,13 +116,19 @@ public class PutRequest extends CfdpRequest {
                 destinationCfdpEntityId,
                 sequenceNumber);
 
+        List<TLV> result = new ArrayList<>();
+        if (messagesToUser != null)
+            result.addAll(messagesToUser);
+        if (fileStoreRequests != null)
+            result.addAll(fileStoreRequests);
+
         metadata = new MetadataPacket(
                 closureRequested,
                 checksumType,
                 0,
                 "",
                 "",
-                new ArrayList<>(messagesToUser),
+                result,
                 header);
 
         return transactionId;

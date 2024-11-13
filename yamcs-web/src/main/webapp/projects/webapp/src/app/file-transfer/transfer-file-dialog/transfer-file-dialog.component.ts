@@ -1,9 +1,9 @@
 import { Component, Inject, OnDestroy, ViewChild } from '@angular/core';
-import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup, Validators, UntypedFormArray } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableDataSource } from '@angular/material/table';
-import { Bucket, FileTransferOption, FileTransferService, MessageService, PreferenceStore, RemoteFileListSubscription, StorageClient, WebappSdkModule, YamcsService } from '@yamcs/webapp-sdk';
+import { Bucket, FileTransferOption, FileProxyOperationOption, FileProxyOperationValue, FileTransferService, MessageService, PreferenceStore, RemoteFileListSubscription, StorageClient, WebappSdkModule, YamcsService } from '@yamcs/webapp-sdk';
 import { BehaviorSubject } from 'rxjs';
 import { ObjectSelector } from '../../shared/object-selector/object-selector.component';
 import { FileActionRequest, RemoteFileSelectorComponent } from '../remote-file-selector/remote-file-selector.component';
@@ -23,6 +23,7 @@ export class TransferFileDialogComponent implements OnDestroy {
   public isDownloadEnabled = false;
   public isUploadEnabled = false;
   form: UntypedFormGroup;
+  formBuilder: UntypedFormBuilder;
   readonly service: FileTransferService;
   private storageClient: StorageClient;
   dataSource = new MatTableDataSource<Bucket>();
@@ -42,6 +43,9 @@ export class TransferFileDialogComponent implements OnDestroy {
   private fileListSubscription: RemoteFileListSubscription;
 
   optionsMapping = new Map<FileTransferOption, string>();
+
+  fpo: FileProxyOperationOption;
+  fpoActions: { value: string; verboseName?: string | undefined }[] = [];  // Store dropdown options dynamically
 
   readonly DROPDOWN_SUFFIX = "_Dropdown";
   readonly CUSTOM_OPTION_VALUE = "_CUSTOM_OPTION_";
@@ -71,10 +75,14 @@ export class TransferFileDialogComponent implements OnDestroy {
     private snackBar: MatSnackBar,
     @Inject(MAT_DIALOG_DATA) readonly data: any,
   ) {
+    this.formBuilder = formBuilder;
     this.service = data.service;
     this.prefPrefix += this.service.name + ".";
     this.showBucketSize$ = this.addPreference$('showBucketSize', false);
     this.localDirectory$ = this.addPreference$('localDirectory', "");
+    if (this.service.capabilities.fileProxyOperations)
+      this.fpo = this.service.fileProxyOperationOption;
+
     const firstLocalEntity = this.service.localEntities && this.service.localEntities.length ? this.service.localEntities[0].name : '';
     const firstRemoteEntity = this.service.remoteEntities && this.service.remoteEntities.length ? this.service.remoteEntities[0].name : '';
     const localEntity$ = this.addPreference$('localEntity', firstLocalEntity);
@@ -126,14 +134,31 @@ export class TransferFileDialogComponent implements OnDestroy {
       }
     );
 
-    // Setup forms
-    this.form = formBuilder.group({
-      localFilenames: ['', []],
-      remoteFilenames: ['', []],
-      localEntity: [localEntity$.value, this.service.localEntities && this.service.localEntities.length && Validators.required],
-      remoteEntity: [remoteEntity$.value, this.service.remoteEntities && this.service.remoteEntities.length && Validators.required],
-      ...controlNames
-    });
+    if (this.service.capabilities.fileProxyOperations) {
+      if (this.fpo.action && this.fpo.action.values) {
+        this.fpoActions = this.fpo.action.values;
+      }
+    }
+
+    if (this.service.capabilities.fileProxyOperations) {
+      // Setup forms
+      this.form = formBuilder.group({
+        fileProxyOps: formBuilder.array([]),
+        localFilenames: ['', []],
+        remoteFilenames: ['', []],
+        localEntity: [localEntity$.value, this.service.localEntities && this.service.localEntities.length && Validators.required],
+        remoteEntity: [remoteEntity$.value, this.service.remoteEntities && this.service.remoteEntities.length && Validators.required],
+        ...controlNames
+      });
+    } else {
+      this.form = formBuilder.group({
+        localFilenames: ['', []],
+        remoteFilenames: ['', []],
+        localEntity: [localEntity$.value, this.service.localEntities && this.service.localEntities.length && Validators.required],
+        remoteEntity: [remoteEntity$.value, this.service.remoteEntities && this.service.remoteEntities.length && Validators.required],
+        ...controlNames
+      });
+    }
 
     // Subscribe to some form variables to determine enabled state of buttons
     this.form.get('localFilenames')?.valueChanges.subscribe((value: any) => {
@@ -170,11 +195,36 @@ export class TransferFileDialogComponent implements OnDestroy {
             this.setPreferenceValue("options." + option.name, value != null ? value : "");
         }
       });
+
+      // FIXME: Save FPO preferences
     });
 
     // Show most recent file list
     const remoteDirectory$ = this.addPreference$('remoteDirectory', "");
     this.getFileList(remoteEntity$.value, remoteDirectory$.value || '');
+  }
+
+  // Getter to access the FormArray named 'fieldSets' in the form group
+  get fileProxyOps(): UntypedFormArray {
+    return this.form.get('fileProxyOps') as UntypedFormArray;  // Ensure the FormArray is properly cast
+  }
+
+  addFieldSet() {
+    const actionName = this.fpo.action.name;
+    const firstFileName = this.fpo.firstFileName.name;
+    const secondFileName = this.fpo.secondFileName.name;
+
+    const fieldSet = this.formBuilder.group({
+      [actionName] : ['', Validators.required],  // Dropdown field
+      [firstFileName]: ['', Validators.required],  // First text field
+      [secondFileName]: ['']   // Second text field
+    });
+    this.fileProxyOps.push(fieldSet);
+  }
+
+  // Method to remove a field set by index
+  removeFieldSet(index: number) {
+    this.fileProxyOps.removeAt(index);
   }
 
   getControlName(option: FileTransferOption, index: number) {
@@ -256,7 +306,8 @@ export class TransferFileDialogComponent implements OnDestroy {
         remotePath: paths[1],
         source: sourceEntity,
         destination: destinationEntity,
-        options: this.getTransferOptions()
+        options: this.getTransferOptions(),
+        fileProxyOperationOptions: this.getFpoOptions()
       });
     });
 
@@ -328,6 +379,17 @@ export class TransferFileDialogComponent implements OnDestroy {
         this.lastFileListState$.next(fileList.state);
       });
     }
+  }
+
+  private getFpoOptions() {
+    if (this.service.capabilities.fileProxyOperations) {
+      const fpoValues: FileProxyOperationValue[]| undefined = this.form.get('fileProxyOps')?.value;
+
+      if (fpoValues) {
+        return fpoValues;
+      }
+    }
+    return [];
   }
 
   private getTransferOptions() {

@@ -1,7 +1,11 @@
 package org.yamcs.filetransfer;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+
+import org.yamcs.tctm.pus.tuples.Triple;
 
 public class TransferOptions {
     private boolean overwrite;
@@ -15,6 +19,7 @@ public class TransferOptions {
     private boolean closureRequestedSet = false;
 
     private final Map<String, Object> extraOptions = new HashMap<>();
+    private final List<Triple<String, String, String>> fileProxyOperations = new ArrayList<>();
 
     public boolean isOverwrite() {
         return overwrite;
@@ -62,7 +67,15 @@ public class TransferOptions {
         extraOptions.putAll(options);
     }
 
+    public void putFileProxyOperations(List<Triple<String, String, String>> options) {
+        fileProxyOperations.addAll(options);
+    }
+
     public Map<String, Object> getExtraOptions() {
         return extraOptions;
+    }
+
+    public List<Triple<String, String, String>> getFileProxyOperations () {
+        return fileProxyOperations;
     }
 }

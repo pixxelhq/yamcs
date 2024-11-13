@@ -8,6 +8,7 @@ import org.yamcs.InitException;
 import org.yamcs.YConfiguration;
 import org.yamcs.YamcsService;
 import org.yamcs.protobuf.EntityInfo;
+import org.yamcs.protobuf.FileProxyOperationOption;
 import org.yamcs.protobuf.FileTransferCapabilities;
 import org.yamcs.protobuf.FileTransferOption;
 import org.yamcs.yarch.Bucket;
@@ -58,6 +59,9 @@ public interface FileTransferService extends YamcsService, FileListingService {
      * @return
      */
     public FileTransferCapabilities getCapabilities();
+
+
+    public FileProxyOperationOption getFileProxyOperationOptions();
 
     /**
      * Get configured options for the file transfers

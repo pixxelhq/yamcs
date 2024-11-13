@@ -15,30 +15,49 @@
       </mat-menu>
     }
 
-    @if (service(); as service) {
-      @if (
-        mayControlFileTransfers() && (service.capabilities.download || service.capabilities.upload)
-      ) {
-        <ya-page-button
-          (click)="showCreateTransferDialog(service)"
-          [icon]="
-            service.capabilities.download && service.capabilities.upload
-              ? 'cloud'
-              : service.capabilities.upload
-                ? 'cloud_upload'
-                : 'cloud_download'
-          ">
-          New
-          {{
-            service.capabilities.download && service.capabilities.upload
-              ? "transfer"
-              : service.capabilities.upload
-                ? "upload"
-                : "download"
-          }}
-        </ya-page-button>
+    <mat-menu #exportMenu="matMenu" class="ya-menu">
+      @if (service(); as service) {
+        @if (
+          mayControlFileTransfers() && (service.capabilities.download || service.capabilities.upload)
+        ) {
+          <ya-page-button
+            (click)="showCreateTransferDialog(service)"
+            [icon]="
+              service.capabilities.download && service.capabilities.upload
+                ? 'cloud'
+                : service.capabilities.upload
+                  ? 'cloud_upload'
+                  : 'cloud_download'
+            ">
+            New
+            {{
+              service.capabilities.download && service.capabilities.upload
+                ? "transfer"
+                : service.capabilities.upload
+                  ? "upload"
+                  : "download"
+            }}
+          </ya-page-button>
+        }
       }
-    }
+      @if (service(); as service) {
+        @if (
+          mayControlFileTransfers() && (service.capabilities.fileProxyOperations)
+        ) {
+          <ya-page-button
+          (click)="showCreateFileProxyOperationDialog(service)"
+          [icon]="'cloud_upload'"
+          >
+            New File Proxy Operation
+          </ya-page-button>
+        }
+      }
+    </mat-menu>
+    <ya-page-button
+      [matMenuTriggerFor]="exportMenu"
+      icon="save_alt">
+      Actions
+    </ya-page-button>
   </app-instance-toolbar>
 
   <div class="table-wrapper">

@@ -27,6 +27,7 @@ import org.yamcs.cfdp.pdu.ConditionCode;
 import org.yamcs.cfdp.pdu.EofPacket;
 import org.yamcs.cfdp.pdu.FileDataPacket;
 import org.yamcs.cfdp.pdu.FileDirectiveCode;
+import org.yamcs.cfdp.pdu.FileStoreResponse;
 import org.yamcs.cfdp.pdu.FinishedPacket;
 import org.yamcs.cfdp.pdu.KeepAlivePacket;
 import org.yamcs.cfdp.pdu.MetadataPacket;
@@ -351,6 +352,15 @@ public class CfdpOutgoingTransfer extends OngoingCfdpTransfer {
             return;
         }
 
+        // Handle FileStore responses
+        List<FileStoreResponse> fileStoreResponses = finishedPacket.getFileStoreResponses();
+        if (!fileStoreResponses.isEmpty()) {
+            for (FileStoreResponse fr: fileStoreResponses) {
+                if (fr.getStatusCode() != 0)
+                    pushError(fr.toString());
+            }
+        }
+
         // depending on the conditioncode, the transfer was a success or a failure
         if (finishedPacket.getConditionCode() != ConditionCode.NO_ERROR) {
             complete(finishedPacket.getConditionCode());
@@ -544,12 +554,19 @@ public class CfdpOutgoingTransfer extends OngoingCfdpTransfer {
     }
 
     private MetadataPacket getMetadataPacket() {
+        List<TLV> result = new ArrayList<>();
+
+        if (request.getMessagesToUser() != null)
+            result.addAll(request.getMessagesToUser());
+        if (request.getFileStoreRequests() != null)
+            result.addAll(request.getFileStoreRequests());
+
         return new MetadataPacket(
                 closureRequested, checksumType,
                 request.getFileLength(),
                 request.getSourceFileName(),
                 request.getDestinationFileName(),
-                new ArrayList<>(request.getFileStoreRequests()), directiveHeader);
+                result, directiveHeader);
     }
 
     private FileDataPacket getNextFileDataPacket() {

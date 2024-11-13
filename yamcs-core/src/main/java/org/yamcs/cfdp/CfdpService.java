@@ -64,6 +64,7 @@ import org.yamcs.filetransfer.RemoteFileListMonitor;
 import org.yamcs.filetransfer.TransferMonitor;
 import org.yamcs.filetransfer.TransferOptions;
 import org.yamcs.protobuf.EntityInfo;
+import org.yamcs.protobuf.FileProxyOperationOption;
 import org.yamcs.protobuf.FileTransferCapabilities;
 import org.yamcs.protobuf.FileTransferOption;
 import org.yamcs.protobuf.ListFilesResponse;
@@ -120,11 +121,17 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
 
     // FileTransferOption name literals
     private final String OVERWRITE_OPTION = "overwrite";
-    private final String RELIABLE_OPTION = "reliable";
     private final String CLOSURE_OPTION = "closureRequested";
     private final String CREATE_PATH_OPTION = "createPath";
+
+    private final String RELIABLE_OPTION = "reliable";
     private final String PDU_DELAY_OPTION = "pduDelay";
     private final String PDU_SIZE_OPTION = "pduSize";
+
+    // FileStoreRequests
+    private final String FSR_ACTION = "filestoreRequestAction";
+    private final String FSR_FIRST_FILE_NAME = "filestoreRequestFirstFileName";
+    private final String FSR_SECOND_FILE_NAME = "filestoreRequestSecondFileName";
 
     Map<CfdpTransactionId, OngoingCfdpTransfer> pendingTransfers = new ConcurrentHashMap<>();
     Queue<QueuedCfdpOutgoingTransfer> queuedTransfers = new ConcurrentLinkedQueue<>();
@@ -171,6 +178,7 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
     private boolean canChangePduSize;
     private List<Integer> pduSizePredefinedValues;
     private boolean canChangePduDelay;
+    private boolean canSendFileStoreRequest;
     private List<Integer> pduDelayPredefinedValues;
 
     private Stream dbStream;
@@ -179,8 +187,6 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
 
     Sequence idSeq;
     static final Map<String, ConditionCode> VALID_CODES = new HashMap<>();
-
-    private List<Triple<Integer, String, String>> filestoreRequests = new ArrayList<>();
 
     static {
         VALID_CODES.put("AckLimitReached", ConditionCode.ACK_LIMIT_REACHED);
@@ -242,6 +248,7 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
         spec.addOption("pduSizePredefinedValues", OptionType.LIST).withDefault(Collections.emptyList())
                 .withElementType(OptionType.INTEGER);
         spec.addOption("canChangePduDelay", OptionType.BOOLEAN).withDefault(false);
+        spec.addOption("canSendFileStoreRequest", OptionType.BOOLEAN).withDefault(false);
         spec.addOption("pduDelayPredefinedValues", OptionType.LIST).withDefault(Collections.emptyList())
                 .withElementType(OptionType.INTEGER);
         spec.addOption("eofAckTimeout", OptionType.INTEGER).withDefault(5000);
@@ -277,7 +284,6 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
                 .withDefault(new HashMap<>());
         spec.addOption("automaticDirectoryListingReloads", OptionType.BOOLEAN).withDefault(false);
 
-        spec.addOption("filestoreRequests", OptionType.LIST).withElementType(OptionType.MAP).withSpec(filestoreSpec);
         return spec;
     }
 
@@ -314,6 +320,7 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
         canChangePduSize = config.getBoolean("canChangePduSize");
         pduSizePredefinedValues = config.getList("pduSizePredefinedValues");
         canChangePduDelay = config.getBoolean("canChangePduDelay");
+        canSendFileStoreRequest = config.getBoolean("canSendFileStoreRequest");
         pduDelayPredefinedValues = config.getList("pduDelayPredefinedValues");
         hasDownloadCapability = config.getBoolean("hasDownloadCapability");
         hasFileListingCapability = config.getBoolean("hasFileListingCapability");
@@ -372,16 +379,6 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
         }
         setupRecording(ydb);
         setupFileListTable(ydb);
-
-        // Load filestoreRequests from the config
-        if (config.containsKey("filestoreRequests")) {
-            for (YConfiguration fr: config.getConfigList("filestoreRequests")) {
-                int action = fr.getInt("action");
-                String firstFileName = fr.getString("firstFileName");
-                String secondFileName = fr.getString("secondFileName", null);
-                filestoreRequests.add(new Triple<Integer,String,String>(action, firstFileName, secondFileName));
-            }
-        }
     }
 
     private Map<ConditionCode, FaultHandlingAction> readFaultHandlers(Map<String, String> map) {
@@ -1000,27 +997,24 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
                 CREATE_PATH_OPTION, options.isCreatePath()));
 
         OptionValues optionValues = getOptionValues(options.getExtraOptions());
+        List<Triple<String, String, String>> fpOptionValues = options.getFileProxyOperations();
 
+        var doubleOptions = optionValues.doubleOptions;
         booleanOptions.putAll(optionValues.booleanOptions);
 
         // Generate Filestore Requests
-        List<FileStoreRequest> fsr = new ArrayList<>();
-        for (Triple<Integer, String, String> fr: filestoreRequests) {
-            FilestoreType ft = FilestoreType.fromByte(fr.getFirst().byteValue());
-            LV firstFileName = new LV(fr.getSecond());
-            LV secondFileName = fr.getThird() == null? null: new LV(fr.getThird());
-
-            fsr.add(new FileStoreRequest(ft, firstFileName, secondFileName));
-        }
+        List<FileStoreRequest> fileStoreRequests = fpOptionValues.stream()
+                .map(fs -> new FileStoreRequest(FilestoreType.fromByte(Byte.parseByte(fs.getFirst().split("_")[0])), new LV(fs.getSecond()), (fs.getThird() == "" || fs.getThird() == null)? null: new LV(fs.getThird())))
+                .collect(Collectors.toList());
 
         FilePutRequest request = new FilePutRequest(sourceId, destinationId, objectName, absoluteDestinationPath,
                 booleanOptions.get(OVERWRITE_OPTION), booleanOptions.get(RELIABLE_OPTION),
-                booleanOptions.get(CLOSURE_OPTION), booleanOptions.get(CREATE_PATH_OPTION), bucket, objData, fsr);
+                booleanOptions.get(CLOSURE_OPTION), booleanOptions.get(CREATE_PATH_OPTION), bucket, objData, fileStoreRequests);
+
+        Double pduSize = doubleOptions.get(PDU_SIZE_OPTION);
+        Double pduDelay = doubleOptions.get(PDU_DELAY_OPTION);
+
         long creationTime = YamcsServer.getTimeService(yamcsInstance).getMissionTime();
-
-        Double pduSize = optionValues.doubleOptions.get(PDU_SIZE_OPTION);
-        Double pduDelay = optionValues.doubleOptions.get(PDU_DELAY_OPTION);
-
         if (numPendingUploads() < maxNumPendingUploads) {
             return processPutRequest(sourceId, idSeq.next(), creationTime, request, bucket,
                     pduSize != null ? pduSize.intValue() : null, pduDelay != null ? pduDelay.intValue() : null);
@@ -1035,7 +1029,49 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
             executor.submit(this::tryStartQueuedTransfer);
             return transfer;
         }
+    }
 
+    public synchronized FileTransfer startFsr(String sourceEntity, String destinationEntity, TransferOptions options) {
+        if (!canSendFileStoreRequest) {
+            throw new InvalidRequestException("Sending File Proxy Operations is not enabled on this CFDP service");
+        }
+        long sourceId = getEntityFromName(sourceEntity, localEntities).id;
+        long destinationId = getEntityFromName(destinationEntity, remoteEntities).id; 
+
+        OptionValues optionValues = getOptionValues(options.getExtraOptions());
+        List<Triple<String, String, String>> fpOptionValues = options.getFileProxyOperations();
+
+        CfdpPacket.TransmissionMode transmissionMode = CfdpPacket.TransmissionMode.UNACKNOWLEDGED;
+        if (Boolean.TRUE.equals(optionValues.booleanOptions.get(RELIABLE_OPTION))) {
+            transmissionMode = CfdpPacket.TransmissionMode.ACKNOWLEDGED;
+        }
+
+        // Generate Filestore Requests
+        List<FileStoreRequest> fileStoreRequests = fpOptionValues.stream()
+                .map(fs -> new FileStoreRequest(FilestoreType.fromByte(Byte.parseByte(fs.getFirst().split("_")[0])), new LV(fs.getSecond()), (fs.getThird() == "" || fs.getThird() == null)? null: new LV(fs.getThird())))
+                .collect(Collectors.toList());
+
+        Double pduSize = optionValues.doubleOptions.get(PDU_SIZE_OPTION);
+        Double pduDelay = optionValues.doubleOptions.get(PDU_DELAY_OPTION);
+
+        PutRequest request = new PutRequest(destinationId, transmissionMode, null, fileStoreRequests);
+        CfdpTransactionId transactionId = request.process(sourceId, idSeq.next(), ChecksumType.MODULAR, config);
+
+        long creationTime = YamcsServer.getTimeService(yamcsInstance).getMissionTime();
+        if (numPendingUploads() < maxNumPendingUploads) {
+            return processPutRequest(sourceId, transactionId.getSequenceNumber(), creationTime, request, null,
+                pduSize != null ? pduSize.intValue() : null, pduDelay != null ? pduDelay.intValue() : null);
+        } else {
+            QueuedCfdpOutgoingTransfer transfer = new QueuedCfdpOutgoingTransfer(sourceId, transactionId.getSequenceNumber(), creationTime,
+                    request, null,
+                    pduSize != null ? pduSize.intValue() : null, pduDelay != null ? pduDelay.intValue() : null);
+            dbStream.emitTuple(CompletedTransfer.toInitialTuple(transfer));
+            queuedTransfers.add(transfer);
+            transferListeners.forEach(l -> l.stateChanged(transfer));
+
+            executor.submit(this::tryStartQueuedTransfer);
+            return transfer;
+        }
     }
 
     @Override
@@ -1084,7 +1120,7 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
         Double pduSize = optionValues.doubleOptions.get(PDU_SIZE_OPTION);
         Double pduDelay = optionValues.doubleOptions.get(PDU_DELAY_OPTION);
 
-        PutRequest request = new PutRequest(sourceId, transmissionMode, messagesToUser);
+        PutRequest request = new PutRequest(sourceId, transmissionMode, messagesToUser, null);
         CfdpTransactionId transactionId = request.process(destinationId, idSeq.next(), ChecksumType.MODULAR, config);
 
         long creationTime = YamcsServer.getTimeService(yamcsInstance).getMissionTime();
@@ -1133,7 +1169,7 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
                 destinationEntity.id,
                 Boolean.TRUE.equals(options.get(RELIABLE_OPTION)) ? CfdpPacket.TransmissionMode.ACKNOWLEDGED
                         : CfdpPacket.TransmissionMode.UNACKNOWLEDGED,
-                messagesToUser);
+                messagesToUser, null);
         CfdpTransactionId transactionId = request.process(sourceEntity.id, idSeq.next(), ChecksumType.MODULAR, config);
 
         OptionValues optionValues = getOptionValues(options);
@@ -1382,13 +1418,58 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
     }
 
     @Override
+    public FileProxyOperationOption getFileProxyOperationOptions() {
+        FileProxyOperationOption options = null;
+        if (canSendFileStoreRequest) {
+            List<String> predefinedFsrActions = Arrays.stream(FileStoreRequest.FilestoreType.values())
+                                                    .map(fsrt -> (int) fsrt.getByte() + "_" + fsrt.name())
+                                                    .collect(Collectors.toList());
+            FileTransferOption action = FileTransferOption.newBuilder()
+                    .setName(FSR_ACTION)
+                    .setType(FileTransferOption.Type.STRING)
+                    .setTitle("FSR Action")
+                    .addAllValues(predefinedFsrActions.stream()
+                            .map(value -> FileTransferOption.Value.newBuilder().setValue(value.toString()).build())
+                            .collect(Collectors.toList()))
+                    .setAllowCustomOption(false)
+                    .build();
+
+            FileTransferOption firstFileName = FileTransferOption.newBuilder()
+                    .setName(FSR_FIRST_FILE_NAME)
+                    .setType(FileTransferOption.Type.STRING)
+                    .setTitle("FSR First File Name")
+                    .setAllowCustomOption(true)
+                    .setAssociatedText("First File Name")
+                    .build();
+
+            FileTransferOption secondFileName = FileTransferOption.newBuilder()
+                    .setName(FSR_SECOND_FILE_NAME)
+                    .setType(FileTransferOption.Type.STRING)
+                    .setTitle("FSR First Second Name")
+                    .setAllowCustomOption(true)
+                    .setAssociatedText("Second File Name")
+                    .build();
+
+            options = FileProxyOperationOption.newBuilder()
+                    .setAction(action)
+                    .setFirstFileName(firstFileName)
+                    .setSecondFileName(secondFileName)
+                    .build();
+                    
+        }
+
+        return options;
+    }
+    
+    @Override
     protected void addCapabilities(FileTransferCapabilities.Builder builder) {
         builder.setDownload(hasDownloadCapability)
                 .setUpload(true)
                 .setRemotePath(true)
                 .setFileList(hasFileListingCapability)
                 .setPauseResume(true)
-                .setHasTransferType(true);
+                .setHasTransferType(true)
+                .setFileProxyOperations(canSendFileStoreRequest);
     }
 
     ScheduledThreadPoolExecutor getExecutor() {
