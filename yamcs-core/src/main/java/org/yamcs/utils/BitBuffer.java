@@ -365,6 +365,9 @@ public class BitBuffer {
         return new BitBuffer(b, idx(position >> 3));
     }
 
+    /**
+     * returns the array backing the BitBuffer
+     */
     public byte[] array() {
         return b;
     }
