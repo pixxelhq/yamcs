@@ -2579,6 +2579,7 @@ public class XtceStaxReader extends AbstractStaxReader {
                 readLocationInContainerInBits(indirectParameterRefEntry);
             } else if (isStartElementWithName(ELEM_PARAMETER_INSTANCE)) {
                 ParameterInstanceRef ref = readParameterInstanceRef(spaceSystem, null);
+                ref.setRelativeTo(InstanceRelativeTo.CURRENT_ENTRY_WITHIN_PACKET);
                 indirectParameterRefEntry.setParameterRef(ref);
             } else if (isEndElementWithName(ELEM_INDIRECT_PARAMETER_REF_ENTRY)) {
                 if (indirectParameterRefEntry.getParameterRef() == null) {
@@ -3456,9 +3457,14 @@ public class XtceStaxReader extends AbstractStaxReader {
             } else if (isStartElementWithName(ELEM_ENCODING)) {
                 readEncoding(spaceSystem, typeBuilder);
             } else if (isEndElementWithName(ELEM_ABSOLUTE_TIME_ARGUMENT_TYPE)) {
+
                 if (typeBuilder.getReferenceTime() == null) {
-                    throw new XMLStreamException("AbsoluteTimeArgumentType without a reference time not supported",
-                            xmlEvent.getLocation());
+                    if (!(typeBuilder.getEncoding() instanceof BinaryDataEncoding.Builder bdb)
+                            || bdb.getToBinaryTransformAlgorithm() == null) {
+                        throw new XMLStreamException("AbsoluteTimeArgumentType without a reference time not supported "
+                                + "(except if it used a BinaryDataEncoding with an algorithm which could produce directly an absolute time)",
+                                xmlEvent.getLocation());
+                    }
                 }
                 return incompleteType;
             } else {
