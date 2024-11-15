@@ -743,7 +743,7 @@ public class YConfiguration {
         } else if (o instanceof String) {
             String stringValue = getString(m, key);
             try {
-                return StringConverter.hexStringToArray((String) o);
+                return StringConverter.hexStringToArray((String) stringValue);
             } catch (IllegalArgumentException e) {
                 throw new ConfigurationException("'" + stringValue + "' is not a hexadecimal string");
             }
