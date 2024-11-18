@@ -32,6 +32,7 @@ import org.yamcs.tctm.TmSink;
 import org.yamcs.protobuf.Pvalue.AcquisitionStatus;
 import org.yamcs.protobuf.Yamcs.Value.Type;
 import org.yamcs.tctm.ccsds.VcDownlinkManagedParameters.TMDecoder;
+import org.yamcs.tctm.pus.PusTmManager;
 import org.yamcs.time.Instant;
 import org.yamcs.time.TimeService;
 import org.yamcs.utils.StringConverter;
@@ -61,6 +62,8 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
     PacketDecoder packetDecoder;
     PixxelPacketDecoder pPacketDecoder;
     PixxelPacketMultipleDecoder pMultipleDecoder;
+
+    protected AtomicLong rejectedPacketCount = new AtomicLong();
 
     protected AtomicLong idleFrameCount = new AtomicLong();
     protected AtomicLong packetCount = new AtomicLong();
@@ -308,17 +311,22 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
             log.trace("VC {}, SEQ {} decoded packet of length {}", vmp.vcId, lastFrameSeq, p.length);
         }
 
-        // Increment only for non-idle vcId's
-        if (!isIdleVcid)
-            packetCountIn(1, p.length);
-
         TmPacket pwt = new TmPacket(timeService.getMissionTime(), p);
         pwt.setEarthReceptionTime(ertime);
 
         pwt = packetPreprocessor.process(pwt);
-        if (pwt != null) {
-            tmSink.processPacket(pwt);
+
+        // Increment only for non-idle vcId's
+        if (!isIdleVcid) {
+            packetCountIn(1, p.length);
+
+            // Perform quick PUS checks?
+            if (!PusTmManager.quickPusVerification(pwt))
+                rejectedPacketCountIn(1);
         }
+
+        if (pwt != null)
+            tmSink.processPacket(pwt);
     }
 
     @Override
@@ -392,6 +400,7 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
         extra.put("Idle CCSDS Frames", idleFrameCount.get());
         extra.put("Valid CCSDS Packets", packetCount.get());
         extra.put("Is Idle vcId link?", isIdleVcid);
+        extra.put("Rejected Packets", rejectedPacketCount.get());
         return extra;
     }
 
@@ -405,7 +414,7 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
             return "DISABLED";
 
         } else {
-            return String.format("Idle CCSDS Frames: %d%n | Valid CCSDS Packets: %d%n", idleFrameCount.get(), packetCount.get());
+            return String.format("Idle CCSDS Frames: %d%n | Valid CCSDS Packets: %d%n | Rejected Packet Count: %d%n", idleFrameCount.get(), packetCount.get(), rejectedPacketCount.get());
         }
     }
 
@@ -486,5 +495,9 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
     protected void packetCountIn(long inCount, long size) {
         packetCount.addAndGet(inCount);
         packetCountRateMeter.mark(size);
+    }
+
+    protected void rejectedPacketCountIn(long inCount) {
+        rejectedPacketCount.addAndGet(inCount);
     }
 }

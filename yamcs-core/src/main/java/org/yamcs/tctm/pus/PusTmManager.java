@@ -1,6 +1,7 @@
 package org.yamcs.tctm.pus;
 
 import java.io.IOException;
+import java.lang.StackWalker.Option;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -72,6 +73,23 @@ public class PusTmManager extends AbstractYamcsService implements StreamSubscrib
     protected int DEFAULT_SPARE_OFFSET = 2;
     public static int spareOffsetForFractionTime;
 
+    // FIXME: Move these to config later
+    public static Map<Integer, List<Integer>> supportedServices = new HashMap<>();
+    static {
+        supportedServices.put(11, List.of(11, 13));
+        supportedServices.put(15, List.of(40, 19, 6, 13, 38, 36, 23));
+        supportedServices.put(5, List.of(8, 4, 1, 3, 2));
+        supportedServices.put(14, List.of(8, 4, 16, 12));
+        supportedServices.put(9, List.of(2));
+        supportedServices.put(1, List.of(1, 2, 7, 8));
+        supportedServices.put(17, List.of(2, 4));
+        supportedServices.put(6, List.of(4, 6));
+        supportedServices.put(13, List.of(1, 16, 3, 2));
+        supportedServices.put(3, List.of(25, 26));
+        supportedServices.put(20, List.of(2));
+        supportedServices.put(2, List.of(9, 6, 12));
+    }
+
     @Override
     public Spec getSpec() {
         Spec spec = new Spec();
@@ -126,6 +144,12 @@ public class PusTmManager extends AbstractYamcsService implements StreamSubscrib
 
         ydb = YarchDatabase.getInstance(yamcsInstance);
         timeService = YamcsServer.getTimeService(yamcsInstance);
+
+        // ToDo; Supported services exposed via config files
+        if (config.containsKey("supportedServices")) {
+            YConfiguration ss = config.getConfig("supportedServices");
+            ss.getKeys();
+        }
 
         if (!config.containsKey("streamMatrix"))
             throw new ConfigurationException(this.getClass() + ": streamMatrix needs to be defined to know the inputStream -> outStream mapping");
@@ -228,6 +252,20 @@ public class PusTmManager extends AbstractYamcsService implements StreamSubscrib
                 tmSink.emitTmTuple(pkt, stream, tmLinkName);
             }
         }
+    }
+
+    public static boolean quickPusVerification(TmPacket tmPacket) {
+        PusTmCcsdsPacket pPkt = new PusTmCcsdsPacket(tmPacket.getPacket());
+        int serviceType = pPkt.getMessageType();
+        int subServiceType = pPkt.getMessageSubType();
+
+        if (!supportedServices.containsKey(serviceType))
+            return false;
+        
+        if(!supportedServices.get(serviceType).contains(subServiceType))
+            return false;
+
+        return true;
     }
 
     @Override
