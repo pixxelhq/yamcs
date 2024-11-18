@@ -46,7 +46,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
     // srs3
     int stripHeader;
     int rhLength;
-    byte[] spacecraftIdSrs;
+    byte[] spacecraftIdSrs = null;
 
     // which error detection algorithm to use (null = no checksum)
     protected ErrorDetectionWordCalculator crc;
@@ -109,7 +109,9 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
             YConfiguration srs3 = config.getConfig("srs3");
             crc = AbstractPacketPreprocessor.getErrorDetectionWordCalculator(srs3);
             rhLength = srs3.getInt("rhLength");
-            spacecraftIdSrs = srs3.getBinary("spacecraftIdSrs");
+
+            if (srs3.containsKey("spacecraftIdSrs"))
+                spacecraftIdSrs = srs3.getBinary("spacecraftIdSrs");
 
             if (srs3.containsKey("stripHeaders")) {
                 YConfiguration sc = srs3.getConfig("stripHeaders");
@@ -207,11 +209,13 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                 }
             }
 
-            // Check radio SCID
-            byte[] scId = Arrays.copyOfRange(data, offset + rhLength, offset + rhLength + spacecraftIdSrs.length);
-            if (!Arrays.equals(scId, spacecraftIdSrs)) {
-                errFrameCount++;
-                return;
+            if (spacecraftIdSrs != null) {
+                // Check radio SCID
+                byte[] scId = Arrays.copyOfRange(data, offset + rhLength, offset + rhLength + spacecraftIdSrs.length);
+                if (!Arrays.equals(scId, spacecraftIdSrs)) {
+                    errFrameCount++;
+                    return;
+                }
             }
 
             if (redirection != null) {
