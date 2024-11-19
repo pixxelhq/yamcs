@@ -297,7 +297,7 @@ public abstract class AbstractPacketPreprocessor implements PacketPreprocessor {
             }
         } catch (Exception e) {
             log.warn("Failed to extract time from the packet", e);
-            eventProducer.sendWarning("Failed to extract time from packet: " + e);
+            eventProducer.sendCritical("Failed to extract time from packet: " + e);
             tmPacket.setInvalid(true);
         }
     }
