@@ -258,7 +258,7 @@
                 <!-- Dynamic fields -->
                 <div class="form-group">
                   <label>{{ fpo.action.title }}:</label>
-                  <select formControlName="{{ fpo.action.name }}">
+                  <select formControlName="{{ fpo.action.name }}" style="min-height: 30px;">
                     <!-- Populate the dropdown options dynamically -->
                     <option *ngFor="let option of fpoActions" [value]="option.value">
                       {{ option.verboseName || option.value }}  <!-- Display verboseName if available, otherwise the value -->
@@ -269,6 +269,7 @@
                 <div class="form-group">
                   <label>{{ fpo.firstFileName.title }}:</label>
                   <input 
+                    style="width: 300px; min-height: 30px;"
                     formControlName="{{ fpo.firstFileName.name }}" 
                     type="text"
                     [placeholder]="fpo.firstFileName.associatedText || ''" />
@@ -277,6 +278,7 @@
                 <div class="form-group">
                   <label>{{ fpo.secondFileName.title }}:</label>
                   <input 
+                    style="width: 300px; min-height: 30px;"
                     formControlName="{{ fpo.secondFileName.name }}" 
                     type="text"
                     [placeholder]="fpo.secondFileName.associatedText || ''" />
