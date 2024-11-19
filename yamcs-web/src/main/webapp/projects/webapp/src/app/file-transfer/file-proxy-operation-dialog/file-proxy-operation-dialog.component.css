@@ -21,7 +21,7 @@
     display: grid;
     grid-auto-flow: column;
     grid-template-rows: [header] min-content [footer] min-content [options-footer-o] min-content [options-footer-f] min-content [options-footer-a] min-content [options-footer-u] min-content;
-    grid-template-columns: [local] 600px  [remote] 200px ;
+    grid-template-columns: [local] 900px  [remote] 200px ;
     column-gap: 8px;
     flex: 1;
     min-height: 0;
@@ -240,4 +240,5 @@
 .field-set-row .form-group input {
   padding: 5px;
   min-width: 150px; /* Set a minimum width for inputs */
+  width: 300px;
 }
