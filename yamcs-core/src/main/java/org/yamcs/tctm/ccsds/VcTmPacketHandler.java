@@ -316,7 +316,7 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
 
         pwt = packetPreprocessor.process(pwt);
 
-        System.out.println("LinkName: " + name + " | SeqCount: " + pwt.getSeqCount() + " | Gentime: " + pwt.getGenerationTime());
+        System.out.println("LinkName: " + name + " | SeqCount: " + pwt.getSeqCount() + " | Gentime: " + pwt.getGenerationTime() + " | Packet: " + StringConverter.arrayToHexString(pwt.getPacket()));
 
         if (pwt != null) {
             // Increment only for non-idle vcId's
