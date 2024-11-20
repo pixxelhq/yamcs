@@ -146,7 +146,6 @@ public class PusPacketPreprocessor extends CcsdsPacketPreprocessor {
 
     private void extactAndSetTime(TmPacket tmPacket) {
         byte[] packet = tmPacket.getPacket();
-        boolean corrupted = false;
         if (!useLocalGenerationTime && timeEpoch == null || timeEpoch == TimeEpochs.NONE) {
             long obt = timeDecoder.decodeRaw(packet, pktTimeOffset);
             Instant ert = tmPacket.getEarthReceptionTime();
@@ -157,7 +156,6 @@ public class PusPacketPreprocessor extends CcsdsPacketPreprocessor {
         setRealtimePacketTime(tmPacket, pktTimeOffset);
 
         int apidseqcount = ByteBuffer.wrap(packet).getInt(0);
-        tmPacket.setInvalid(corrupted);
         tmPacket.setSequenceCount(apidseqcount);
     }
 }

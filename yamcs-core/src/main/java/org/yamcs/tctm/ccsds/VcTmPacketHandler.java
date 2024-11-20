@@ -316,17 +316,20 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
 
         pwt = packetPreprocessor.process(pwt);
 
-        // Increment only for non-idle vcId's
-        if (!isIdleVcid) {
-            packetCountIn(1, p.length);
+        if (pwt != null) {
+            // Increment only for non-idle vcId's
+            if (!isIdleVcid) {
+                packetCountIn(1, p.length);
 
-            // Perform quick PUS checks?
-            if (!PusTmManager.quickPusVerification(pwt))
-                rejectedPacketCountIn(1);
-        }
+                // Perform quick PUS checks?
+                if (!PusTmManager.quickPusVerification(pwt))
+                    rejectedPacketCountIn(1);
+            }
 
-        if (pwt != null)
             tmSink.processPacket(pwt);
+        } else {
+            log.info("Received a packet that could not be pre-processed: " + StringConverter.arrayToHexString(p));
+        }
     }
 
     @Override
