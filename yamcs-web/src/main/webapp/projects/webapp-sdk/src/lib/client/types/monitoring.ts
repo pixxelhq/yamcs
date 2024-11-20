@@ -163,6 +163,17 @@ export interface EditReplayProcessorRequest {
   loop?: boolean;
 }
 
+export interface RebuildParametersOptions {
+  /**
+   * Inclusive lower bound
+   */
+  start?: string;
+  /**
+   * Exclusive upper bound
+   */
+  stop?: string;
+}
+
 export interface GetPacketsOptions {
   /**
    * Inclusive lower bound

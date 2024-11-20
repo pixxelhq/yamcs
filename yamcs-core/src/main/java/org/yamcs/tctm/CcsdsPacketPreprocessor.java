@@ -22,7 +22,7 @@ public abstract class CcsdsPacketPreprocessor extends AbstractPacketPreprocessor
         int oldseq = ai.getAndSet(newseq);
 
         if (checkForSequenceDiscontinuity && oldseq != -1 && ((newseq - oldseq) & 0x3FFF) != 1) {
-            eventProducer.sendWarning("SEQ_COUNT_JUMP",
+            eventProducer.sendWatch("SEQ_COUNT_JUMP",
                     "Sequence count jump for apid: " + apid + " old seq: " + oldseq + " newseq: " + newseq);
         }
     }

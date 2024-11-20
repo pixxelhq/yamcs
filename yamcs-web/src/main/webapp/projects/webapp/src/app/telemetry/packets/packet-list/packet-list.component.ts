@@ -6,10 +6,12 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { DownloadPacketsOptions, GetPacketsOptions, MessageService, Packet, Synchronizer, WebappSdkModule, YaColumnInfo, YaSelectOption, YamcsService, utils } from '@yamcs/webapp-sdk';
 import { BehaviorSubject } from 'rxjs';
 import { HexComponent } from '../../../shared/hex/hex.component';
+import { PacketFillerDialogComponent } from '../packet-filler-dialog/packet-filler-dialog.component';
 import { InstancePageTemplateComponent } from '../../../shared/instance-page-template/instance-page-template.component';
 import { InstanceToolbarComponent } from '../../../shared/instance-toolbar/instance-toolbar.component';
 import { PacketDownloadLinkPipe } from './packet-download-link.pipe';
 import { PacketsDataSource } from './packets.datasource';
+import { MatDialog } from '@angular/material/dialog';
 
 const defaultInterval = 'PT1H';
 
@@ -84,6 +86,7 @@ export class PacketListComponent {
   private link: string;
 
   constructor(
+    private dialog: MatDialog,
     readonly yamcs: YamcsService,
     private router: Router,
     private route: ActivatedRoute,
@@ -198,6 +201,17 @@ export class PacketListComponent {
       this.validStart = utils.subtractDuration(this.validStop, interval);
       this.loadData();
     }
+  }
+
+  rebuildArchive() {
+    const { controls } = this.filterForm;
+    this.dialog.open(PacketFillerDialogComponent, {
+      width: '800px',
+      data: {
+        start: this.validStart,
+        stop: this.validStop,
+      },
+    });
   }
 
   // Used in table trackBy to prevent continuous row recreation
