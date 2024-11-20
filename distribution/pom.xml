@@ -3,7 +3,7 @@
   <parent>
     <groupId>org.yamcs</groupId>
     <artifactId>yamcs</artifactId>
-    <version>5.10.7-Pixxel-5.3.0</version>
+    <version>5.10.7-Pixxel-5.4.0</version>
   </parent>
 
   <artifactId>distribution</artifactId>
