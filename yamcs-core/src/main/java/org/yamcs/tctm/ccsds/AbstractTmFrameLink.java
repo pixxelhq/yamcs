@@ -192,7 +192,6 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
 
                 // Reduce length by removing CRC
                 length -= crcSize;
-                dataEnd -= crcSize;
             }
 
             if (se != null) {

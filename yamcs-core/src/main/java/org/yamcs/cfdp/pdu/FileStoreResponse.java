@@ -48,6 +48,31 @@ public class FileStoreResponse extends TLV {
                     mm.put((byte) 2, "Delete not allowed");
                 }
                 case DENY_FILE, DENY_DIRECTORY -> mm.put((byte) 2, "Delete not allowed");
+                case COMPRESS -> {
+                    mm.put((byte) 1, "Directory does not exist");
+                    mm.put((byte) 2, "Command Failed");
+                }
+                case UNCOMPRESS -> {
+                    mm.put((byte) 1, "Archive does not exist");
+                    mm.put((byte) 2, "`mkdir` command failed");
+                    mm.put((byte) 3, "Command Failed");
+                }
+                case VERIFY_CHECKSUM -> {
+                    mm.put((byte) 1, "File does not exist");
+                    mm.put((byte) 2, "Checksum does not exist");
+                    mm.put((byte) 3, "File Open failed");
+                    mm.put((byte) 4, "File Read failed");
+                    mm.put((byte) 5, "Checksum open failed");
+                    mm.put((byte) 6, "Checksum read failed");
+                    mm.put((byte) 7, "CHecksum failed");
+                    mm.put((byte) 8, "ile Close failed");
+                    mm.put((byte) 9, "Checksum file close failed");
+                }
+                case UPDATE_XDI -> {
+                    mm.put((byte) 1, "File does not exist");
+                    mm.put((byte) 2, "Subaction invalid");
+                    mm.put((byte) 3, "Command Failed");
+                }
                 default -> {}  // No additional handling needed for other cases
             }
 
