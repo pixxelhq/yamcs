@@ -1,0 +1,25 @@
+<h2 mat-dialog-title>Rebuild Parameter archive</h2>
+
+<mat-dialog-content class="ya-form">
+  <form [formGroup]="form">
+    <div class="label">
+      Start
+      <ya-date-time-input formControlName="start" />
+    </div>
+    <hr class="half-break" />
+    <div class="label">
+      Stop
+      <ya-date-time-input formControlName="stop" />
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <ya-button mat-dialog-close>CANCEL</ya-button>
+  <ya-button
+    appearance="primary"
+    (click)="triggerRebuild()"
+    [disabled]="!formIsValid">
+    REBUILD
+  </ya-button>
+</mat-dialog-actions>
