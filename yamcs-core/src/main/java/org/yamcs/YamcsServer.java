@@ -1127,6 +1127,22 @@ public class YamcsServer {
                 // When first trying Sentry it's good to see what the SDK is doing:
                 options.setDebug(true);
             });
+
+            // Set the tags
+            String satelliteTag = System.getenv("SATELLITE");
+            if (satelliteTag != null && !satelliteTag.isEmpty()) {
+                Sentry.configureScope(scope -> {
+                    scope.setTag("satellite", satelliteTag);
+                });
+            }
+
+            String mcsTypeTag = System.getenv("MCSTYPE");
+            if (mcsTypeTag != null && !mcsTypeTag.isEmpty()) {
+                Sentry.configureScope(scope -> {
+                    scope.setTag("mcstype", mcsTypeTag);
+                });
+            }
+
         } else {
             LOG.info("Sentry not initialized. SENTRY_DSN environment variable is not set");
         }
