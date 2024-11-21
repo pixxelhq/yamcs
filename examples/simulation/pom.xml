@@ -5,7 +5,7 @@
   <parent>
     <groupId>org.yamcs.examples</groupId>
     <artifactId>examples</artifactId>
-    <version>5.10.7-Pixxel-5.6.0</version>
+    <version>5.10.7-Pixxel-5.7.0</version>
   </parent>
 
   <artifactId>simulation</artifactId>
