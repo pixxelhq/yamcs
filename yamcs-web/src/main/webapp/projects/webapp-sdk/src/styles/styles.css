@@ -154,7 +154,7 @@ a.ya-link.ya-header-link {
 .ng-invalid:not(.ng-pristine)>.binary-input>input,
 input.ng-invalid:not(.ng-pristine),
 .ng-invalid:not(.ng-pristine)>.duration-input>input {
-  border-color: crimson !important;
+  border-color: var(--y-error-color) !important;
 }
 
 .ya-autocomplete .mat-mdc-option {
@@ -175,28 +175,7 @@ input.ng-invalid:not(.ng-pristine),
 .block {
   font-weight: normal;
   font-size: 12px;
-}
-
-.down {
-  color: lightgrey;
-}
-
-.success {
-  color: #00c752;
-}
-
-.warning,
-.WATCH td,
-.WARNING td {
-  color: orange !important;
-}
-
-.alert,
-.ERROR td,
-.DISTRESS td,
-.CRITICAL td,
-.SEVERE td {
-  color: crimson !important;
+  color: rgba(0, 0, 0, 0.654);
 }
 
 .badge {
@@ -310,20 +289,6 @@ input[type="radio"] {
   display: none;
 }
 
-.blink {
-  animation: yblink 1s linear infinite;
-}
-
-@keyframes yblink {
-  50% {
-    opacity: 0;
-  }
-}
-
-.spin {
-  animation: yspin 2s infinite linear;
-}
-
 hr.half-break {
   visibility: hidden;
   line-height: 0.5em;
@@ -363,18 +328,6 @@ p {
  */
 .print-only {
   display: none;
-}
-
-@keyframes yspin {
-  0% {
-    -webkit-transform: rotate(0deg) scaleX(-1);
-    transform: rotate(0deg) scaleX(-1);
-  }
-
-  100% {
-    -webkit-transform: rotate(359deg) scaleX(-1);
-    transform: rotate(359deg) scaleX(-1);
-  }
 }
 
 @media print {

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, Input, OnInit } from '@angular/core';
 import { ControlContainer, FormGroupName } from '@angular/forms';
 import { ArgumentType, Value, WebappSdkModule, utils } from '@yamcs/webapp-sdk';
-import { TemplateProvider } from '../../command-form/command-form.component';
+import { TemplateProvider } from '../../command-form/TemplateProvider';
 import { AggregateArgumentComponent } from '../aggregate-argument/aggregate-argument.component';
 import { ArrayArgumentComponent } from '../array-argument/array-argument.component';
 import { BinaryArgumentComponent } from '../binary-argument/binary-argument.component';
@@ -45,7 +45,7 @@ export function renderValue(value: Value): any {
       }
       return result;
     case 'ARRAY':
-      return value.arrayValue!.map(v => renderValue(v));
+      return (value.arrayValue || []).map(v => renderValue(v));
   }
 }
 
