@@ -61,8 +61,7 @@ export interface HistoryInfo {
   author: string;
 }
 
-export interface Parameter extends NameDescription {
-  dataSource: 'COMMAND'
+export type DataSource = 'COMMAND'
   | 'COMMAND_HISTORY'
   | 'CONSTANT'
   | 'DERIVED'
@@ -74,6 +73,8 @@ export interface Parameter extends NameDescription {
   | 'SYSTEM'
   | 'TELEMETERED';
 
+export interface Parameter extends NameDescription {
+  dataSource: DataSource;
   type?: ParameterType;
   usedBy?: UsedByInfo;
   path?: string[];

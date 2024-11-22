@@ -23,7 +23,6 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterModule } from '@angular/router';
-import { StorageUrlPipe } from '../public-api';
 import { YaBinaryInput } from './components/binary-input/binary-input.component';
 import { YaBreadcrumbTrail } from './components/breadcrumb/breadcrumb-trail.component';
 import { YaBreadcrumb } from './components/breadcrumb/breadcrumb.component';
@@ -75,7 +74,8 @@ import { YaWarningMessage } from './components/warning-message/warning-message.c
 import { DataTableDirective } from './directives/data-table.directive';
 import { SimpleTableDirective } from './directives/simple-table.directive';
 import { TableDirective } from './directives/table.directive';
-import { ActionLogFormatPipe } from './pipes/action-log-format.pipe';
+
+import { YaActionLogSummary } from './components/action-log-summary/action-log-summary.component';
 import { AliasPipe } from './pipes/alias.pipe';
 import { ArrayContainsPipe } from './pipes/array-contains.pipe';
 import { BasenamePipe } from './pipes/basename.pipe';
@@ -100,9 +100,11 @@ import { OperatorPipe } from './pipes/operator.pipe';
 import { ParameterTypeForPathPipe } from './pipes/parameter-type-for-path.pipe';
 import { ParentsPipe } from './pipes/parents.pipe';
 import { PrintJsonPipe } from './pipes/print-json.pipe';
+import { PrintObjPipe } from './pipes/print-obj.pipe';
 import { ReversePipe } from './pipes/reverse.pipe';
 import { ShortNamePipe } from './pipes/short-name.pipe';
 import { SpaceSystemPipe } from './pipes/space-system.pipe';
+import { StorageUrlPipe } from './pipes/storage-url.pipe';
 import { ToValuePipe } from './pipes/to-value.pipe';
 import { UnitsPipe } from './pipes/units.pipe';
 import { ValuePipe } from './pipes/value.pipe';
@@ -110,7 +112,6 @@ import { YaPrintZone } from './print/print-zone.component';
 import { PrintableDirective } from './print/printable.directive';
 
 const pipes = [
-  ActionLogFormatPipe,
   AliasPipe,
   ArrayContainsPipe,
   BasenamePipe,
@@ -135,6 +136,7 @@ const pipes = [
   ParameterTypeForPathPipe,
   ParentsPipe,
   PrintJsonPipe,
+  PrintObjPipe,
   ReversePipe,
   ShortNamePipe,
   SpaceSystemPipe,
@@ -153,6 +155,7 @@ const directives = [
 ];
 
 const sharedComponents = [
+  YaActionLogSummary,
   YaBinaryInput,
   YaBreadcrumb,
   YaBreadcrumbTrail,
