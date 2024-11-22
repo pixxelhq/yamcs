@@ -45,7 +45,7 @@ public class Srs3ManagedParameters {
             YConfiguration enConfig = en.getConfigOrEmpty("args");
 
             se = YObjectLoader.loadObject(className);
-            se.init(enConfig);
+            se.init("FF1", enConfig);
         }
     }
 

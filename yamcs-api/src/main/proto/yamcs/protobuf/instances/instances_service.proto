@@ -101,6 +101,20 @@ service InstancesApi {
       post: "/api/instances/{instance}:restart"
     };
   }
+
+  // Update any type of key of the instance
+  rpc UpdateKey(UpdateKeyRequest) returns (UpdateKeyResponse) {
+    option (yamcs.api.route) = {
+      post: "/api/instances/{instance}:updateKey"
+    };
+  }
+
+  // Get the key of a family of the instance
+  rpc GetActiveKey(ActiveKeyRequest) returns (ActiveKeyResponse) {
+    option (yamcs.api.route) = {
+        get: "/api/instances/activeKey/{instance}"
+    };
+  }
 }
 
 message ListInstancesRequest {
@@ -167,4 +181,39 @@ message StopInstanceRequest {
 message RestartInstanceRequest {
   // Yamcs instance name.
   optional string instance = 1;
+}
+
+message UpdateKeyRequest{
+  // Yamcs instance name.
+  optional string instance = 1;
+
+  // Type of the key
+  required string keyFamily = 2;
+
+  // Key ID to be updated to
+  required string keyId = 3;
+}
+
+message UpdateKeyResponse {
+    optional string keyId = 1;
+}
+
+message ActiveKeyRequest {
+  // Yamcs instance name.
+  optional string instance = 1;
+
+  // Type of the key
+  optional string family = 2;
+}
+
+message ActiveKeyResponse {
+  // Yamcs instance name.
+  optional string instance = 1;
+
+  // KeyID
+  optional string keyId = 2;
+
+  // Type of the key
+  optional string family = 3;
+
 }

@@ -31,24 +31,13 @@ import org.yamcs.management.ManagementListener;
 import org.yamcs.management.ManagementService;
 import org.yamcs.mdb.Mdb;
 import org.yamcs.plists.ParameterListService;
-import org.yamcs.protobuf.AbstractInstancesApi;
-import org.yamcs.protobuf.CreateInstanceRequest;
-import org.yamcs.protobuf.GetInstanceRequest;
-import org.yamcs.protobuf.GetInstanceTemplateRequest;
-import org.yamcs.protobuf.InstanceTemplate;
-import org.yamcs.protobuf.ListInstanceTemplatesResponse;
-import org.yamcs.protobuf.ListInstancesRequest;
-import org.yamcs.protobuf.ListInstancesResponse;
-import org.yamcs.protobuf.ReconfigureInstanceRequest;
-import org.yamcs.protobuf.RestartInstanceRequest;
-import org.yamcs.protobuf.StartInstanceRequest;
-import org.yamcs.protobuf.StopInstanceRequest;
-import org.yamcs.protobuf.TemplateVariable;
-import org.yamcs.protobuf.YamcsInstance;
+import org.yamcs.protobuf.*;
 import org.yamcs.protobuf.YamcsInstance.InstanceState;
 import org.yamcs.security.SystemPrivilege;
+import org.yamcs.security.encryption.aes.KeyManagementService;
 import org.yamcs.templating.Template;
 import org.yamcs.templating.Variable;
+import org.yamcs.time.TimeCorrelationService;
 import org.yamcs.time.TimeService;
 import org.yamcs.timeline.TimelineService;
 import org.yamcs.utils.ExceptionUtil;
@@ -60,6 +49,8 @@ import org.yamcs.utils.parser.ast.Comparison;
 
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.Empty;
+import org.yamcs.yarch.Stream;
+import org.yamcs.yarch.Tuple;
 
 public class InstancesApi extends AbstractInstancesApi<Context> {
 
@@ -288,6 +279,57 @@ public class InstancesApi extends AbstractInstancesApi<Context> {
                 observer.completeExceptionally(t);
             }
         });
+    }
+
+    @Override
+    public void updateKey(Context ctx, UpdateKeyRequest request, Observer<UpdateKeyResponse> observer) {
+        ctx.checkSystemPrivilege(SystemPrivilege.ControlServices);
+
+        KeyManagementService keyMgmService = YamcsServer.getServer().getInstance(request.getInstance()).getService(KeyManagementService.class, "keyManagementService");
+        TimeService timeService = YamcsServer.getTimeService(request.getInstance());
+
+        Stream stream = keyMgmService.getStream();
+
+        try {
+            Tuple t = new Tuple(KeyManagementService.ACTIVE_KEY_TUPLE_DEFINITION, new Object[]{
+                    timeService.getMissionTime(),
+                    request.getKeyId(),
+                    request.getKeyFamily(),
+            });
+            stream.emitTuple(t);
+            UpdateKeyResponse.Builder updateKeyResponse = UpdateKeyResponse.newBuilder();
+            updateKeyResponse.setKeyId(request.getKeyId());
+            observer.complete(updateKeyResponse.build());
+        } catch (Exception e){
+            log.warn("Error while updating key: {}", e);
+            observer.completeExceptionally(e);
+        }
+    }
+
+    @Override
+    public void getActiveKey(Context ctx, ActiveKeyRequest request, Observer<ActiveKeyResponse> observer) {
+        ctx.checkSystemPrivilege(SystemPrivilege.ControlServices);
+
+        KeyManagementService keyMgmService = YamcsServer.getServer().getInstance(request.getInstance()).getService(KeyManagementService.class, "keyManagementService");
+
+        try {
+            ActiveKeyResponse.Builder activeKeyResponse = ActiveKeyResponse.newBuilder();
+            if (request.getFamily().equals("tm")) {
+                activeKeyResponse.setKeyId(keyMgmService.getTmKeyId());
+            } else if(request.getFamily().equals("tc")) {
+                activeKeyResponse.setKeyId(keyMgmService.getTcKeyId());
+            } else if((request.getFamily().equals("pay"))){
+                activeKeyResponse.setKeyId(keyMgmService.getPayloadKeyId());
+            } else{
+                activeKeyResponse.setKeyId("family not found");
+            }
+            activeKeyResponse.setFamily(request.getFamily());
+            activeKeyResponse.setInstance(request.getInstance());
+            observer.complete(activeKeyResponse.build());
+        } catch (Exception e){
+            log.warn("Error while updating key: {}", e);
+            observer.completeExceptionally(e);
+        }
     }
 
     private Predicate<YamcsServerInstance> getFilter(List<String> flist) throws HttpException {
