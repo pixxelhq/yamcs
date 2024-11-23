@@ -183,7 +183,7 @@ public class TcManagedParameters extends UplinkManagedParameters {
                 YConfiguration enConfig = en.getConfigOrEmpty("args");
     
                 se = YObjectLoader.loadObject(className);
-                se.init(enConfig);
+                se.init("FF1", enConfig);
             }
 
             if (config.containsKey("srs3")) {
