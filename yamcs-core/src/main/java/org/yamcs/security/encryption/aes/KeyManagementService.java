@@ -123,7 +123,7 @@ public class KeyManagementService extends AbstractYamcsService implements YamcsS
                 this.tmKeyId = tmKeyId.toString();
                 this.tmKey = parser.getKeySections().get("TM Keys").get(this.spacecraftId + "_TM_" + tmKeyId).getKey();
             } else {
-                this.tmKeyId = tmKeyId.toString();
+                this.tmKeyId = config.getString("defaultTmKeyId");
                 this.tmKey = parser.getKeySections().get("TM Keys").get(this.spacecraftId + "_TM_" + config.getString("defaultTmKeyId")).getKey();
             }
 
@@ -131,7 +131,7 @@ public class KeyManagementService extends AbstractYamcsService implements YamcsS
                 this.tcKeyId = tcKeyId.toString();
                 this.tcKey = parser.getKeySections().get("TC Keys").get(this.spacecraftId + "_TC_" + tcKeyId).getKey();
             } else {
-                this.tcKeyId = tcKeyId.toString();
+                this.tcKeyId = config.getString("defaultTcKeyId");
                 this.tcKey = parser.getKeySections().get("TC Keys").get(this.spacecraftId + "_TC_" + config.getString("defaultTcKeyId")).getKey();
             }
 
@@ -139,6 +139,7 @@ public class KeyManagementService extends AbstractYamcsService implements YamcsS
 //                this.payKeyId = payKeyId.toString();
 //                this.tcKey = parser.getKeySections().get("PAY Keys").get(this.spacecraftId + "_PAY_" + payKeyId).getKey();
 //            } else {
+//                this.payloadKeyId = config.getString("defaultPayKeyId");
 //                this.tcKey = parser.getKeySections().get("PAY Keys").get(this.spacecraftId + "_PAY_" + config.getString("defaultPayKeyId")).getKey();
 //            }
         } catch (StreamSqlException | ParseException e) {
