@@ -42,8 +42,8 @@ public class GCM implements SymmetricEncryption {
     public byte[] encrypt(byte[] plainMessage)
             throws NoSuchAlgorithmException,InvalidKeySpecException, InvalidKeyException, InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
         byte[] iv = getRandomNonce(IV_LENGTH);
-
         SecretKey secretKey = getSecretKey(keyMgmService.getTcKey());
+        log.warn("KeyBeing Used: {}", secretKey.toString());
 
         Cipher cipher = initCipher(Cipher.ENCRYPT_MODE, secretKey, iv);
         if (aad != null)
@@ -80,7 +80,7 @@ public class GCM implements SymmetricEncryption {
     public byte[] decrypt(byte[] cipherContent) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException,
             InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException  {
         SecretKey secretKey = getSecretKey(keyMgmService.getTmKey());
-
+        log.warn("KeyBeing Used: {}", secretKey.toString());
         ByteBuffer bb = ByteBuffer.wrap(cipherContent);
 
         byte[] iv = new byte[IV_LENGTH];

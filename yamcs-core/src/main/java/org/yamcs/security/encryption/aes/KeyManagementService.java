@@ -175,10 +175,12 @@ public class KeyManagementService extends AbstractYamcsService implements YamcsS
 
     public void setTcKeyId(String tcKeyId) {
         this.tcKeyId = tcKeyId;
+        this.tcKey = this.parser.getKeySections().get("TC Keys").get(config.getString("spacecraftIdSrs")+"_TC_"+tcKeyId).getKey();
     }
 
     public void setTmKeyId(String tmKeyId) {
         this.tmKeyId = tmKeyId;
+        this.tmKey = this.parser.getKeySections().get("TM Keys").get(config.getString("spacecraftIdSrs")+"_TM_"+tmKeyId).getKey();
     }
 
     public void setPayloadKeyId(String payloadKeyId){
