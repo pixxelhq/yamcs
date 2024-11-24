@@ -19,10 +19,9 @@ import org.yamcs.YConfiguration;
 import org.yamcs.security.encryption.SymmetricEncryption;
 import org.yamcs.utils.StringConverter;
 import org.yamcs.YamcsServer;
-import org.yamcs.logging.Log;
+
 
 public class GCM implements SymmetricEncryption {
-    private static final Log log = new Log(SymmetricEncryption.class);
 
     private static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
 
@@ -43,7 +42,6 @@ public class GCM implements SymmetricEncryption {
             throws NoSuchAlgorithmException,InvalidKeySpecException, InvalidKeyException, InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
         byte[] iv = getRandomNonce(IV_LENGTH);
         SecretKey secretKey = getSecretKey(keyMgmService.getTcKey());
-        log.warn("KeyBeing Used: {}", secretKey.toString());
 
         Cipher cipher = initCipher(Cipher.ENCRYPT_MODE, secretKey, iv);
         if (aad != null)
@@ -80,7 +78,6 @@ public class GCM implements SymmetricEncryption {
     public byte[] decrypt(byte[] cipherContent) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException,
             InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException  {
         SecretKey secretKey = getSecretKey(keyMgmService.getTmKey());
-        log.warn("KeyBeing Used: {}", secretKey.toString());
         ByteBuffer bb = ByteBuffer.wrap(cipherContent);
 
         byte[] iv = new byte[IV_LENGTH];

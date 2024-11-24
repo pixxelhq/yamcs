@@ -39,6 +39,7 @@ import org.yamcs.http.api.FileTransferApi;
 import org.yamcs.http.api.IamApi;
 import org.yamcs.http.api.IndexesApi;
 import org.yamcs.http.api.InstancesApi;
+import org.yamcs.http.api.KeyManagementApi;
 import org.yamcs.http.api.LinksApi;
 import org.yamcs.http.api.MdbApi;
 import org.yamcs.http.api.MdbOverrideApi;
@@ -290,6 +291,7 @@ public class HttpServer extends AbstractYamcsService {
         addApi(new IamApi(auditLog, tokenStore));
         addApi(new IndexesApi());
         addApi(new InstancesApi());
+        addApi(new KeyManagementApi());
         addApi(new LinksApi(auditLog));
         addApi(new MdbApi());
         addApi(new MdbOverrideApi());

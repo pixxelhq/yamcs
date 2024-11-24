@@ -10,6 +10,7 @@ public class Srs3ManagedParameters {
     byte[] cspHeader;
     int radioHeaderLength;
     byte[] spacecraftId;
+    String yamcsInstance;
 
     // which error detection algorithm to use (null = no checksum)
     protected ErrorDetectionWordCalculator errorDetectionCalculator;
@@ -20,7 +21,9 @@ public class Srs3ManagedParameters {
     int maxFrameLength;
     boolean enforceFrameLength;
 
-    public Srs3ManagedParameters(YConfiguration config) {
+    public Srs3ManagedParameters(String yamcsInstance, YConfiguration config) {
+        this.yamcsInstance = yamcsInstance;
+
         if (config.containsKey("maxFrameLength"))
             maxFrameLength = config.getInt("maxFrameLength");
 
@@ -45,12 +48,12 @@ public class Srs3ManagedParameters {
             YConfiguration enConfig = en.getConfigOrEmpty("args");
 
             se = YObjectLoader.loadObject(className);
-            se.init("FF1", enConfig);
+            se.init(yamcsInstance, enConfig);
         }
     }
 
-    public Srs3ManagedParameters(YConfiguration config, int maxFrameLength) {
-        this(config);
+    public Srs3ManagedParameters(String yamcsInstance, YConfiguration config, int maxFrameLength) {
+        this(yamcsInstance, config);
         this.maxFrameLength = maxFrameLength;
     }
 

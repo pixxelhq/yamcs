@@ -44,7 +44,7 @@ public abstract class GenericTcFrameLink extends AbstractTcDataLink implements R
         if (config.containsKey("srs3")) {
             YConfiguration srs3 = config.getConfig("srs3");
 
-            srs3Mp = new Srs3ManagedParameters(srs3, maxFrameLength);
+            srs3Mp = new Srs3ManagedParameters(yamcsInstance, srs3, maxFrameLength);
             frameFactory = srs3Mp.getFrameFactory();
         }
     }

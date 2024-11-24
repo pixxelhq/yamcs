@@ -1,0 +1,69 @@
+syntax="proto2";
+
+package yamcs.protobuf.instances;
+
+option java_package = "org.yamcs.protobuf";
+option java_outer_classname = "KeyManagmentServiceProto";
+option java_multiple_files = true;
+
+import "google/protobuf/empty.proto";
+
+import "yamcs/api/annotations.proto";
+
+service KeyManagmentApi {
+
+    // Update any type of key of the instance
+    rpc UpdateKey(UpdateKeyRequest) returns (UpdateKeyResponse) {
+        option (yamcs.api.route) = {
+            post: "/api/instances/{instance}:updateKey"
+        };
+    }
+
+    // Get the key of a family of the instance
+    rpc GetActiveKey(ActiveKeyRequest) returns (ActiveKeyResponse) {
+        option (yamcs.api.route) = {
+            get: "/api/instances/activeKey/{instance}"
+        };
+    }
+}
+
+message UpdateKeyRequest{
+    // Yamcs instance name.
+    optional string instance = 1;
+
+    // Type of the key
+    required string keyFamily = 2;
+
+    // Key ID to be updated to
+    required string keyId = 3;
+}
+
+message UpdateKeyResponse {
+    optional string keyId = 1;
+
+    // Type of the key
+    optional string keyFamily = 2;
+
+    // Error message
+    optional string error = 3;
+}
+
+message ActiveKeyRequest {
+    // Yamcs instance name.
+    optional string instance = 1;
+
+    // Type of the key
+    optional string family = 2;
+}
+
+message ActiveKeyResponse {
+    // Yamcs instance name.
+    optional string instance = 1;
+
+    // KeyID
+    optional string keyId = 2;
+
+    // Type of the key
+    optional string family = 3;
+
+}

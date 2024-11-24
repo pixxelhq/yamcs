@@ -1,7 +1,8 @@
 package org.yamcs.security.encryption.aes;
 
+import java.lang.RuntimeException;
+
 import org.yamcs.AbstractYamcsService;
-import org.yamcs.YamcsService;
 import org.yamcs.YConfiguration;
 import org.yamcs.logging.Log;
 import org.yamcs.InitException;
@@ -13,31 +14,40 @@ import org.yamcs.yarch.*;
 import org.yamcs.yarch.streamsql.StreamSqlException;
 import org.yamcs.yarch.streamsql.StreamSqlResult;
 
-import java.util.Objects;
+import java.util.Optional;
 
-public class KeyManagementService extends AbstractYamcsService implements YamcsService, StreamSubscriber {
+public class KeyManagementService extends AbstractYamcsService implements StreamSubscriber {
     private static final Log log = new Log(SymmetricEncryption.class);
 
     public static final String TABLE_NAME = "activekeys";
     public static final String STREAM_NAME = "active_keys";
 
     public static final TupleDefinition ACTIVE_KEY_TUPLE_DEFINITION = new TupleDefinition();
+    public static final TupleDefinition KEY_INSERTION_RESPONSE_TUPLE_DEFINITION = new TupleDefinition();
     static {
         ACTIVE_KEY_TUPLE_DEFINITION.addColumn("inserttime", DataType.TIMESTAMP);
-        ACTIVE_KEY_TUPLE_DEFINITION.addColumn("keyid", DataType.INT);
+        ACTIVE_KEY_TUPLE_DEFINITION.addColumn("keyid", DataType.STRING);
         ACTIVE_KEY_TUPLE_DEFINITION.addColumn("family", DataType.ENUM);
+    }
+    static {
+        KEY_INSERTION_RESPONSE_TUPLE_DEFINITION.addColumn("status", DataType.BOOLEAN);
+        KEY_INSERTION_RESPONSE_TUPLE_DEFINITION.addColumn("error", DataType.STRING);
+        KEY_INSERTION_RESPONSE_TUPLE_DEFINITION.addColumn("family", DataType.ENUM);
+        KEY_INSERTION_RESPONSE_TUPLE_DEFINITION.addColumn("keyid", DataType.STRING);
     }
 
     protected String yamcsInstance;
 
-    String tcKey;
-    String tmKey;
-    Stream stream;
-    String payloadKey;
+    private String tcKey;
+    private String tmKey;
+    private String payKey;
+
     String spacecraftId;
-    String tmKeyId;
-    String tcKeyId;
-    String payloadKeyId;
+    Stream stream;
+
+    private String tmKeyId;
+    private String tcKeyId;
+    private String payKeyId;
 
     KeyParser parser;
     VaultClient client;
@@ -89,59 +99,58 @@ public class KeyManagementService extends AbstractYamcsService implements YamcsS
         stream = ydb.getStream(STREAM_NAME);
     }
 
+    /**
+     * Fetches the key ID for a given family from the database.
+     *
+     * @param ydb       the database instance
+     * @param tableName the table name
+     * @param family    the family type
+     * @return an Optional containing the key ID if found, or empty if not
+     * @throws StreamSqlException if a database error occurs
+     */
+    private Optional<Integer> fetchKeyId(String tableName, String family) throws StreamSqlException, ParseException {
+        StreamSqlResult result = null;
+        try {
+            String query = String.format("select keyid from %s where family='%s' order desc limit 1", tableName, family);
+            result = ydb.execute(query);
+            if (result.hasNext()) {
+                return Optional.ofNullable(result.next().getColumn("keyid"));
+            }
+
+        } finally {
+            if (result != null) {
+                result.close(); // Manually close the resource
+            }
+        }
+        return Optional.empty();
+    }
+
     @Override
     protected void doStart() {
         stream.addSubscriber(this);
         try {
-            Integer tmKeyId = null;
-            Integer tcKeyId = null;
-            Integer payKeyId = null;
+            Optional<Integer> tmKeyId = fetchKeyId(TABLE_NAME, "tm");
+            Optional<Integer> tcKeyId = fetchKeyId(TABLE_NAME, "tc");
+            Optional<Integer> payKeyId = fetchKeyId(TABLE_NAME, "pay");
+        
+            // Process TM Key
+            this.tmKeyId = tmKeyId
+                    .map(String::valueOf)
+                    .orElseGet(() -> config.getString("defaultTmKeyId"));
+            setDefaultTmKey(this.tmKeyId);
 
-            StreamSqlResult result = ydb.execute("select * from " + TABLE_NAME + " where family='tm' order desc limit 1");
+            // Process TC Key
+            this.tcKeyId = tcKeyId
+                    .map(String::valueOf)
+                    .orElseGet(() -> config.getString("defaultTcKeyId"));
+            setDefaultTcKey(this.tcKeyId);
 
-            log.warn("Results: {}", result);
-
-            while (result.hasNext()) {
-                tmKeyId = result.next().getColumn("keyid");
-            }
-
-            result = ydb.execute("select * from " +  TABLE_NAME + " where family='tc' order desc limit 1");
-            log.warn("Results: {}", result);
-
-            while (result.hasNext()) {
-                tcKeyId = result.next().getColumn("keyid");
-            }
-
-            result = ydb.execute("select * from " +  TABLE_NAME + " where family='pay' order desc limit 1");
-            log.warn("Results: {}", result);
-
-            while (result.hasNext()) {
-                payKeyId = result.next().getColumn("keyid");
-            }
-
-            if (tmKeyId!=null) {
-                this.tmKeyId = tmKeyId.toString();
-                this.tmKey = parser.getKeySections().get("TM Keys").get(this.spacecraftId + "_TM_" + tmKeyId).getKey();
-            } else {
-                this.tmKeyId = config.getString("defaultTmKeyId");
-                this.tmKey = parser.getKeySections().get("TM Keys").get(this.spacecraftId + "_TM_" + config.getString("defaultTmKeyId")).getKey();
-            }
-
-            if (tcKeyId!=null) {
-                this.tcKeyId = tcKeyId.toString();
-                this.tcKey = parser.getKeySections().get("TC Keys").get(this.spacecraftId + "_TC_" + tcKeyId).getKey();
-            } else {
-                this.tcKeyId = config.getString("defaultTcKeyId");
-                this.tcKey = parser.getKeySections().get("TC Keys").get(this.spacecraftId + "_TC_" + config.getString("defaultTcKeyId")).getKey();
-            }
-
-//            if (payKeyId!=null) {
-//                this.payKeyId = payKeyId.toString();
-//                this.tcKey = parser.getKeySections().get("PAY Keys").get(this.spacecraftId + "_PAY_" + payKeyId).getKey();
-//            } else {
-//                this.payloadKeyId = config.getString("defaultPayKeyId");
-//                this.tcKey = parser.getKeySections().get("PAY Keys").get(this.spacecraftId + "_PAY_" + config.getString("defaultPayKeyId")).getKey();
-//            }
+        
+            this.payKeyId = payKeyId
+                    .map(String::valueOf)
+                    .orElseGet(() -> config.getString("defaultPayKeyId"));
+            setDefaultPayloadKey(this.payKeyId);
+        
         } catch (StreamSqlException | ParseException e) {
             throw new RuntimeException(e);
         }
@@ -149,6 +158,7 @@ public class KeyManagementService extends AbstractYamcsService implements YamcsS
         notifyStarted();
     }
 
+    // Key GET | Careful with this
     public String getTcKey() {
         return this.tcKey;
     }
@@ -158,9 +168,10 @@ public class KeyManagementService extends AbstractYamcsService implements YamcsS
     }
 
     public String getPayloadKey(){
-        return this.payloadKey;
+        return this.payKey;
     }
 
+    // Key ID GET
     public String getTcKeyId() {
         return this.tcKeyId;
     }
@@ -170,7 +181,7 @@ public class KeyManagementService extends AbstractYamcsService implements YamcsS
     }
 
     public String getPayloadKeyId(){
-        return this.payloadKeyId;
+        return this.payKeyId;
     }
 
     public void setTcKeyId(String tcKeyId) {
@@ -184,21 +195,35 @@ public class KeyManagementService extends AbstractYamcsService implements YamcsS
     }
 
     public void setPayloadKeyId(String payloadKeyId){
-        this.payloadKeyId = payloadKeyId;
+        this.payKeyId = payloadKeyId;
     }
 
     public Stream getStream(){
         return stream;
     }
 
-    public void setTcKey(String tcKeyId) {
-        log.debug("New TC KEY ID: {}", tcKeyId);
-        this.tcKey = this.parser.getKeySections().get("TC Keys").get(config.getString("spacecraftIdSrs")+"_TC_"+tcKeyId).getKey();
+    private void setDefaultTcKey(String keyId) {
+        log.debug("New TC KEY ID: {}", keyId);
+        this.tcKey = this.parser.getKeySections()
+                .get("TC Keys")
+                .get(config.getString("spacecraftIdSrs") + "_TC_" + keyId)
+                .getKey();
     }
 
-    public void setTmKey(String tmKeyId) {
-        log.debug("New TM KEY ID: {}", tmKeyId);
-        this.tmKey = this.parser.getKeySections().get("TM Keys").get(config.getString("spacecraftIdSrs")+"_TM_"+tmKeyId).getKey();
+    private void setDefaultTmKey(String keyId) {
+        log.debug("New TM KEY ID: {}", keyId);
+        this.tmKey = this.parser.getKeySections()
+                .get("TM Keys")
+                .get(config.getString("spacecraftIdSrs") + "_TM_" + keyId)
+                .getKey();
+    }
+
+    private void setDefaultPayloadKey(String keyId) {
+        log.debug("New PAY KEY ID: {}", keyId);
+        this.payKey = this.parser.getKeySections()
+                .get("PAY Keys")
+                .get(config.getString("spacecraftIdSrs") + "_PAY_" + keyId)
+                .getKey();
     }
 
     @Override
@@ -213,21 +238,31 @@ public class KeyManagementService extends AbstractYamcsService implements YamcsS
 
     @Override
     public void onTuple(Stream stream, Tuple tuple) {
-        try {
-            long inserttime = (Long)tuple.getColumn("inserttime");
-            String keyId = (String)tuple.getColumn("keyid");
-            String family = (String)tuple.getColumn("family");
-            ydb.execute("insert into " + TABLE_NAME + "(inserttime, keyid, family) values("+inserttime + ",'" + keyId +"','"+ family + "')");
-            if (Objects.equals(family, "tc")) {
-                this.setTcKeyId(keyId);
-            }else if (Objects.equals(family, "tm")) {
-                this.setTmKeyId(keyId);
-            }else if (Objects.equals(family, "pay")) {
-                this.setPayloadKeyId(keyId);
-            }
-        } catch (StreamSqlException | ParseException e) {
-            throw new RuntimeException(e);
-        }
+        // Stream responseStream = ydb.getStream((String) tuple.getColumn("responsestream"));
+
+        // try {
+        //     long inserttime = (Long) tuple.getColumn("inserttime");
+        //     String keyId = (String) tuple.getColumn("keyid");
+        //     String family = (String) tuple.getColumn("family");
+
+        //     ydb.execute("insert into " + TABLE_NAME + "(inserttime, keyid, family) values("+inserttime + ",'" + keyId +"','"+ family + "')");
+        //     switch (family) {
+        //         case "tc" -> this.setTcKeyId(keyId);
+        //         case "tm" -> this.setTmKeyId(keyId);
+        //         case "pay" -> this.setPayloadKeyId(keyId);
+        //     }
+
+        //     responseStream.emitTuple(new Tuple(KEY_INSERTION_RESPONSE_TUPLE_DEFINITION, 
+        //         new Object[]{true, "Success", keyId, family})
+        //     );
+
+        // } catch (StreamSqlException | ParseException e) {
+        //     responseStream.emitTuple(new Tuple(KEY_INSERTION_RESPONSE_TUPLE_DEFINITION, 
+        //         new Object[]{false, e.toString()})
+        //     );
+        // }
+
+        throw new RuntimeException("deliberate");
     }
 
     @Override
