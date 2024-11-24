@@ -43,9 +43,6 @@ message UpdateKeyResponse {
 
     // Type of the key
     optional string keyFamily = 2;
-
-    // Error message
-    optional string error = 3;
 }
 
 message ActiveKeyRequest {

@@ -23,17 +23,10 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
     public static final String STREAM_NAME = "active_keys";
 
     public static final TupleDefinition ACTIVE_KEY_TUPLE_DEFINITION = new TupleDefinition();
-    public static final TupleDefinition KEY_INSERTION_RESPONSE_TUPLE_DEFINITION = new TupleDefinition();
     static {
         ACTIVE_KEY_TUPLE_DEFINITION.addColumn("inserttime", DataType.TIMESTAMP);
         ACTIVE_KEY_TUPLE_DEFINITION.addColumn("keyid", DataType.STRING);
         ACTIVE_KEY_TUPLE_DEFINITION.addColumn("family", DataType.ENUM);
-    }
-    static {
-        KEY_INSERTION_RESPONSE_TUPLE_DEFINITION.addColumn("status", DataType.BOOLEAN);
-        KEY_INSERTION_RESPONSE_TUPLE_DEFINITION.addColumn("error", DataType.STRING);
-        KEY_INSERTION_RESPONSE_TUPLE_DEFINITION.addColumn("family", DataType.ENUM);
-        KEY_INSERTION_RESPONSE_TUPLE_DEFINITION.addColumn("keyid", DataType.STRING);
     }
 
     protected String yamcsInstance;
@@ -132,7 +125,6 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
             Optional<Integer> tmKeyId = fetchKeyId(TABLE_NAME, "tm");
             Optional<Integer> tcKeyId = fetchKeyId(TABLE_NAME, "tc");
             Optional<Integer> payKeyId = fetchKeyId(TABLE_NAME, "pay");
-        
             // Process TM Key
             this.tmKeyId = tmKeyId
                     .map(String::valueOf)
@@ -145,7 +137,6 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
                     .orElseGet(() -> config.getString("defaultTcKeyId"));
             setDefaultTcKey(this.tcKeyId);
 
-        
             this.payKeyId = payKeyId
                     .map(String::valueOf)
                     .orElseGet(() -> config.getString("defaultPayKeyId"));
@@ -238,31 +229,21 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
 
     @Override
     public void onTuple(Stream stream, Tuple tuple) {
-        // Stream responseStream = ydb.getStream((String) tuple.getColumn("responsestream"));
 
-        // try {
-        //     long inserttime = (Long) tuple.getColumn("inserttime");
-        //     String keyId = (String) tuple.getColumn("keyid");
-        //     String family = (String) tuple.getColumn("family");
+        try {
+            long inserttime = (Long) tuple.getColumn("inserttime");
+            String keyId = (String) tuple.getColumn("keyid");
+            String family = (String) tuple.getColumn("family");
 
-        //     ydb.execute("insert into " + TABLE_NAME + "(inserttime, keyid, family) values("+inserttime + ",'" + keyId +"','"+ family + "')");
-        //     switch (family) {
-        //         case "tc" -> this.setTcKeyId(keyId);
-        //         case "tm" -> this.setTmKeyId(keyId);
-        //         case "pay" -> this.setPayloadKeyId(keyId);
-        //     }
-
-        //     responseStream.emitTuple(new Tuple(KEY_INSERTION_RESPONSE_TUPLE_DEFINITION, 
-        //         new Object[]{true, "Success", keyId, family})
-        //     );
-
-        // } catch (StreamSqlException | ParseException e) {
-        //     responseStream.emitTuple(new Tuple(KEY_INSERTION_RESPONSE_TUPLE_DEFINITION, 
-        //         new Object[]{false, e.toString()})
-        //     );
-        // }
-
-        throw new RuntimeException("deliberate");
+            ydb.execute("insert into " + TABLE_NAME + "(inserttime, keyid, family) values("+inserttime + ",'" + keyId +"','"+ family + "')");
+            switch (family) {
+                case "tc" -> this.setTcKeyId(keyId);
+                case "tm" -> this.setTmKeyId(keyId);
+                case "pay" -> this.setPayloadKeyId(keyId);
+            }
+        } catch (StreamSqlException | ParseException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
