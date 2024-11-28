@@ -24,8 +24,10 @@ import org.yamcs.utils.TimeEncoding;
 public class TcPacketHandler extends AbstractTcDataLink implements VcUplinkHandler {
     protected BlockingQueue<PreparedCommand> commandQueue;
     final TcVcManagedParameters vmp;
+
     private TcFrameFactory frameFactory;
     private Srs3FrameFactory srs3FrameFactory;
+
     boolean blockSenderOnQueueFull;
     private Semaphore dataAvailableSemaphore;
 

@@ -23,6 +23,7 @@ export * from './types/table';
 export * from './types/time';
 export * from './types/timeline';
 export * from './types/web';
+export * from './types/keymanagement'
 export * from './WebSocketCall';
 export * from './WebSocketClient';
 export { default as YamcsClient } from './YamcsClient';
