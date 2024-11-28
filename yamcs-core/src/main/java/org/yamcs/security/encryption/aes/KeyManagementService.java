@@ -75,6 +75,7 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
             this.parser = new KeyParser();
             parser.parse(decryptedData);
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException(e);
         }
 

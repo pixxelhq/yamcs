@@ -13,16 +13,16 @@ import "yamcs/api/annotations.proto";
 service KeyManagmentApi {
 
     // Update any type of key of the instance
-    rpc UpdateKey(UpdateKeyRequest) returns (UpdateKeyResponse) {
+    rpc UpdateKey(UpdateKeyRequest) returns (KeyResponse) {
         option (yamcs.api.route) = {
-            post: "/api/instances/{instance}:updateKey"
+            post: "/api/keymanagement/{instance}:updateKey"
         };
     }
 
     // Get the key of a family of the instance
-    rpc GetActiveKey(ActiveKeyRequest) returns (ActiveKeyResponse) {
+    rpc GetActiveKey(ActiveKeyRequest) returns (KeyResponse) {
         option (yamcs.api.route) = {
-            get: "/api/instances/activeKey/{instance}"
+            get: "/api/keymanagement/{instance}"
         };
     }
 }
@@ -32,17 +32,10 @@ message UpdateKeyRequest{
     optional string instance = 1;
 
     // Type of the key
-    required string keyFamily = 2;
+    required string family = 2;
 
     // Key ID to be updated to
     required string keyId = 3;
-}
-
-message UpdateKeyResponse {
-    optional string keyId = 1;
-
-    // Type of the key
-    optional string keyFamily = 2;
 }
 
 message ActiveKeyRequest {
@@ -53,14 +46,10 @@ message ActiveKeyRequest {
     optional string family = 2;
 }
 
-message ActiveKeyResponse {
-    // Yamcs instance name.
+message KeyResponse {
     optional string instance = 1;
-
-    // KeyID
     optional string keyId = 2;
 
     // Type of the key
     optional string family = 3;
-
 }

@@ -20,7 +20,7 @@ public class KeyManagementApi extends AbstractKeyManagmentApi<Context>{
     public static final Pattern ALLOWED_INSTANCE_NAMES = Pattern.compile("\\w[\\w\\.-]*");
 
     @Override
-    public void updateKey(Context ctx, UpdateKeyRequest request, Observer<UpdateKeyResponse> observer) {
+    public void updateKey(Context ctx, UpdateKeyRequest request, Observer<KeyResponse> observer) {
         ctx.checkSystemPrivilege(SystemPrivilege.ControlServices);
 
         KeyManagementService keyMgmService = YamcsServer.getServer().getInstance(request.getInstance()).getService(KeyManagementService.class, "keyManagementService");
@@ -31,16 +31,16 @@ public class KeyManagementApi extends AbstractKeyManagmentApi<Context>{
             publishStream.emitTuple(new Tuple(KeyManagementService.ACTIVE_KEY_TUPLE_DEFINITION, new Object[]{
                     timeService.getMissionTime(),
                     request.getKeyId(),
-                    request.getKeyFamily(),
+                    request.getFamily(),
                 })
             );
 
-            UpdateKeyResponse.Builder updateKeyResponse = UpdateKeyResponse.newBuilder();
-            updateKeyResponse
-                .setKeyFamily(request.getKeyFamily())
+            KeyResponse.Builder response = KeyResponse.newBuilder();
+            response
+                .setFamily(request.getFamily())
                 .setKeyId(request.getKeyId());
 
-            observer.complete(updateKeyResponse.build());
+            observer.complete(response.build());
         } catch (RuntimeException e) {
             log.warn("Error while updating key: {}", e);
             observer.completeExceptionally(e);
@@ -48,7 +48,7 @@ public class KeyManagementApi extends AbstractKeyManagmentApi<Context>{
     }
 
     @Override
-    public void getActiveKey(Context ctx, ActiveKeyRequest request, Observer<ActiveKeyResponse> observer) {
+    public void getActiveKey(Context ctx, ActiveKeyRequest request, Observer<KeyResponse> observer) {
         ctx.checkSystemPrivilege(SystemPrivilege.ControlServices);
         KeyManagementService keyMgmService = YamcsServer.getServer().getInstance(request.getInstance()).getService(KeyManagementService.class, "keyManagementService");
 
@@ -61,7 +61,7 @@ public class KeyManagementApi extends AbstractKeyManagmentApi<Context>{
                 default -> keyId = "family not found";
             }
 
-            ActiveKeyResponse.Builder activeKeyResponse = ActiveKeyResponse.newBuilder();
+            KeyResponse.Builder activeKeyResponse = KeyResponse.newBuilder();
             activeKeyResponse
                 .setFamily(request.getFamily())
                 .setInstance(request.getInstance())
