@@ -288,6 +288,10 @@ export class InstancePageComponent implements OnInit, OnDestroy {
     return this.user.hasAnyObjectPrivilegeOfType('ReadPacket');
   }
 
+  showKeyManagementItem() {
+    return this.user.hasSystemPrivilege('ControlServices');
+  }
+
   handleKeydown(event: KeyboardEvent) {
     const el: HTMLInputElement = this.searchInput.nativeElement;
     if (event.key === "/" && this.isValidKeySource()) {
