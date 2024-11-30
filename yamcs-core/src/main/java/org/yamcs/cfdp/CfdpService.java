@@ -162,7 +162,6 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
     boolean nakMetadata;
     int maxNumPendingDownloads;
     int maxNumPendingUploads;
-    int archiveRetrievalLimit;
     int pendingAfterCompletion;
 
     boolean queueConcurrentUploads;
@@ -261,7 +260,6 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
         spec.addOption("nakLimit", OptionType.INTEGER).withDefault(-1);
         spec.addOption("nakTimeout", OptionType.INTEGER).withDefault(5000);
         spec.addOption("immediateNak", OptionType.BOOLEAN).withDefault(true);
-        spec.addOption("archiveRetrievalLimit", OptionType.INTEGER).withDefault(100);
         spec.addOption("receiverFaultHandlers", OptionType.MAP).withSpec(Spec.ANY);
         spec.addOption("senderFaultHandlers", OptionType.MAP).withSpec(Spec.ANY);
         spec.addOption("queueConcurrentUploads", OptionType.BOOLEAN).withDefault(false);
@@ -312,7 +310,6 @@ public class CfdpService extends AbstractFileTransferService implements StreamSu
         maxExistingFileRenames = config.getInt("maxExistingFileRenames", 1000);
         maxNumPendingDownloads = config.getInt("maxNumPendingDownloads");
         maxNumPendingUploads = config.getInt("maxNumPendingUploads");
-        archiveRetrievalLimit = config.getInt("archiveRetrievalLimit", 100);
         pendingAfterCompletion = config.getInt("pendingAfterCompletion", 600000);
         queueConcurrentUploads = config.getBoolean("queueConcurrentUploads");
         allowConcurrentFileOverwrites = config.getBoolean("allowConcurrentFileOverwrites");

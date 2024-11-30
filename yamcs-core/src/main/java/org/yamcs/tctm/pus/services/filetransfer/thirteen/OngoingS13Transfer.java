@@ -87,7 +87,7 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
 
     public OngoingS13Transfer(String yamcsInstance, Stream cmdHistStream, long creationTime, ScheduledThreadPoolExecutor executor,
             YConfiguration config, S13TransactionId s13TransactionId,
-            EventProducer eventProducer, TransferMonitor monitor, String transferType,
+            EventProducer eventProducer, TransferMonitor monitor, String transferType, Integer retries,
             Map<ConditionCode, FaultHandlingAction> faultHandlerActions) {
         this.yamcsInstance = yamcsInstance;
         this.s13TransactionId = s13TransactionId;
@@ -108,7 +108,7 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
         this.inactivityTimeout = config.getLong("inactivityTimeout", 10000);
 
         this.cancelOnNoAck = config.getBoolean("cancelOnNoAck", false);
-        this.retries = config.getInt("filePartRetries", 1);
+        this.retries = retries != null? retries : config.getInt("filePartRetries", 1);
 
         this.faultHandlerActions = faultHandlerActions;
         this.origin = "0.0.0.0";    // FIXME: Is this alright?
@@ -322,7 +322,7 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
 
     @Override
     public String getFailuredReason() {
-        return String.join("; ", errors);
+        return String.join("; \n", errors);
     }
 
     @Override

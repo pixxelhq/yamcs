@@ -79,10 +79,10 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
             FilePutRequest request, YConfiguration config, Bucket bucket,
             Integer customPacketSize, Integer customPacketDelay,
             EventProducer eventProducer, TransferMonitor monitor, String transferType,
-            Map<ConditionCode, FaultHandlingAction> faultHandlerActions) {
+            Map<ConditionCode, FaultHandlingAction> faultHandlerActions, Integer filePartRetries) {
 
         super(yamcsInstance, cmdHistRealtime, creationTime, executor, config, makeTransactionId(request.getRemoteId(), transferInstanceId, largePacketTransactionId), 
-            eventProducer, monitor, transferType, faultHandlerActions);
+            eventProducer, monitor, transferType, filePartRetries, faultHandlerActions);
         this.request = request;
         this.bucket = bucket;
         this.origin = ServiceThirteen.origin;
@@ -147,6 +147,7 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
                 }
 
 
+                partSequenceNumber++;
                 transferred += (end - offset);
                 offset = end;
 
@@ -158,7 +159,6 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
             case SENDING_DATA:
                 if (request.getFileLength() - offset < maxDataSize) {   // Last Packet
                     end = Math.min(offset + maxDataSize, request.getFileLength());
-                    partSequenceNumber++;
 
                     fullyQualifiedCmdName = ServiceThirteen.constructFullyQualifiedCmdName(lastPacketCmdName, request.getRemoteId());
                     packet = new UplinkS13Packet(s13TransactionId, partSequenceNumber, fullyQualifiedCmdName, getFilePart(), skipAcknowledgement);
@@ -177,7 +177,7 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
                         return;
                     }
 
-
+                    partSequenceNumber++;
                     transferred += (end - offset);
                     offset = end;
                     
@@ -185,7 +185,6 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
 
                 } else {    // Intermediate Packet
                     end = Math.min(offset + maxDataSize, request.getFileLength());
-                    partSequenceNumber++;
 
                     fullyQualifiedCmdName = ServiceThirteen.constructFullyQualifiedCmdName(intermediatePacketCmdName, request.getRemoteId());
                     packet = new UplinkS13Packet(s13TransactionId, partSequenceNumber, fullyQualifiedCmdName, getFilePart(), skipAcknowledgement);
@@ -203,6 +202,8 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
                         handleFault(ConditionCode.NAK_LIMIT_REACHED);
                         return;
                     }
+
+                    partSequenceNumber++;
                     transferred += (end - offset);
                     offset = end;
                 }
