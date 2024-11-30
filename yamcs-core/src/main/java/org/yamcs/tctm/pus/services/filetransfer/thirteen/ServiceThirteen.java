@@ -95,6 +95,9 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
         VALID_CODES.put("InactivityDetected", ConditionCode.INACTIVITY_DETECTED);
         VALID_CODES.put("PreparedCommandNotFormed", ConditionCode.UNSUPPORTED_CHECKSUM_TYPE);
         VALID_CODES.put("RunOutOfRetry", ConditionCode.NAK_LIMIT_REACHED);
+        VALID_CODES.put("OnboardTimeout", ConditionCode.ONBOARD_TIMEOUT);
+        VALID_CODES.put("OnboardDiscontinuity", ConditionCode.ONBOARD_DISCONTINUITY);
+        VALID_CODES.put("OnboardMemoryError", ConditionCode.ONBOARD_MEMORY_ERROR);
     }
 
     Map<S13TransactionId.S13UniqueId, OngoingS13Transfer> pendingTransfers = new ConcurrentHashMap<>();
@@ -454,7 +457,9 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
             FileTransfer filetransfer = getOngoingUploadFileTransfer(packet.getUniquenessId().getLargePacketTransactionId());
             if (filetransfer != null) {
                 S13OutgoingTransfer outgoingTransfer = (S13OutgoingTransfer) filetransfer;
-                outgoingTransfer.cancel(ConditionCode.reaConditionCodeAsIs((byte) packet.getFailureCode().byteValue()));
+                ConditionCode failureCode = packet.getFailureCode() != null? 
+                        ConditionCode.reaConditionCodeAsIs((byte) packet.getFailureCode().byteValue()): ConditionCode.RESERVED; 
+                outgoingTransfer.cancel(failureCode);
 
             } else {
                 log.warn("Erroneous Uplink abortion request received");

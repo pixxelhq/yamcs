@@ -22,6 +22,12 @@ public enum ConditionCode {
     UNSUPPORTED_CHECKSUM_TYPE((byte)0x0B),
     SUSPEND_REQUEST_RECEIVED((byte) 0x0E),
     CANCEL_REQUEST_RECEIVED((byte) 0x0F),
+
+    // Pixxel specific
+    ONBOARD_TIMEOUT((byte) 0x10),
+    ONBOARD_DISCONTINUITY((byte) 0x11),
+    ONBOARD_MEMORY_ERROR((byte) 0x12),
+
     RESERVED((byte) 0x0C);
 
     private byte code;
