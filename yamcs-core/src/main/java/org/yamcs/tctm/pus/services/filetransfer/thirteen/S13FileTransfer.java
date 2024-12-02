@@ -25,8 +25,6 @@ public interface S13FileTransfer extends FileTransfer {
     
     long getRemoteId();
 
-    String getOrigin();
-
     long getInitiatorEntityId();
 
     long getDestinationId();

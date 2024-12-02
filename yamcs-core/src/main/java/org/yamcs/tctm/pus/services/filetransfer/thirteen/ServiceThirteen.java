@@ -103,7 +103,7 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
     Map<S13TransactionId.S13UniqueId, OngoingS13Transfer> pendingTransfers = new ConcurrentHashMap<>();
     FileDownloadRequests fileDownloadRequests = new FileDownloadRequests();
 
-    ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(6);  // FIXME: Careful with this number, not sure how it would affect perfomance
+    ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(6);
     Map<ConditionCode, FaultHandlingAction> receiverFaultHandlers;
     Map<ConditionCode, FaultHandlingAction> senderFaultHandlers;
 
@@ -116,7 +116,6 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
     static String spaceSystem;
     static Map<Long, String> spaceSubSystems = new HashMap<>();
     static Map<Long, String> contentTypeMap = new HashMap<>();
-    static String origin;
 
     private final Set<TransferMonitor> transferListeners = new CopyOnWriteArraySet<>();
     
@@ -138,7 +137,6 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
     private static CommandingManager commandingManager;
 
     public static String commandReleaseUser;
-    public static String startDownlinkCmdName;
 
     private final String PDU_DELAY_OPTION = "pduDelay";
     private final String FILE_PART_RETRY_OPTION = "filePartRetryNumber";
@@ -165,7 +163,6 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
         spec.addOption("pendingAfterCompletion", OptionType.INTEGER).withDefault(600000);
         spec.addOption("spaceSystem", OptionType.STRING).withDefault("FF");
         spec.addOption("commandReleaseUser", OptionType.STRING).withDefault("administrator");
-        spec.addOption("startDownlinkCmdName", OptionType.STRING).withDefault("StartLargePacketDownload");
 
         spec.addOption("checkAckTimeout", OptionType.INTEGER).withDefault(10000l);
         spec.addOption("checkAckLimit", OptionType.INTEGER).withDefault(5);
@@ -177,7 +174,6 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
         spec.addOption("lastPacketCmdName", OptionType.STRING).withDefault("LastUplinkPart");
         spec.addOption("skipAcknowledgement", OptionType.BOOLEAN).withDefault(true);
         spec.addOption("cmdhistStream", OptionType.STRING).withDefault("cmdhist_realtime");
-        spec.addOption("cancelOnNoAck", OptionType.BOOLEAN).withDefault(false);
         
         spec.addOption("canChangePacketDelay", OptionType.BOOLEAN).withDefault(false);
         spec.addOption("packetDelayPredefinedValues", OptionType.LIST).withDefault(Collections.emptyList())
@@ -216,7 +212,6 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
         spaceSystem = config.getString("spaceSystem");
         maxExistingFileRenames = config.getInt("maxExistingFileRenames", 1000);
         commandReleaseUser = config.getString("commandReleaseUser", "admin");
-        startDownlinkCmdName = config.getString("startDownlinkCmdName", "StartLargePacketDownload");
 
         canChangePacketDelay = config.getBoolean("canChangePacketDelay");
         packetDelayPredefinedValues = config.getList("packetDelayPredefinedValues");
@@ -411,9 +406,9 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
 
     private S13FileTransfer processPutRequest(long transferInstanceId, long largePacketTransactionId, long creationTime, 
             FilePutRequest request, 
-            Bucket bucket, String transferType, Integer filePartRetries, Integer customPacketDelay) {
+            Bucket bucket, String transferType, Integer filePartRetries, Integer customPacketDelay, String username) {
         S13OutgoingTransfer transfer = new S13OutgoingTransfer(yamcsInstance, transferInstanceId, largePacketTransactionId, creationTime,
-                executor, cmdhistRealtime, request, config, bucket, null, customPacketDelay, eventProducer, this, transferType, senderFaultHandlers, filePartRetries);
+                executor, cmdhistRealtime, request, config, bucket, null, customPacketDelay, eventProducer, this, transferType, senderFaultHandlers, filePartRetries, username);
 
         dbStream.emitTuple(CompletedTransfer.toInitialTuple(transfer));
 
@@ -462,31 +457,16 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
                 outgoingTransfer.cancel(failureCode);
 
             } else {
-                log.warn("Erroneous Uplink abortion request received");
+                String errorMsg = "Erroneous Uplink abortion request received | " + packet;
+                eventProducer.sendWarning(ETYPE_UNEXPECTED_S13_PACKET, "TXID[S13-UNKNOWN] " + errorMsg);
+                log.warn("Erroneous Uplink abortion request received | " + packet);
             }
 
             return;
         }
-
-        OngoingS13Transfer transfer = null;
-        if (pendingTransfers.containsKey(packet.getUniquenessId())) {
-            transfer = pendingTransfers.get(packet.getUniquenessId());
-
-        } else {
-            // the communication partner has initiated a transfer
-            transfer = instantiateIncomingTransaction(packet);
-            if (transfer != null) {
-                pendingTransfers.put(transfer.getTransactionId().getUniquenessId(), transfer);
-                OngoingS13Transfer t1 = transfer;
-                executor.submit(() -> dbStream.emitTuple(CompletedTransfer.toInitialTuple(t1)));
-            }
-        }
-
-        if (transfer != null) {
-            transfer.processPacket(packet);
-        }
     }
 
+    @SuppressWarnings("unused")
     private OngoingS13Transfer instantiateIncomingTransaction(DownlinkS13Packet packet) {
         S13TransactionId.S13UniqueId uniquenessId = packet.getUniquenessId();
         S13TransactionId txId = new S13TransactionId(uniquenessId.getLargePacketTransactionId(), transferInstanceId.next(), uniquenessId.getLargePacketTransactionId(), uniquenessId.getTransferDirection());
@@ -734,7 +714,7 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
     }
 
     private static class OptionValues {
-        HashMap<String, Boolean> booleanOptions = new HashMap<>();
+        HashMap<String, String> stringOptions = new HashMap<>();
         HashMap<String, Double> doubleOptions = new HashMap<>();
     }
 
@@ -748,6 +728,8 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
                 case FILE_PART_RETRY_OPTION:
                     optionValues.doubleOptions.put(option.getKey(), (double) option.getValue());
                     break;
+                case "TRANSFER_USER":
+                    optionValues.stringOptions.put(option.getKey(), (String) option.getValue());
                 default:
                     log.warn("Unknown file transfer option: {} (value: {})", option.getKey(), option.getValue());
                 }
@@ -810,12 +792,14 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
         Double filePartRetries = optionValues.doubleOptions.get(FILE_PART_RETRY_OPTION);
         Double packetDelay = optionValues.doubleOptions.get(PDU_DELAY_OPTION);
 
+        String username = optionValues.stringOptions.get("TRANSFER_USER");
+
         FilePutRequest request = new FilePutRequest(sourceId, destinationId, objectName, absoluteDestinationPath, bucket, objData);
         long creationTime = YamcsServer.getTimeService(yamcsInstance).getMissionTime();
 
         return processPutRequest(transferInstanceId.next(), destinationId, creationTime, request, bucket, 
                 PredefinedTransferTypes.UPLOAD_LARGE_FILE_TRANSFER.toString(),
-                filePartRetries != null? filePartRetries.intValue(): null, packetDelay != null? packetDelay.intValue(): null);
+                filePartRetries != null? filePartRetries.intValue(): null, packetDelay != null? packetDelay.intValue(): null, username);
     }
 
     @Override

@@ -56,7 +56,6 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
 
     private OutTxState outTxState;
     private long transferred;
-    private String origin;
 
     private long offset = 0;
     private long end = 0;
@@ -79,13 +78,12 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
             FilePutRequest request, YConfiguration config, Bucket bucket,
             Integer customPacketSize, Integer customPacketDelay,
             EventProducer eventProducer, TransferMonitor monitor, String transferType,
-            Map<ConditionCode, FaultHandlingAction> faultHandlerActions, Integer filePartRetries) {
+            Map<ConditionCode, FaultHandlingAction> faultHandlerActions, Integer filePartRetries, String username) {
 
         super(yamcsInstance, cmdHistRealtime, creationTime, executor, config, makeTransactionId(request.getRemoteId(), transferInstanceId, largePacketTransactionId), 
-            eventProducer, monitor, transferType, filePartRetries, faultHandlerActions);
+            eventProducer, monitor, transferType, filePartRetries, username, faultHandlerActions);
         this.request = request;
         this.bucket = bucket;
-        this.origin = ServiceThirteen.origin;
         int maxPacketSize = customPacketSize != null && customPacketSize > 0 ? customPacketSize : config.getInt("maxPacketSize", 512);
         maxDataSize = maxPacketSize - (PusTcManager.secondaryHeaderLength + PusTcManager.DEFAULT_PRIMARY_HEADER_LENGTH + 
                 org.yamcs.tctm.pus.services.tc.thirteen.ServiceThirteen.largePacketTransactionIdSize + org.yamcs.tctm.pus.services.tc.thirteen.ServiceThirteen.partSequenceNumberSize);
@@ -330,11 +328,6 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
     @Override
     public long getTransferredSize() {
         return this.transferred;
-    }
-
-    @Override
-    public String getOrigin(){
-        return this.origin;
     }
 
     @Override

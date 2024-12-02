@@ -3,6 +3,8 @@ package org.yamcs.tctm.pus.services.filetransfer.thirteen;
 import static org.yamcs.tctm.pus.services.filetransfer.thirteen.ServiceThirteen.ETYPE_TRANSFER_PACKET_ERROR;
 import static org.yamcs.tctm.pus.services.filetransfer.thirteen.ServiceThirteen.ETYPE_TRANSFER_PACKET_ERROR_NOK;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -48,9 +50,6 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
 
     protected String transferType;
 
-    // Origin
-    protected String origin;
-
     final TransferMonitor monitor;
 
     // transaction unique identifier (coming from a database)
@@ -62,9 +61,9 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
     // accumulate the errors
     List<String> errors = new ArrayList<>();
     Stream cmdHistStream;
-    boolean cancelOnNoAck;
     int retries;
-    
+    String username;
+
     public enum FaultHandlingAction {
         SUSPEND, CANCEL, ABANDON;
 
@@ -87,7 +86,7 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
 
     public OngoingS13Transfer(String yamcsInstance, Stream cmdHistStream, long creationTime, ScheduledThreadPoolExecutor executor,
             YConfiguration config, S13TransactionId s13TransactionId,
-            EventProducer eventProducer, TransferMonitor monitor, String transferType, Integer retries,
+            EventProducer eventProducer, TransferMonitor monitor, String transferType, Integer retries, String username,
             Map<ConditionCode, FaultHandlingAction> faultHandlerActions) {
         this.yamcsInstance = yamcsInstance;
         this.s13TransactionId = s13TransactionId;
@@ -99,6 +98,7 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
         this.wallclockStartTime = System.currentTimeMillis();
         this.log = new Log(this.getClass(), yamcsInstance);
         this.id = s13TransactionId.getTransferId();
+        this.username = username;
         this.creationTime = creationTime;
         if (monitor == null) {
             throw new NullPointerException("the monitor cannot be null");
@@ -107,11 +107,8 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
         this.monitor = monitor;
         this.inactivityTimeout = config.getLong("inactivityTimeout", 10000);
 
-        this.cancelOnNoAck = config.getBoolean("cancelOnNoAck", false);
         this.retries = retries != null? retries : config.getInt("filePartRetries", 1);
-
         this.faultHandlerActions = faultHandlerActions;
-        this.origin = "0.0.0.0";    // FIXME: Is this alright?
     }
 
     public abstract void processPacket(FileTransferPacket packet);
@@ -123,11 +120,14 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
 
         PreparedCommand pc = null;
         try {
+            var origin = InetAddress.getLocalHost().getHostName();
             pc = processor.getCommandingManager().buildCommand(cmd, assignments, origin, 0, user);
 
         } catch (ErrorInCommand e) {
             throw new BadRequestException(e);
         } catch (YamcsException e) { // could be anything, consider as internal server error
+            throw new InternalServerErrorException(e);
+        } catch (UnknownHostException e) {
             throw new InternalServerErrorException(e);
         }
 
@@ -139,7 +139,11 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
     }
 
     public User getCommandReleaseUser() {
-        return ServiceThirteen.getUserDirectory().getUser(ServiceThirteen.commandReleaseUser);
+        User user = ServiceThirteen.getUserDirectory().getUser(username);
+        if (user == null)
+            return ServiceThirteen.getUserDirectory().getUser(ServiceThirteen.commandReleaseUser);
+
+        return user;
     }
 
     protected void sendPacket(UplinkS13Packet packet) throws Exception {
@@ -169,22 +173,19 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
                         synchronized (commandDispatcher) {
                             if (pc1.getCommandId().equals(pc.getCommandId())) {
                                 String attr = pc1.getStringAttribute("CommandComplete_Status");
-                                if (attr != null) {
-                                    switch(attr) {
-                                        case "OK":
-                                            commandDispatcher.notify();
-                                            break;
-                                        case "NOK":
-                                            commandDispatcher.interrupt();
-                                            break;
-                                        default:
-                                    }
+                                if (attr == null)
+                                    return;
+            
+                                switch (attr) {
+                                    case "OK" -> commandDispatcher.notify();
+                                    case "NOK" -> commandDispatcher.interrupt();
                                 }
                             }
                         }
                     }
                 };
-                if (!packet.getSkipAcknowledgement()) {
+
+                if (!packet.skipAcknowledgement()) {
                     cmdHistStream.addSubscriber(sc);
                 }
 
@@ -195,11 +196,11 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
                             s13TransactionId, packet.getFullyQualifiedName(), packet.getPartSequenceNumber());
                 }
 
-                if (!packet.getSkipAcknowledgement()) {
+                if (!packet.skipAcknowledgement()) {
                     synchronized (commandDispatcher) {
                         try {
                             commandDispatcher.wait();
-    
+
                         } catch (InterruptedException e) {
                             ackError = "LargePacketUplink | NOK | Transaction ID: " + s13TransactionId
                                             + " | CommandName: " + packet.getFullyQualifiedName() + "Part Sequence Number: "
@@ -229,7 +230,7 @@ public abstract class OngoingS13Transfer implements S13FileTransfer {
                 break;
         }
 
-        if (cancelOnNoAck && !ack) {
+        if (!ack) {
             throw new Exception(ackError);
         }
     }
