@@ -31,7 +31,9 @@
             "type": "string",
             "enum": [
               "check",
-              "command"
+              "command",
+              "text",
+              "verify"
             ]
           },
           "comment": {
@@ -43,6 +45,38 @@
           "type"
         ],
         "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "check"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "parameters": {
+                  "type": "array",
+                  "description": "Parameters to check",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "parameter": {
+                        "type": "string",
+                        "description": "Qualified parameter name"
+                      }
+                    },
+                    "required": [
+                      "parameter"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "parameters"
+              ]
+            }
+          },
           {
             "if": {
               "properties": {
@@ -126,31 +160,84 @@
             "if": {
               "properties": {
                 "type": {
-                  "const": "check"
+                  "const": "text"
                 }
               }
             },
             "then": {
               "properties": {
-                "parameters": {
+                "text": {
+                  "type": "string",
+                  "description": "Text in Markdown format"
+                }
+              },
+              "required": [
+                "text"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "verify"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "condition": {
                   "type": "array",
-                  "description": "Parameters to check",
+                  "description": "Comparisons to verify (all must be satisfied)",
                   "items": {
                     "type": "object",
                     "properties": {
                       "parameter": {
                         "type": "string",
                         "description": "Qualified parameter name"
+                      },
+                      "operator": {
+                        "type": "string",
+                        "description": "Comparison operator",
+                        "enum": [
+                          "eq",
+                          "neq",
+                          "le",
+                          "lte",
+                          "gt",
+                          "gte"
+                        ]
+                      },
+                      "value": {
+                        "type": [
+                          "array",
+                          "boolean",
+                          "number",
+                          "object",
+                          "string"
+                        ],
+                        "description": "Value to compare against"
                       }
                     },
                     "required": [
-                      "parameter"
+                      "parameter",
+                      "operator",
+                      "value"
                     ]
                   }
+                },
+                "delay": {
+                  "type": "integer",
+                  "description": "Wait time before starting to check (in milliseconds)",
+                  "default": 0
+                },
+                "timeout": {
+                  "type": "integer",
+                  "description": "How long before the verification is considered unsuccessful (in milliseconds)"
                 }
               },
               "required": [
-                "parameters"
+                "condition"
               ]
             }
           }
