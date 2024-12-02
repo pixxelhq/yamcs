@@ -2,30 +2,24 @@
   <app-instance-toolbar>
     Stacks &nbsp;&nbsp;&nbsp;
     @if (mayManageStacks()) {
-      <ya-page-button (click)="createStack()" icon="add_circle_outline">
+      <ya-page-button (clicked)="createStack()" icon="add_circle_outline">
         Create stack
       </ya-page-button>
     }
     @if (mayManageStacks()) {
-      <ya-page-button (click)="openUploadDialog()" icon="file_upload">
+      <ya-page-button (clicked)="openUploadDialog()" icon="file_upload">
         Upload stack
-        <input
-          #uploader
-          type="file"
-          hidden
-          accept=".xml,.XML,.ycs,.YCS"
-          multiple
-          (change)="importStack()" />
+        <input #uploader type="file" hidden accept=".xml,.ycs" multiple (change)="importStack()" />
       </ya-page-button>
     }
     @if (mayManageStacks()) {
-      <ya-page-button (click)="createFolder()" icon="create_new_folder">
+      <ya-page-button (clicked)="createFolder()" icon="create_new_folder">
         Create folder
       </ya-page-button>
     }
     @if (mayManageStacks()) {
       <ya-page-button
-        (click)="deleteSelectedStacks()"
+        (clicked)="deleteSelectedStacks()"
         [disabled]="!selection.hasValue()"
         icon="delete">
         Delete
@@ -129,14 +123,6 @@
                   <a mat-menu-item [href]="item.objectUrl" download>Download</a>
                   <mat-divider />
                   <button mat-menu-item (click)="deleteFile(item)">Delete</button>
-                  @if ((item.name | filename | extension | lowercase) === "xml") {
-                    <mat-divider />
-                  }
-                  @if ((item.name | filename | extension | lowercase) === "xml") {
-                    <button mat-menu-item (click)="convertToJSON($event, item.name)">
-                      Convert to new format
-                    </button>
-                  }
                 </ya-more>
               }
             </td>
@@ -148,17 +134,7 @@
                 <span>
                   @switch (item.name | filename | extension | lowercase) {
                     @case ("xml") {
-                      <span
-                        style="color: #cc0000; cursor: help"
-                        title="Certain features are not implemented for XML, the format will be phased out gradually">
-                        Warning: XML-formatted stacks are deprecated,
-                        <a
-                          style="color: inherit; cursor: pointer"
-                          (click)="convertToJSON($event, item.name)"
-                          title="Convert to YCS">
-                          convert to the new format
-                        </a>
-                      </span>
+                      <span></span>
                     }
                     @case ("ycs") {
                       <span></span>
