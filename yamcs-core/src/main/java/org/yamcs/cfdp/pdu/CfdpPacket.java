@@ -88,7 +88,8 @@ public abstract class CfdpPacket {
                     getData(bb, position, pduSize));
         }
 
-        bb.limit(position + pduSize - fcsLength);
+        // bb.limit(position + pduSize - fcsLength);
+        bb.limit(position + pduSize - fcsLength + 1);
 
         CfdpPacket toReturn = null;
         if (header.isFileDirective()) {
