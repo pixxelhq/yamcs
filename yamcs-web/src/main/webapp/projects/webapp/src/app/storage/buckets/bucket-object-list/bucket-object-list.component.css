@@ -81,3 +81,62 @@ mat-toolbar-row {
   max-width: calc(100% - 5em);
   max-height: calc(100% - 5em);
 }
+
+#csv-table table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  user-select: text
+}
+
+#csv-table th,
+#csv-table td {
+  padding: 8px 12px;
+  text-align: left;
+  user-select: text;
+}
+
+#csv-table th {
+  background-color: #f4f4f4;
+  border: 1px solid #ddd;
+}
+
+#csv-table td {
+  border: 1px solid #ddd;
+  color: #ddd;
+}
+
+.json-content {
+  display: block;  /* Ensure the pre tag is treated as a block element */
+  white-space: pre-wrap;  /* Allows long lines to wrap */
+  word-wrap: break-word;  /* Prevents words from overflowing */
+  width: 100%;  /* Ensures it takes the full width of the container */
+  padding: 10px;  /* Adds space inside the pre block for readability */
+  margin: 0;  /* Removes any default margin */
+  overflow-x: auto;  /* Enables horizontal scrolling for very long lines */
+  text-align: left;  /* Ensures text is aligned to the left, not centered */
+  color: #ddd;  /* Set the text color to #ddd */
+  user-select: text;
+}
+
+.json-content .key {
+  font-weight: bold;  /* Makes the key field bold */
+  
+}
+
+/* Styling for collapsible nested levels */
+.json-content .nested {
+  display: none;  /* Hide nested elements by default */
+  margin-left: 20px;  /* Indentation for nested levels */
+}
+
+/* Adds a small clickable indicator (like a plus/minus) before nested elements */
+.json-content .toggle {
+  cursor: pointer;
+  color: #aaa;
+}
+
+/* Add some style for when an item is expanded */
+.json-content .expanded {
+  display: block;
+}

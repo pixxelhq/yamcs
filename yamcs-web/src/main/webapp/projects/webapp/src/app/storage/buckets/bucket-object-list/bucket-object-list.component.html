@@ -45,8 +45,25 @@
         [style.width]="(previewWidth$ | async) + 'px'"
         style="text-align: center">
         <div class="resize-handle" (mousedown)="resizeMouseDown($event)"></div>
+          <!-- Loading Spinner -->
+          <div *ngIf="isLoading">Loading...</div>
         @if (selection.selected.length === 1 && isImage(selection.selected[0])) {
           <img [src]="selection.selected[0].objectUrl" />
+        } @else if (selection.selected.length === 1 && isJson(selection.selected[0])) {
+          <ngx-json-viewer class="json-content" [json]="parsedJson"></ngx-json-viewer>
+        } @else if (selection.selected.length === 1 && isCsv(selection.selected[0]) && tableData !== null) {
+          <table style="margin-left: 17px; margin-right: 17px" id="csv-table" *ngIf="tableData.length > 0" border="1">
+            <thead>
+              <tr>
+                <th *ngFor="let header of headers">{{ header }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of tableData">
+                <td *ngFor="let cell of row">{{ cell }}</td>
+              </tr>
+            </tbody>
+          </table>
         } @else {
           <div style="margin-top: 4em; color: #fff">
             <mat-icon>arrow_back</mat-icon>
