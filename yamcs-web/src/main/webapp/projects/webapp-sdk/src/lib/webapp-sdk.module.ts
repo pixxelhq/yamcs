@@ -110,6 +110,7 @@ import { UnitsPipe } from './pipes/units.pipe';
 import { ValuePipe } from './pipes/value.pipe';
 import { YaPrintZone } from './print/print-zone.component';
 import { PrintableDirective } from './print/printable.directive';
+import { NgxJsonViewerModule } from 'ngx-json-viewer';
 
 const pipes = [
   AliasPipe,
@@ -237,6 +238,7 @@ const materialModules = [
     ReactiveFormsModule,
     RouterModule,
     materialModules,
+    NgxJsonViewerModule,
     directives,
     pipes,
     sharedComponents,
@@ -249,6 +251,7 @@ const materialModules = [
     materialModules,
     sharedComponents,
     pipes,
+    NgxJsonViewerModule,
   ],
 })
 export class WebappSdkModule { }
