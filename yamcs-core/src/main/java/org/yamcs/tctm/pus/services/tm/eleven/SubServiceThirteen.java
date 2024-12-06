@@ -111,12 +111,6 @@ public class SubServiceThirteen implements PusSubService {
                 ZoneId.of("GMT")
             ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")));
 
-            // Populate modified time
-            metadata.put("ModifiedTime", LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(missionTime),
-                ZoneId.of("GMT")
-            ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")));
-
             // Populate properties
             for (Map.Entry<String, Integer> prop: props.entrySet()) {
                 if (prop.getKey() == "ReportIndex") {
@@ -146,12 +140,6 @@ public class SubServiceThirteen implements PusSubService {
         } else {
             metadata = new HashMap<>(foundObject.getMetadataMap());
             filename = foundObject.getName();
-
-            // Populate modified time
-            metadata.put("ModifiedTime", LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(missionTime),
-                ZoneId.of("GMT")
-            ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")));
 
             // Update Report indices in metadata
             @SuppressWarnings("unchecked")
@@ -240,8 +228,17 @@ public class SubServiceThirteen implements PusSubService {
 
         // Check if a unique file already exists
         try {
-            ObjectProperties foundObject = findObject(uniqueSignature);
             long generationTime = ByteArrayUtils.decodeCustomInteger(pPkt.getGenerationTime(), 0, PusTmManager.absoluteTimeLength);
+            ObjectProperties foundObject = findObject(uniqueSignature);
+
+            if (foundObject == null) {
+                String filename = yamcsInstance + "/timetagScheduleSummaryReport/" + folders.get(apid) + "/" + LocalDateTime.ofInstant(
+                    Instant.ofEpochSecond(generationTime),
+                    ZoneId.of("GMT")
+                ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")) + ".csv";
+
+                foundObject = timetagScheduleSummaryReportBucket.findObject(filename);
+            }
 
             // Generate the report
             generateTimetagScheduleSummaryReport(generationTime, requestTcPacketsMap, props, foundObject, apid);
