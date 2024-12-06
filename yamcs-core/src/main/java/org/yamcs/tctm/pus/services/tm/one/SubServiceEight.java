@@ -7,6 +7,7 @@ import org.yamcs.TmPacket;
 import org.yamcs.commanding.PreparedCommand;
 import org.yamcs.events.EventProducer;
 import org.yamcs.events.EventProducerFactory;
+import org.yamcs.protobuf.Event.EventSeverity;
 import org.yamcs.tctm.pus.PusTmManager;
 import org.yamcs.tctm.pus.services.PusSubService;
 import org.yamcs.tctm.pus.services.tm.PusTmCcsdsPacket;
@@ -41,21 +42,21 @@ public class SubServiceEight implements PusSubService {
         long errorReason = ByteArrayUtils.decodeCustomInteger(failureNotice, ServiceOne.failureCodeSize, ServiceOne.failureDataSize);
 
         try {
-            eventProducer.sendCritical(TC_COMPLETION_EXECUTION_FAILED,
+            eventProducer.sendEvent(EventSeverity.CRITICAL, TC_COMPLETION_EXECUTION_FAILED,
                 "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + ServiceOne.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: "
-                        + tcCcsdsSeqCount
-                        + ") has failed to complete execution | Error Code: " + ServiceOne.FailureCode.fromValue((int) errorCode).toString()
-                        + "| Failure reason: " + errorReason
-            );
+                    + tcCcsdsSeqCount
+                    + ") has failed to complete execution | Error Code: " + ServiceOne.FailureCode.fromValue((int) errorCode).toString()
+                    + "| Failure reason: " + errorReason,
+                tmPacket.getGenerationTime());
+
         } catch (Exception e) {
-            eventProducer.sendCritical(TC_COMPLETION_EXECUTION_FAILED,
+            eventProducer.sendEvent(EventSeverity.CRITICAL, TC_COMPLETION_EXECUTION_FAILED,
                 "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + ServiceOne.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: "
-                        + tcCcsdsSeqCount
-                        + ") has failed to complete execution | Error Code: " + errorCode + " (No enumeration found)"
-                        + "| Failure reason: " + errorReason
-            );
+                    + tcCcsdsSeqCount
+                    + ") has failed to complete execution | Error Code: " + errorCode + " (No enumeration found)"
+                    + "| Failure reason: " + errorReason,
+                tmPacket.getGenerationTime());
         }
-        
 
         ArrayList<TmPacket> pktList = new ArrayList<>();
         pktList.add(tmPacket);

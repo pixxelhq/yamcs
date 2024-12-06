@@ -6,6 +6,7 @@ import org.yamcs.TmPacket;
 import org.yamcs.commanding.PreparedCommand;
 import org.yamcs.events.EventProducer;
 import org.yamcs.events.EventProducerFactory;
+import org.yamcs.protobuf.Event.EventSeverity;
 import org.yamcs.tctm.pus.PusTmManager;
 import org.yamcs.tctm.pus.services.PusSubService;
 import org.yamcs.tctm.pus.services.tm.PusTmCcsdsPacket;
@@ -34,9 +35,10 @@ public class SubServiceOne implements PusSubService {
         if (PusTmManager.destinationId != pPkt.getDestinationID())
             return null;
 
-        eventProducer.sendInfo(TC_ACCEPTANCE_SUCCESS,
-                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + ServiceOne.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: " + tcCcsdsSeqCount + ") has been accepted");
-        
+        eventProducer.sendEvent(EventSeverity.INFO, TC_ACCEPTANCE_SUCCESS,
+                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + ServiceOne.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: " + tcCcsdsSeqCount + ") has been accepted",
+                tmPacket.getGenerationTime());
+
         ArrayList<TmPacket> pktList = new ArrayList<>();
         pktList.add(tmPacket);
 

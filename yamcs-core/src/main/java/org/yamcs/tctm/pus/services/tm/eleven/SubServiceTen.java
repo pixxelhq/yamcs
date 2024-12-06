@@ -112,13 +112,6 @@ public class SubServiceTen implements PusSubService {
                 ZoneId.of("GMT")
             ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")));
 
-            // Populate modified time
-            metadata.put("ModifiedTime", LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(missionTime),
-                ZoneId.of("GMT")
-            ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")));
-
-
             // Populate properties
             for (Map.Entry<String, Integer> prop: props.entrySet()) {
                 if (prop.getKey() == "ReportIndex") {
@@ -147,12 +140,6 @@ public class SubServiceTen implements PusSubService {
         } else {
             metadata = new HashMap<>(foundObject.getMetadataMap());
             filename = foundObject.getName();
-
-            // Populate modified time
-            metadata.put("ModifiedTime", LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(missionTime),
-                ZoneId.of("GMT")
-            ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")));
 
             // Update Report indices in metadata
             @SuppressWarnings("unchecked")
@@ -247,15 +234,24 @@ public class SubServiceTen implements PusSubService {
 
         // Check if a unique file already exists
         ObjectProperties foundObject = null;
+        long generationTime = ByteArrayUtils.decodeCustomInteger(pPkt.getGenerationTime(), 0, PusTmManager.absoluteTimeLength);
+
         try {
             foundObject = findObject(uniqueSignature);
+            if (foundObject == null) {
+                String filename = yamcsInstance + "/timetagScheduleDetailReport/" + folders.get(apid) + "/" + LocalDateTime.ofInstant(
+                    Instant.ofEpochSecond(generationTime),
+                    ZoneId.of("GMT")
+                ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")) + ".csv";
+
+                foundObject = timetagScheduleDetailReportBucket.findObject(filename);
+            }
 
         } catch (IOException e) {
             throw new UncheckedIOException("S(11, 10) | Unable to find object with UniqueSignature: " + uniqueSignature + " in bucket: " + (timetagScheduleDetailReportBucket != null ? " -> " + timetagScheduleDetailReportBucket.getName() : ""), e);
         }
 
         // Generate the report
-        long generationTime = ByteArrayUtils.decodeCustomInteger(pPkt.getGenerationTime(), 0, PusTmManager.absoluteTimeLength);
         ArrayList<byte[]> newPayload = generateTimetagScheduleDetailReport(generationTime, requestTcPacketsMap, props, foundObject, apid);
 
         // Create a new TmPacket similar S(11, 10)
