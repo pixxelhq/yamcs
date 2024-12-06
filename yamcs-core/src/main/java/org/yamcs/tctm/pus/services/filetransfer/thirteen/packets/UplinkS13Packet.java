@@ -34,7 +34,7 @@ public class UplinkS13Packet extends FileTransferPacket {
         this.filePart = padByteArray(filePart, filePartMDbSize, (byte) 0xFF);
     }
 
-    public boolean getSkipAcknowledgement() {
+    public boolean skipAcknowledgement() {
         return skipAcknowledgement;
     }
 
