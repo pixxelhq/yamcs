@@ -122,8 +122,6 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
     protected Map<String, EntityConf> localEntities = new LinkedHashMap<>();
     protected Map<String, EntityConf> remoteEntities = new LinkedHashMap<>();
 
-    int pendingAfterCompletion;
-
     private int maxExistingFileRenames;
     boolean allowConcurrentFileOverwrites;
 
@@ -160,7 +158,6 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
         spec.addOption("receiverFaultHandlers", OptionType.MAP).withSpec(Spec.ANY);
         spec.addOption("senderFaultHandlers", OptionType.MAP).withSpec(Spec.ANY);
         spec.addOption("allowConcurrentFileOverwrites", OptionType.BOOLEAN).withDefault(false);
-        spec.addOption("pendingAfterCompletion", OptionType.INTEGER).withDefault(600000);
         spec.addOption("spaceSystem", OptionType.STRING).withDefault("FF");
         spec.addOption("commandReleaseUser", OptionType.STRING).withDefault("administrator");
 
@@ -207,7 +204,6 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
         }
 
         defaultIncomingBucket = getBucket(config.getString("incomingBucket"), true);
-        pendingAfterCompletion = config.getInt("pendingAfterCompletion", 600000);
         allowConcurrentFileOverwrites = config.getBoolean("allowConcurrentFileOverwrites");
         spaceSystem = config.getString("spaceSystem");
         maxExistingFileRenames = config.getInt("maxExistingFileRenames", 1000);

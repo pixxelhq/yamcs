@@ -138,6 +138,9 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
                     handleFault(ConditionCode.UNSUPPORTED_CHECKSUM_TYPE);
                     return;
 
+                } catch (InterruptedException e) {
+                    return;
+
                 } catch (Exception e) {
                     pushError(e.toString());
                     handleFault(ConditionCode.NAK_LIMIT_REACHED);
@@ -169,6 +172,9 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
                         handleFault(ConditionCode.UNSUPPORTED_CHECKSUM_TYPE);
                         return;
 
+                    } catch (InterruptedException e) {
+                        return;
+
                     } catch (Exception e) {
                         pushError(e.toString());
                         handleFault(ConditionCode.NAK_LIMIT_REACHED);
@@ -191,12 +197,13 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
                         sendPacket(packet);
 
                     } catch (CommandEncodingException e) {
-                        pushError(e.toString());
                         handleFault(ConditionCode.UNSUPPORTED_CHECKSUM_TYPE);
                         return;
 
+                    } catch (InterruptedException e) {
+                        return;
+
                     } catch (Exception e) {
-                        pushError(e.toString());
                         handleFault(ConditionCode.NAK_LIMIT_REACHED);
                         return;
                     }
@@ -225,6 +232,9 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
         long duration = (System.currentTimeMillis() - wallclockStartTime) / 1000;
 
         String eventMessageSuffix = request.getSourceFileName() + " -> " + request.getDestinationFileName();
+
+        // Force Cancel running schedule | To stop the currently running TC uplink task
+        packetSendingSchedule.cancel(true);
 
         if (conditionCode == ConditionCode.NO_ERROR) {
             changeState(TransferState.COMPLETED);
