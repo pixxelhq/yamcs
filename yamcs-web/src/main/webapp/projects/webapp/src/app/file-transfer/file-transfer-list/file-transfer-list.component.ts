@@ -70,7 +70,7 @@ export class FileTransferListComponent implements OnInit {
   });
 
   isIncomplete = (index: number, transfer: Transfer) => {
-    return transfer.state !== 'COMPLETED';
+    return transfer.state !== 'COMPLETED' || transfer.failureReason;
   };
 
   validStart: Date | null;

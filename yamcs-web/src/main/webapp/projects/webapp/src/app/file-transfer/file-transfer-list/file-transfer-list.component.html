@@ -221,7 +221,7 @@
           *matRowDef="let row; columns: displayedColumns$ | async"
           class="item-row"
           [class.upload]="row.direction === 'UPLOAD'"
-          [class.nodetail]="row.state === 'COMPLETED'"></tr>
+          [class.nodetail]="row.state === 'COMPLETED' && row.failureReason === ''"></tr>
         <tr
           mat-row
           class="item-detail"

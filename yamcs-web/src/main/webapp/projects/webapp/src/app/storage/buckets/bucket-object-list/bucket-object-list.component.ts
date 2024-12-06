@@ -1,5 +1,5 @@
 import { SelectionModel } from '@angular/cdk/collections';
-import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatTableDataSource } from '@angular/material/table';
 import { Title } from '@angular/platform-browser';
@@ -38,6 +38,12 @@ export class BucketObjectListComponent implements OnDestroy {
   private uploaderEl: ElementRef<HTMLInputElement>;
 
   name: string;
+  parsedJson: any[] | null = []; // Array to hold parsed and formatted JSON data
+
+  // Csv content
+  tableData: string[][] | null = [];
+  headers: string[] | null = [];
+  isLoading: boolean = false; // To track loading state
 
   breadcrumb$ = new BehaviorSubject<BreadCrumbItem[]>([]);
   dragActive$ = new BehaviorSubject<boolean>(false);
@@ -56,14 +62,17 @@ export class BucketObjectListComponent implements OnDestroy {
   private progressDialogOpen = false;
 
   private dialogRef: MatDialogRef<any>;
+  cdr: ChangeDetectorRef;
 
   constructor(
     private dialog: MatDialog,
     router: Router,
     private route: ActivatedRoute,
     yamcs: YamcsService,
+    cdr: ChangeDetectorRef,
     title: Title,
   ) {
+    this.cdr = cdr;
     this.name = route.snapshot.parent!.parent!.paramMap.get('name')!;
     title.setTitle(this.name);
     this.storageClient = yamcs.createStorageClient();
@@ -129,11 +138,21 @@ export class BucketObjectListComponent implements OnDestroy {
       this.dataSource.filteredData.forEach(row => this.selection.select(row));
   }
 
+  resetContent() {
+    this.isLoading = true;
+    this.tableData = null;
+    this.headers = null;
+    this.parsedJson = null;
+  }
+
   toggleOne(row: BrowseItem) {
     if (!this.selection.isSelected(row) || this.selection.selected.length > 1) {
       this.selection.clear();
     }
+    this.resetContent();
+
     this.selection.toggle(row);
+    this.generateContent(row);
   }
 
   createFolder() {
@@ -361,6 +380,90 @@ export class BucketObjectListComponent implements OnDestroy {
     const lc = item.name.toLocaleLowerCase();
     return lc.endsWith('.png') || lc.endsWith('.gif') || lc.endsWith('.jpg')
       || lc.endsWith('jpeg') || lc.endsWith('bmp') || lc.endsWith('svg') || lc.endsWith('ico');
+  }
+
+  isJson(item: BrowseItem) {
+    if (item.folder) {
+      return false;
+    }
+
+    const lc = item.name.toLocaleLowerCase();
+    return lc.endsWith('.json');
+  }
+
+  isCsv(item: BrowseItem) {
+    if (item.folder) {
+      return false;
+    }
+
+    const lc = item.name.toLocaleLowerCase();
+    return lc.endsWith('.csv');
+  }
+
+  generateContent(item: BrowseItem) {
+    if (item.objectUrl) {
+      fetch(item.objectUrl)
+        .then(response => response.text())
+        .then(data => {
+          if (this.isJson(item)) {
+            this.parsedJson = this.formatJson(JSON.parse(JSON.stringify(JSON.parse(data), null, 2)));
+            this.headers = null;
+            this.tableData = null;
+          } else if (this.isCsv(item)) {
+            this.parsedJson = null;
+            this.parseCSV(data);
+          } else {
+            this.parsedJson = null;
+            this.tableData = null;
+            this.headers = null;
+          }
+
+        // Once the data is fetched, manually trigger change detection
+        this.isLoading = false; // Set loading to false
+        this.cdr.detectChanges();
+
+        })
+        .catch(error => {
+          console.error('Error fetching file:', error)
+          this.isLoading = false; // Handle error and stop loading
+          this.cdr.detectChanges(); // Ensure the DOM updates  
+        });
+    }
+  }
+
+  // Format JSON to include key fields, nested objects, and collapsibility
+  formatJson(data: any, parentKey: string = ''): any[] {
+    const result = [];
+    for (const key in data) {
+      if (data.hasOwnProperty(key)) {
+        const value = data[key];
+        const isKey = true;
+        const nested = (typeof value === 'object' && value !== null) ? this.formatJson(value, key) : null;
+        result.push({
+          key,
+          value,
+          isKey,
+          nested,
+          expanded: false // Initially collapsed
+        });
+      }
+    }
+    return result;
+  }
+
+  // Toggle the expanded/collapsed state for a nested item
+  toggleCollapse(index: number) {
+    if (this.parsedJson != null) {
+      const item = this.parsedJson[index];
+      item.expanded = !item.expanded;  // Toggle the expanded state
+    }
+  }
+
+  parseCSV(data: string): void {
+    const lines = data.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    this.headers = lines[0].split(',');
+
+    this.tableData = lines.slice(1).map(line => line.split(','));
   }
 
   private async showUploadProgress() {
