@@ -3,6 +3,7 @@ package org.yamcs.http.api;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -225,6 +226,9 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
             transferOptions.setOverwrite(true);
             transferOptions.setCreatePath(true);
             transferOptions.putExtraOptions(GpbWellKnownHelper.toJava(request.getOptions()));
+
+            // Put the context user name as well
+            transferOptions.putExtraOptions(Map.of("TRANSFER_USER", ctx.user.getName()));
 
             List<Triple<String, String, String>> fssrrr = request.getFileProxyOperationOptionsList().stream()
                     .map(fp -> new Triple<>(fp.getFilestoreRequestAction(), fp.getFilestoreRequestFirstFileName(), fp.getFilestoreRequestSecondFileName()))

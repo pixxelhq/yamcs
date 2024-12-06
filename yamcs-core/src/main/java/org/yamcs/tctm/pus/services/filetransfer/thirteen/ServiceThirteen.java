@@ -20,7 +20,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.yamcs.ConfigurationException;
@@ -91,29 +90,20 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
     private Sequence transferInstanceId;
 
     static final Map<String, ConditionCode> VALID_CODES = new HashMap<>();
-    static final Map<Integer, String> FAILURE_CODES = new HashMap<>();
-
     static {
         VALID_CODES.put("CancelRequestReceived", ConditionCode.CANCEL_REQUEST_RECEIVED);
-        VALID_CODES.put("FilestoreRejection", ConditionCode.FILESTORE_REJECTION);
         VALID_CODES.put("InactivityDetected", ConditionCode.INACTIVITY_DETECTED);
-        VALID_CODES.put("FileChecksumFailure", ConditionCode.FILE_CHECKSUM_FAILURE);
-        VALID_CODES.put("CheckLimitReached", ConditionCode.CHECK_LIMIT_REACHED);
         VALID_CODES.put("PreparedCommandNotFormed", ConditionCode.UNSUPPORTED_CHECKSUM_TYPE);
-    }
-
-    static {
-        FAILURE_CODES.put(4, "FILESTORE_REJECTION_ONBOARD");
-        FAILURE_CODES.put(5, "FILE_CHECKSUM_ERROR_ONBOARD");
-        FAILURE_CODES.put(6, "FILE_SIZE_ERROR_ONBOARD");
-        FAILURE_CODES.put(8, "INACTIVITY_DETECTED_ONBOARD");
-        FAILURE_CODES.put(9, "INVALID_FILE_STRUCTURE_RECEIVED_ONBOARD");
+        VALID_CODES.put("RunOutOfRetry", ConditionCode.NAK_LIMIT_REACHED);
+        VALID_CODES.put("OnboardTimeout", ConditionCode.ONBOARD_TIMEOUT);
+        VALID_CODES.put("OnboardDiscontinuity", ConditionCode.ONBOARD_DISCONTINUITY);
+        VALID_CODES.put("OnboardMemoryError", ConditionCode.ONBOARD_MEMORY_ERROR);
     }
 
     Map<S13TransactionId.S13UniqueId, OngoingS13Transfer> pendingTransfers = new ConcurrentHashMap<>();
     FileDownloadRequests fileDownloadRequests = new FileDownloadRequests();
 
-    ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(6);  // FIXME: Careful with this number, not sure how it would affect perfomance
+    ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(6);
     Map<ConditionCode, FaultHandlingAction> receiverFaultHandlers;
     Map<ConditionCode, FaultHandlingAction> senderFaultHandlers;
 
@@ -126,7 +116,6 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
     static String spaceSystem;
     static Map<Long, String> spaceSubSystems = new HashMap<>();
     static Map<Long, String> contentTypeMap = new HashMap<>();
-    static String origin;
 
     private final Set<TransferMonitor> transferListeners = new CopyOnWriteArraySet<>();
     
@@ -134,18 +123,21 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
     protected Map<String, EntityConf> remoteEntities = new LinkedHashMap<>();
 
     private int maxExistingFileRenames;
-
-    int pendingAfterCompletion;
-    int archiveRetrievalLimit;
-
     boolean allowConcurrentFileOverwrites;
+
+    private boolean canChangePacketDelay;
+    private List<Integer> packetDelayPredefinedValues;
+    private boolean canChangeNumberOfRetries;
+    private List<Integer> filePartRetriesPredefinedValues;
 
     private static Processor processor;
     private static Directory directory;
     private static CommandingManager commandingManager;
 
     public static String commandReleaseUser;
-    public static String startDownlinkCmdName;
+
+    private final String PDU_DELAY_OPTION = "pduDelay";
+    private final String FILE_PART_RETRY_OPTION = "filePartRetryNumber";
 
     @Override
     public Spec getSpec() {
@@ -163,28 +155,32 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
         spec.addOption("maxExistingFileRenames", OptionType.INTEGER).withDefault(1000);
         spec.addOption("localEntities", OptionType.LIST).withElementType(OptionType.MAP).withSpec(entitySpec);
         spec.addOption("remoteEntities", OptionType.LIST).withElementType(OptionType.MAP).withSpec(entitySpec);
-        spec.addOption("archiveRetrievalLimit", OptionType.INTEGER).withDefault(100);
         spec.addOption("receiverFaultHandlers", OptionType.MAP).withSpec(Spec.ANY);
         spec.addOption("senderFaultHandlers", OptionType.MAP).withSpec(Spec.ANY);
         spec.addOption("allowConcurrentFileOverwrites", OptionType.BOOLEAN).withDefault(false);
-        spec.addOption("pendingAfterCompletion", OptionType.INTEGER).withDefault(600000);
         spec.addOption("spaceSystem", OptionType.STRING).withDefault("FF");
         spec.addOption("commandReleaseUser", OptionType.STRING).withDefault("administrator");
-        spec.addOption("startDownlinkCmdName", OptionType.STRING).withDefault("StartLargePacketDownload");
 
         spec.addOption("checkAckTimeout", OptionType.INTEGER).withDefault(10000l);
         spec.addOption("checkAckLimit", OptionType.INTEGER).withDefault(5);
         spec.addOption("inactivityTimeout", OptionType.INTEGER).withDefault(10000);
 
         spec.addOption("maxPacketSize", OptionType.INTEGER).withDefault(512);
-        spec.addOption("sleepBetweenPackets", OptionType.INTEGER).withDefault(500);
-        spec.addOption("useCop1Bypass", OptionType.BOOLEAN).withDefault(true);
         spec.addOption("firstPacketCmdName", OptionType.STRING).withDefault("FirstUplinkPart");
         spec.addOption("intermediatePacketCmdName", OptionType.STRING).withDefault("IntermediateUplinkPart");
         spec.addOption("lastPacketCmdName", OptionType.STRING).withDefault("LastUplinkPart");
         spec.addOption("skipAcknowledgement", OptionType.BOOLEAN).withDefault(true);
         spec.addOption("cmdhistStream", OptionType.STRING).withDefault("cmdhist_realtime");
-        spec.addOption("cancelOnNoAck", OptionType.BOOLEAN).withDefault(false);
+        
+        spec.addOption("canChangePacketDelay", OptionType.BOOLEAN).withDefault(false);
+        spec.addOption("packetDelayPredefinedValues", OptionType.LIST).withDefault(Collections.emptyList())
+                .withElementType(OptionType.INTEGER);
+        spec.addOption("sleepBetweenPackets", OptionType.INTEGER).withDefault(500);
+
+
+        spec.addOption("canChangeNumberOfRetries", OptionType.BOOLEAN).withDefault(false);
+        spec.addOption("filePartRetriesPredefinedValues", OptionType.LIST).withDefault(Collections.emptyList())
+                .withElementType(OptionType.INTEGER);
         spec.addOption("filePartRetries", OptionType.INTEGER).withDefault(1);
 
         return spec;
@@ -208,13 +204,16 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
         }
 
         defaultIncomingBucket = getBucket(config.getString("incomingBucket"), true);
-        archiveRetrievalLimit = config.getInt("archiveRetrievalLimit", 100);
-        pendingAfterCompletion = config.getInt("pendingAfterCompletion", 600000);
         allowConcurrentFileOverwrites = config.getBoolean("allowConcurrentFileOverwrites");
         spaceSystem = config.getString("spaceSystem");
         maxExistingFileRenames = config.getInt("maxExistingFileRenames", 1000);
         commandReleaseUser = config.getString("commandReleaseUser", "admin");
-        startDownlinkCmdName = config.getString("startDownlinkCmdName", "StartLargePacketDownload");
+
+        canChangePacketDelay = config.getBoolean("canChangePacketDelay");
+        packetDelayPredefinedValues = config.getList("packetDelayPredefinedValues");
+
+        canChangeNumberOfRetries = config.getBoolean("canChangeNumberOfRetries");
+        filePartRetriesPredefinedValues = config.getList("filePartRetriesPredefinedValues");
 
         initSrcDst(config);
         eventProducer = EventProducerFactory.getEventProducer(yamcsInstance, "PusService-13", 10000);
@@ -401,9 +400,11 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
         }
     }
 
-    private S13FileTransfer processPutRequest(long transferInstanceId, long largePacketTransactionId, long creationTime, FilePutRequest request, Bucket bucket, String transferType) {
+    private S13FileTransfer processPutRequest(long transferInstanceId, long largePacketTransactionId, long creationTime, 
+            FilePutRequest request, 
+            Bucket bucket, String transferType, Integer filePartRetries, Integer customPacketDelay, String username) {
         S13OutgoingTransfer transfer = new S13OutgoingTransfer(yamcsInstance, transferInstanceId, largePacketTransactionId, creationTime,
-                executor, cmdhistRealtime, request, config, bucket, null, null, eventProducer, this, transferType, senderFaultHandlers);
+                executor, cmdhistRealtime, request, config, bucket, null, customPacketDelay, eventProducer, this, transferType, senderFaultHandlers, filePartRetries, username);
 
         dbStream.emitTuple(CompletedTransfer.toInitialTuple(transfer));
 
@@ -447,34 +448,21 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
             FileTransfer filetransfer = getOngoingUploadFileTransfer(packet.getUniquenessId().getLargePacketTransactionId());
             if (filetransfer != null) {
                 S13OutgoingTransfer outgoingTransfer = (S13OutgoingTransfer) filetransfer;
-                outgoingTransfer.cancel(ConditionCode.reaConditionCodeAsIs((byte) packet.getFailureCode().byteValue()));
+                ConditionCode failureCode = packet.getFailureCode() != null? 
+                        ConditionCode.reaConditionCodeAsIs((byte) packet.getFailureCode().byteValue()): ConditionCode.RESERVED; 
+                outgoingTransfer.cancel(failureCode);
 
             } else {
-                log.warn("Erroneous Uplink abortion request received");
+                String errorMsg = "Erroneous Uplink abortion request received | " + packet;
+                eventProducer.sendWarning(ETYPE_UNEXPECTED_S13_PACKET, "TXID[S13-UNKNOWN] " + errorMsg);
+                log.warn("Erroneous Uplink abortion request received | " + packet);
             }
 
             return;
         }
-
-        OngoingS13Transfer transfer = null;
-        if (pendingTransfers.containsKey(packet.getUniquenessId())) {
-            transfer = pendingTransfers.get(packet.getUniquenessId());
-
-        } else {
-            // the communication partner has initiated a transfer
-            transfer = instantiateIncomingTransaction(packet);
-            if (transfer != null) {
-                pendingTransfers.put(transfer.getTransactionId().getUniquenessId(), transfer);
-                OngoingS13Transfer t1 = transfer;
-                executor.submit(() -> dbStream.emitTuple(CompletedTransfer.toInitialTuple(t1)));
-            }
-        }
-
-        if (transfer != null) {
-            transfer.processPacket(packet);
-        }
     }
 
+    @SuppressWarnings("unused")
     private OngoingS13Transfer instantiateIncomingTransaction(DownlinkS13Packet packet) {
         S13TransactionId.S13UniqueId uniquenessId = packet.getUniquenessId();
         S13TransactionId txId = new S13TransactionId(uniquenessId.getLargePacketTransactionId(), transferInstanceId.next(), uniquenessId.getLargePacketTransactionId(), uniquenessId.getTransferDirection());
@@ -559,14 +547,8 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
         transferListeners.forEach(l -> l.stateChanged(s13FileTransfer));
 
         if (s13FileTransfer.getTransferState() == TransferState.COMPLETED
-                || s13FileTransfer.getTransferState() == TransferState.FAILED) {
-
-            if (s13FileTransfer instanceof OngoingS13Transfer) {
-                // keep it in pending for a while such that PDUs from remote entity can still be answered
-                executor.schedule(() -> pendingTransfers.remove(s13FileTransfer.getTransactionId().getUniquenessId()),
-                        pendingAfterCompletion, TimeUnit.MILLISECONDS);
-            }
-        }
+                || s13FileTransfer.getTransferState() == TransferState.FAILED)
+            pendingTransfers.remove(s13FileTransfer.getTransactionId().getUniquenessId());
     }
 
     @Override
@@ -696,16 +678,75 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
 
     @Override
     public List<FileTransferOption> getFileTransferOptions() {
-        return new ArrayList<FileTransferOption>();
+        var options = new ArrayList<FileTransferOption>();
+
+        if (canChangePacketDelay) {
+            options.add(FileTransferOption.newBuilder()
+                    .setName(PDU_DELAY_OPTION)
+                    .setType(FileTransferOption.Type.DOUBLE)
+                    .setTitle("Packet delay")
+                    .setDefault(Integer.toString(config.getInt("sleepBetweenPackets")))
+                    .addAllValues(packetDelayPredefinedValues.stream()
+                            .map(value -> FileTransferOption.Value.newBuilder().setValue(value.toString()).build())
+                            .collect(Collectors.toList()))
+                    .setAllowCustomOption(true)
+                    .build());
+        }
+
+        if (canChangeNumberOfRetries) {
+            options.add(FileTransferOption.newBuilder()
+                    .setName(FILE_PART_RETRY_OPTION)
+                    .setType(FileTransferOption.Type.DOUBLE)
+                    .setTitle("File Part Retries")
+                    .setDefault(Integer.toString(config.getInt("filePartRetries")))
+                    .addAllValues(filePartRetriesPredefinedValues.stream()
+                            .map(value -> FileTransferOption.Value.newBuilder().setValue(value.toString()).build())
+                            .collect(Collectors.toList()))
+                    .setAllowCustomOption(true)
+                    .build());
+        }
+
+        return options;
+    }
+
+    private static class OptionValues {
+        HashMap<String, String> stringOptions = new HashMap<>();
+        HashMap<String, Double> doubleOptions = new HashMap<>();
+    }
+
+    private OptionValues getOptionValues(Map<String, Object> extraOptions) {
+        var optionValues = new OptionValues();
+
+        for (Map.Entry<String, Object> option : extraOptions.entrySet()) {
+            try {
+                switch (option.getKey()) {
+                case PDU_DELAY_OPTION:
+                case FILE_PART_RETRY_OPTION:
+                    optionValues.doubleOptions.put(option.getKey(), (double) option.getValue());
+                    break;
+                case "TRANSFER_USER":
+                    optionValues.stringOptions.put(option.getKey(), (String) option.getValue());
+                default:
+                    log.warn("Unknown file transfer option: {} (value: {})", option.getKey(), option.getValue());
+                }
+            } catch (ClassCastException e) {
+                log.warn("Failed to cast option '{}' to its correct type (value: {})", option.getKey(),
+                        option.getValue());
+            }
+        }
+
+        return optionValues;
     }
 
     @Override
     protected void addCapabilities(FileTransferCapabilities.Builder builder) {
         builder.setDownload(false)
+                .setPauseResume(true)
                 .setUpload(true)
-                .setRemotePath(true)
+                .setRemotePath(false)
                 .setFileList(false)
-                .setHasTransferType(true);
+                .setHasTransferType(true)
+                .setFileProxyOperations(false);
     }
 
     private String getAbsoluteDestinationPath(String destinationPath, String localObjectName) {
@@ -743,10 +784,18 @@ public class ServiceThirteen extends AbstractFileTransferService implements Stre
             }
         }
 
+        OptionValues optionValues = getOptionValues(options.getExtraOptions());
+        Double filePartRetries = optionValues.doubleOptions.get(FILE_PART_RETRY_OPTION);
+        Double packetDelay = optionValues.doubleOptions.get(PDU_DELAY_OPTION);
+
+        String username = optionValues.stringOptions.get("TRANSFER_USER");
+
         FilePutRequest request = new FilePutRequest(sourceId, destinationId, objectName, absoluteDestinationPath, bucket, objData);
         long creationTime = YamcsServer.getTimeService(yamcsInstance).getMissionTime();
 
-        return processPutRequest(transferInstanceId.next(), destinationId, creationTime, request, bucket, PredefinedTransferTypes.UPLOAD_LARGE_FILE_TRANSFER.toString());
+        return processPutRequest(transferInstanceId.next(), destinationId, creationTime, request, bucket, 
+                PredefinedTransferTypes.UPLOAD_LARGE_FILE_TRANSFER.toString(),
+                filePartRetries != null? filePartRetries.intValue(): null, packetDelay != null? packetDelay.intValue(): null, username);
     }
 
     @Override

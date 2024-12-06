@@ -36,7 +36,6 @@ public class CompletedTransfer implements S13FileTransfer {
     static final String COL_TRANSFERRED_SIZE = "transferredSize";
     static final String COL_TRANSFER_STATE = "transferState";
     static final String COL_CREATION_TIME = "creationTime";
-    static final String COL_ORIGIN = "origin";
     static final String COL_TRANSFER_TYPE = "transferType";
     static final String COL_FAILURE_REASON = "failureReason";
     static final String COL_REMOTE_PATH = "remotePath";
@@ -55,7 +54,6 @@ public class CompletedTransfer implements S13FileTransfer {
         TDEF.addColumn(COL_TRANSFERRED_SIZE, DataType.LONG);
         TDEF.addColumn(COL_TRANSFER_STATE, DataType.STRING);
         TDEF.addColumn(COL_CREATION_TIME, DataType.TIMESTAMP);
-        TDEF.addColumn(COL_ORIGIN, DataType.STRING);
         TDEF.addColumn(COL_TRANSFER_TYPE, DataType.STRING);
         TDEF.addColumn(COL_FAILURE_REASON, DataType.STRING);
         TDEF.addColumn(COL_REMOTE_ID, DataType.LONG);
@@ -161,7 +159,6 @@ public class CompletedTransfer implements S13FileTransfer {
         t.addColumn(COL_LARGE_PACKET_TRANSACTION_ID, txId.getLargePacketTransactionId());
         
         t.addEnumColumn(COL_TRANSFER_STATE, transfer.getTransferState().name());
-        t.addColumn(COL_ORIGIN, transfer.getOrigin());
         t.addColumn(COL_TRANSFER_TYPE, transfer.getTransferType());
 
         return t;
@@ -225,11 +222,6 @@ public class CompletedTransfer implements S13FileTransfer {
         } else {
             return TimeEncoding.INVALID_INSTANT;
         }
-    }
-
-    @Override
-    public String getOrigin() {
-        return tuple.getColumn(COL_ORIGIN);
     }
 
     @Override
