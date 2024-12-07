@@ -352,9 +352,8 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
         observer.complete(Empty.getDefaultInstance());
 
         if (transaction.getDirection() == TransferDirection.UPLOAD) {
-            // Handle FPO
             if (transaction.getBucketName() != null) {
-                var auditMessage = new StringBuilder("Pausing upload of ")
+                var auditMessage = new StringBuilder("Cancelling upload of ")
                         .append(ObjectId.of(transaction.getBucketName(), transaction.getObjectName()))
                         .append(" to '")
                         .append(transaction.getRemotePath())
@@ -385,7 +384,6 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
         observer.complete(Empty.getDefaultInstance());
 
         if (transaction.getDirection() == TransferDirection.UPLOAD) {
-            // Handle FPO
             if (transaction.getBucketName() != null) {
                 var auditMessage = new StringBuilder("Pausing upload of ")
                         .append(ObjectId.of(transaction.getBucketName(), transaction.getObjectName()))
