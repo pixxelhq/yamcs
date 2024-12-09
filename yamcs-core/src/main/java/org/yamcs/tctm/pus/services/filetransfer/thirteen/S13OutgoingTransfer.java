@@ -56,7 +56,6 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
 
     private OutTxState outTxState;
     private long transferred;
-    private String origin;
 
     private long offset = 0;
     private long end = 0;
@@ -79,13 +78,12 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
             FilePutRequest request, YConfiguration config, Bucket bucket,
             Integer customPacketSize, Integer customPacketDelay,
             EventProducer eventProducer, TransferMonitor monitor, String transferType,
-            Map<ConditionCode, FaultHandlingAction> faultHandlerActions) {
+            Map<ConditionCode, FaultHandlingAction> faultHandlerActions, Integer filePartRetries, String username) {
 
         super(yamcsInstance, cmdHistRealtime, creationTime, executor, config, makeTransactionId(request.getRemoteId(), transferInstanceId, largePacketTransactionId), 
-            eventProducer, monitor, transferType, faultHandlerActions);
+            eventProducer, monitor, transferType, filePartRetries, username, faultHandlerActions);
         this.request = request;
         this.bucket = bucket;
-        this.origin = ServiceThirteen.origin;
         int maxPacketSize = customPacketSize != null && customPacketSize > 0 ? customPacketSize : config.getInt("maxPacketSize", 512);
         maxDataSize = maxPacketSize - (PusTcManager.secondaryHeaderLength + PusTcManager.DEFAULT_PRIMARY_HEADER_LENGTH + 
                 org.yamcs.tctm.pus.services.tc.thirteen.ServiceThirteen.largePacketTransactionIdSize + org.yamcs.tctm.pus.services.tc.thirteen.ServiceThirteen.partSequenceNumberSize);
@@ -140,6 +138,9 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
                     handleFault(ConditionCode.UNSUPPORTED_CHECKSUM_TYPE);
                     return;
 
+                } catch (InterruptedException e) {
+                    return;
+
                 } catch (Exception e) {
                     pushError(e.toString());
                     handleFault(ConditionCode.NAK_LIMIT_REACHED);
@@ -147,6 +148,7 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
                 }
 
 
+                partSequenceNumber++;
                 transferred += (end - offset);
                 offset = end;
 
@@ -158,7 +160,6 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
             case SENDING_DATA:
                 if (request.getFileLength() - offset < maxDataSize) {   // Last Packet
                     end = Math.min(offset + maxDataSize, request.getFileLength());
-                    partSequenceNumber++;
 
                     fullyQualifiedCmdName = ServiceThirteen.constructFullyQualifiedCmdName(lastPacketCmdName, request.getRemoteId());
                     packet = new UplinkS13Packet(s13TransactionId, partSequenceNumber, fullyQualifiedCmdName, getFilePart(), skipAcknowledgement);
@@ -171,13 +172,16 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
                         handleFault(ConditionCode.UNSUPPORTED_CHECKSUM_TYPE);
                         return;
 
+                    } catch (InterruptedException e) {
+                        return;
+
                     } catch (Exception e) {
                         pushError(e.toString());
                         handleFault(ConditionCode.NAK_LIMIT_REACHED);
                         return;
                     }
 
-
+                    partSequenceNumber++;
                     transferred += (end - offset);
                     offset = end;
                     
@@ -185,7 +189,6 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
 
                 } else {    // Intermediate Packet
                     end = Math.min(offset + maxDataSize, request.getFileLength());
-                    partSequenceNumber++;
 
                     fullyQualifiedCmdName = ServiceThirteen.constructFullyQualifiedCmdName(intermediatePacketCmdName, request.getRemoteId());
                     packet = new UplinkS13Packet(s13TransactionId, partSequenceNumber, fullyQualifiedCmdName, getFilePart(), skipAcknowledgement);
@@ -194,15 +197,18 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
                         sendPacket(packet);
 
                     } catch (CommandEncodingException e) {
-                        pushError(e.toString());
                         handleFault(ConditionCode.UNSUPPORTED_CHECKSUM_TYPE);
                         return;
 
+                    } catch (InterruptedException e) {
+                        return;
+
                     } catch (Exception e) {
-                        pushError(e.toString());
                         handleFault(ConditionCode.NAK_LIMIT_REACHED);
                         return;
                     }
+
+                    partSequenceNumber++;
                     transferred += (end - offset);
                     offset = end;
                 }
@@ -226,6 +232,9 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
         long duration = (System.currentTimeMillis() - wallclockStartTime) / 1000;
 
         String eventMessageSuffix = request.getSourceFileName() + " -> " + request.getDestinationFileName();
+
+        // Force Cancel running schedule | To stop the currently running TC uplink task
+        packetSendingSchedule.cancel(true);
 
         if (conditionCode == ConditionCode.NO_ERROR) {
             changeState(TransferState.COMPLETED);
@@ -329,11 +338,6 @@ public class S13OutgoingTransfer extends OngoingS13Transfer{
     @Override
     public long getTransferredSize() {
         return this.transferred;
-    }
-
-    @Override
-    public String getOrigin(){
-        return this.origin;
     }
 
     @Override

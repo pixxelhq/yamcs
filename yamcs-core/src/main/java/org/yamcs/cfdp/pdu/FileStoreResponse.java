@@ -88,6 +88,7 @@ public class FileStoreResponse extends TLV {
         super(TLV.TYPE_FILE_STORE_RESPONSE, encode(actionCode, statusCode, firstFileName, secondFileName));
 
         this.actionCode = actionCode;
+        this.statusCode = statusCode;
         this.firstFileName = firstFileName;
         this.secondFileName = secondFileName;
     }

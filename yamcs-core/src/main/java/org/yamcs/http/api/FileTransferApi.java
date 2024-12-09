@@ -3,6 +3,7 @@ package org.yamcs.http.api;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -226,6 +227,9 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
             transferOptions.setCreatePath(true);
             transferOptions.putExtraOptions(GpbWellKnownHelper.toJava(request.getOptions()));
 
+            // Put the context user name as well
+            transferOptions.putExtraOptions(Map.of("TRANSFER_USER", ctx.user.getName()));
+
             List<Triple<String, String, String>> fssrrr = request.getFileProxyOperationOptionsList().stream()
                     .map(fp -> new Triple<>(fp.getFilestoreRequestAction(), fp.getFilestoreRequestFirstFileName(), fp.getFilestoreRequestSecondFileName()))
                     .collect(Collectors.toList());
@@ -348,9 +352,8 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
         observer.complete(Empty.getDefaultInstance());
 
         if (transaction.getDirection() == TransferDirection.UPLOAD) {
-            // Handle FPO
             if (transaction.getBucketName() != null) {
-                var auditMessage = new StringBuilder("Pausing upload of ")
+                var auditMessage = new StringBuilder("Cancelling upload of ")
                         .append(ObjectId.of(transaction.getBucketName(), transaction.getObjectName()))
                         .append(" to '")
                         .append(transaction.getRemotePath())
@@ -381,7 +384,6 @@ public class FileTransferApi extends AbstractFileTransferApi<Context> {
         observer.complete(Empty.getDefaultInstance());
 
         if (transaction.getDirection() == TransferDirection.UPLOAD) {
-            // Handle FPO
             if (transaction.getBucketName() != null) {
                 var auditMessage = new StringBuilder("Pausing upload of ")
                         .append(ObjectId.of(transaction.getBucketName(), transaction.getObjectName()))

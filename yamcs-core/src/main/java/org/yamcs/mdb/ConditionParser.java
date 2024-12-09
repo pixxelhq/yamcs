@@ -18,6 +18,7 @@ import org.yamcs.xtce.OperatorType;
 import org.yamcs.xtce.Parameter;
 import org.yamcs.xtce.ParameterInstanceRef;
 import org.yamcs.xtce.util.NameReference;
+import org.yamcs.xtce.util.ParameterReference;
 
 /**
  * used by the SpreadsheetLoader to parse conditions
@@ -222,9 +223,6 @@ public class ConditionParser {
             if ("raw".equals(t)) {
                 pname = pname.substring(0, idx);
                 useCalibrated = false;
-            } else {
-                throw new ParseException("Cannot parse parameter for comparison '" + pname
-                        + "'. Use parameterName or parameterName.raw", 0);
             }
         }
 
@@ -253,9 +251,10 @@ public class ConditionParser {
         final ParameterInstanceRef pInstRef = new ParameterInstanceRef(useCalibrated);
         final Comparison ucomp = new Comparison(pInstRef, value, opType);
 
-        NameReference pref = prefFactory.getReference(pname);
-        pref.addResolvedAction(nd -> {
-            pInstRef.setParameter((Parameter) nd);
+        ParameterReference pref = (ParameterReference) prefFactory.getReference(pname);
+        pref.addResolvedAction((p, path) -> {
+            pInstRef.setParameter(p);
+            pInstRef.setMemberPath(path);
             ucomp.validateValueType();
         });
 
