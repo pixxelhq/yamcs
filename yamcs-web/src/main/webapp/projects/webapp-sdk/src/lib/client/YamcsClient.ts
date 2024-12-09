@@ -14,6 +14,7 @@ import { CreateTransferRequest, GetFileTransfersOptions, ListFilesRequest, ListF
 import { AlarmsWrapper, CommandQueuesWrapper, EventsWrapper, GroupsWrapper, IndexResult, InstanceTemplatesWrapper, InstancesWrapper, LinksWrapper, ProcessorsWrapper, RangesWrapper, RecordsWrapper, RocksDbDatabasesWrapper, RolesWrapper, SamplesWrapper, ServicesWrapper, SessionsWrapper, SourcesWrapper, StreamsWrapper, TablesWrapper, UsersWrapper } from './types/internal';
 import { CreateInstanceRequest, InstancesSubscription, Link, LinkEvent, LinkSubscription, ListInstancesOptions, SubscribeLinksRequest } from './types/management';
 import { Algorithm, AlgorithmOverrides, AlgorithmStatus, AlgorithmTrace, AlgorithmsPage, Command, CommandsPage, Container, ContainersPage, GetAlgorithmsOptions, GetCommandsOptions, GetContainersOptions, GetParameterTypesOptions, GetParametersOptions, MissionDatabase, MissionDatabaseVersion, MissionDatabaseHistoryRequest, MissionDatabaseHistory, NamedObjectId, Parameter, ParameterType, ParameterTypesPage, ParametersPage, SpaceSystem, SpaceSystemsPage } from './types/mdb';
+import { KeyInfo, ActiveKeyRequest, UpdateKeyRequest } from './types/keymanagement';
 import { ArchiveRecord, CommandHistoryEntry, CommandHistoryPage, CreateProcessorRequest, DownloadPacketsOptions, DownloadParameterValuesOptions, EditReplayProcessorRequest, ExecutorInfo, ExportParameterValuesOptions, GetCommandHistoryOptions, GetCompletenessIndexOptions, GetPacketsOptions, RebuildParametersOptions, GetParameterRangesOptions, GetParameterSamplesOptions, GetParameterValuesOptions, IndexGroup, IssueCommandOptions, IssueCommandResponse, ListPacketsResponse, Packet, ParameterData, ParameterValue, Range, Sample, StartProcedureOptions, StreamCommandIndexOptions, StreamCompletenessIndexOptions, StreamEventIndexOptions, StreamPacketIndexOptions, StreamParameterIndexOptions, Value } from './types/monitoring';
 import { CreateParameterListRequest, GetParameterListsResponse, ParameterList, UpdateParameterListRequest } from './types/plists';
 import { AlgorithmStatusSubscription, BackfillingSubscription, DownloadCommandsOptions, ExtractPacketResponse, PacketNamesResponse, ParameterSubscription, Processor, ProcessorSubscription, Statistics, SubscribeAlgorithmStatusRequest, SubscribeBackfillingData, SubscribeBackfillingRequest, SubscribeParametersData, SubscribeParametersRequest, SubscribeProcessorsRequest, SubscribeTMStatisticsRequest, TMStatisticsSubscription } from './types/processing';
@@ -1047,6 +1048,22 @@ export default class YamcsClient implements HttpHandler {
   async clearAlarm(instance: string, processor: string, alarm: string, sequenceNumber: number, options: ClearAlarmOptions) {
     const body = JSON.stringify(options);
     const url = `${this.apiUrl}/processors/${instance}/${processor}/alarms${alarm}/${sequenceNumber}:clear`;
+    return await this.doFetch(url, {
+      body,
+      method: 'POST',
+    });
+  }
+
+  // Key Management
+  async getActiveKeyId(instance: string, options: ActiveKeyRequest) {
+    const url = `${this.apiUrl}/keymanagement/${instance}`;
+    const response = await this.doFetch(url + this.queryString(options));
+    return await response.json() as KeyInfo;
+  }
+
+  async updateKeyId(instance: string, options: UpdateKeyRequest) {
+    const body = JSON.stringify(options);
+    const url = `${this.apiUrl}/keymanagement/${instance}:updateKey`;
     return await this.doFetch(url, {
       body,
       method: 'POST',

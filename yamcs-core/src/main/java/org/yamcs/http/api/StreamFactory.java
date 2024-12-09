@@ -10,6 +10,7 @@ import org.yamcs.utils.parser.ParseException;
 import org.yamcs.yarch.Stream;
 import org.yamcs.yarch.StreamSubscriber;
 import org.yamcs.yarch.TableDefinition;
+import org.yamcs.yarch.TupleDefinition;
 import org.yamcs.yarch.YarchDatabase;
 import org.yamcs.yarch.YarchDatabaseInstance;
 import org.yamcs.yarch.streamsql.StreamSqlException;
@@ -45,6 +46,29 @@ public class StreamFactory {
         stream.addSubscriber(subscriber);
         stream.start();
         return;
+    }
+
+    public static Stream asyncResponse(String instance, TupleDefinition td) {
+        YarchDatabaseInstance ydb = YarchDatabase.getInstance(instance);
+
+        String streamName = "http_stream" + streamCounter.incrementAndGet();
+        String sql = new StringBuilder("create stream ")
+                .append(streamName)
+                .append(" ")
+                .append(td.getStringDefinition())
+                .toString();
+
+        log.debug("Executing: {}", sql);
+        try {
+            ydb.executeDiscardingResult(sql);
+        } catch (StreamSqlException | ParseException e) {
+            throw new InternalServerErrorException(e);
+        }
+
+        Stream stream = ydb.getStream(streamName);
+        stream.start();
+
+        return stream;
     }
 
     public static Stream insertStream(String instance, TableDefinition table) {

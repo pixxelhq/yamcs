@@ -20,7 +20,7 @@ public interface SymmetricEncryption {
      * @param config
      *            - the configuration - cannot be null (but can be empty)
      */
-    default void init(YConfiguration config) {
+    default void init(String yamcsInstance, YConfiguration config) {
     }
 
     public int getTagLength();

@@ -56,7 +56,7 @@ public class Cop1TcPacketHandlerTest {
         vc0.put("service", "PACKET");
         vc0.put("clcwStream", "clcw");
 
-        tcParams = new TcManagedParameters(YConfiguration.wrap(m));
+        tcParams = new TcManagedParameters("test", YConfiguration.wrap(m));
         tcFrameFactory = new TcFrameFactory(tcParams.getVcParams(0));
         TimeEncoding.setUp();
         EventProducerFactory.setMockup(false);

@@ -191,6 +191,13 @@
           </ya-sidebar-nav-item>
         }
 
+        @if (showKeyManagementItem()) {
+          <ya-sidebar-nav-item routerLink="/keymanagement" [queryParams]="{ c: yamcs.context }">
+            <mat-icon class="item-icon">vpn_key</mat-icon>
+            Key Management
+          </ya-sidebar-nav-item>
+        }
+
         @if (extraItems.length) {
           <mat-divider class="extra" />
           @for (item of extraItems; track item) {
