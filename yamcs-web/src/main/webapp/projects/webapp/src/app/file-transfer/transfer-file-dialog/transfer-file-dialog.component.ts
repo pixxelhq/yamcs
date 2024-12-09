@@ -90,11 +90,20 @@ export class TransferFileDialogComponent implements OnDestroy {
 
     this.storageClient = yamcs.createStorageClient();
     this.storageClient.getBuckets().then(buckets => {
-      this.dataSource.data = buckets || [];
-      if (buckets) {
-        const bucketPref$ = this.addPreference$('selectedBucket', buckets[0].name);
-        const bucket = buckets.find(bucket => bucket.name === bucketPref$.value);
-        this.selectBucket(bucket || buckets[0]);
+      let newBuckets = [];
+
+      // Filter out displays and stacks buckets
+      for (let i = 0; i < buckets.length; i++) {
+        if (buckets[i].name == 'displays' || buckets[i].name == 'stacks')
+          continue;
+        newBuckets.push(buckets[i]);
+      }
+
+      this.dataSource.data = newBuckets || [];
+      if (newBuckets) {
+        const bucketPref$ = this.addPreference$('selectedBucket', newBuckets[0].name);
+        const bucket = newBuckets.find(bucket => bucket.name === bucketPref$.value);
+        this.selectBucket(bucket || newBuckets[0]);
       }
     });
 
@@ -167,6 +176,9 @@ export class TransferFileDialogComponent implements OnDestroy {
     this.form.get('remoteFilenames')?.valueChanges.subscribe((value: any) => {
       this.updateButtonStates(this.form.get('localFilenames')?.value, value, this.form.get('remoteFilenames')?.value);
     });
+    this.form.get('fileProxyOps')?.valueChanges.subscribe(() => {
+      this.updateButtonStates(this.form.get('localFilenames')?.value, this.form.get('remoteFilenames')?.value, this.form.get('remoteFilenames')?.value)
+    });
 
     // Update entity user preference
     this.form.get('localEntity')?.valueChanges.subscribe((entity: any) => {
@@ -196,7 +208,7 @@ export class TransferFileDialogComponent implements OnDestroy {
         }
       });
 
-      // FIXME: Save FPO preferences
+      // ToDo: Save FPO preferences
     });
 
     // Show most recent file list
@@ -239,7 +251,7 @@ export class TransferFileDialogComponent implements OnDestroy {
 
   private updateButtonStates(localFiles: string, remoteFile: string, textfieldPath: string) {
     this.isDownloadEnabled = this.service.capabilities.download && this.selectedBucket$.value! && remoteFile != '' && this.form.valid;
-    this.isUploadEnabled = this.service.capabilities.upload && localFiles != '' && this.form.valid;
+    this.isUploadEnabled = this.service.capabilities.upload && this.form.valid && (this.fileProxyOps.length > 0 || localFiles != '');
   }
 
   // Returns remote folder path, ready to concatenate a file name
@@ -279,8 +291,42 @@ export class TransferFileDialogComponent implements OnDestroy {
   }
 
   async startTransfer(sourceEntity: string, destinationEntity: string, sourceFilenames: string, destinationFilenames: string, sourceFolderPath: string, destinationFolderPath: string, direction: "UPLOAD" | "DOWNLOAD") {
+    let onlyFpo = false;
     const objectNames: string[] = sourceFilenames.trim().split('|');
     if (!objectNames[0]) {
+      onlyFpo = true;
+    }
+
+    if (onlyFpo) {
+      let anyError: any;
+      let errorCount = 0;
+  
+      try {
+        // Direct API call without wrapping in a function
+        await this.yamcs.yamcsClient.createFileTransfer(this.yamcs.instance!, this.service.name, {
+          direction: direction,
+          bucket: "",
+          objectName: "",
+          remotePath: "",
+          source: sourceEntity,
+          destination: destinationEntity,
+          options: this.getTransferOptions(),
+          fileProxyOperationOptions: this.getFpoOptions()
+        });
+      } catch (err) {
+        anyError = err;
+        errorCount++;
+      }
+  
+      if (anyError) {
+        if (errorCount === 1) {
+          this.messageService.showError(anyError);
+        } else {
+          this.messageService.showError('Some of the transfers failed to start. See server log.');
+        }
+      }
+  
+      this.dialogRef.close();
       return;
     }
 
