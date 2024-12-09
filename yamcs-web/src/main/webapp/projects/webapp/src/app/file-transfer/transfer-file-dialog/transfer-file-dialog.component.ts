@@ -90,11 +90,20 @@ export class TransferFileDialogComponent implements OnDestroy {
 
     this.storageClient = yamcs.createStorageClient();
     this.storageClient.getBuckets().then(buckets => {
-      this.dataSource.data = buckets || [];
-      if (buckets) {
-        const bucketPref$ = this.addPreference$('selectedBucket', buckets[0].name);
-        const bucket = buckets.find(bucket => bucket.name === bucketPref$.value);
-        this.selectBucket(bucket || buckets[0]);
+      let newBuckets = [];
+
+      // Filter out displays and stacks buckets
+      for (let i = 0; i < buckets.length; i++) {
+        if (buckets[i].name == 'displays' || buckets[i].name == 'stacks')
+          continue;
+        newBuckets.push(buckets[i]);
+      }
+
+      this.dataSource.data = newBuckets || [];
+      if (newBuckets) {
+        const bucketPref$ = this.addPreference$('selectedBucket', newBuckets[0].name);
+        const bucket = newBuckets.find(bucket => bucket.name === bucketPref$.value);
+        this.selectBucket(bucket || newBuckets[0]);
       }
     });
 
