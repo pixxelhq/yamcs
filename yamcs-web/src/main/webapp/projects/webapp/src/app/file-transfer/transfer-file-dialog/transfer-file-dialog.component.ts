@@ -251,7 +251,7 @@ export class TransferFileDialogComponent implements OnDestroy {
 
   private updateButtonStates(localFiles: string, remoteFile: string, textfieldPath: string) {
     this.isDownloadEnabled = this.service.capabilities.download && this.selectedBucket$.value! && remoteFile != '' && this.form.valid;
-    this.isUploadEnabled = this.service.capabilities.upload && this.form.valid && (this.fileProxyOps.length > 0 || localFiles != '');
+    this.isUploadEnabled = this.service.capabilities.fileProxyOperations? this.service.capabilities.upload && this.form.valid && (this.fileProxyOps.length > 0 || localFiles != ''): this.service.capabilities.upload && localFiles != '' && this.form.valid;
   }
 
   // Returns remote folder path, ready to concatenate a file name
