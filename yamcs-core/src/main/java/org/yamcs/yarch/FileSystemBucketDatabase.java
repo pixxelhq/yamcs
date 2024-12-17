@@ -62,13 +62,14 @@ public class FileSystemBucketDatabase implements BucketDatabase {
      *            the name of the bucket.
      * 
      * @param location
-     *            the path to the bucket. This location should already exist.
+     *            the path to the bucket. This location should already exist [Not anymore]
      */
     public FileSystemBucket registerBucket(String bucketName, Path location) throws IOException {
         if (!location.toFile().exists()) {
-            throw new FileNotFoundException(
-                    "Directory '" + location + "'(" + location.toAbsolutePath() + ") not found");
-        } else if (!location.toFile().isDirectory()) {
+            // Create the path
+            Files.createDirectories(location);
+
+        } if (!location.toFile().isDirectory()) {
             throw new IOException("Not a directory '" + location + "'");
         }
 
