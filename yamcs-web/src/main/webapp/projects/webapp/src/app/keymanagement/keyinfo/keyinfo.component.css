@@ -1,0 +1,14 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .section {
+    border: 1px solid #ccc;
+    padding: 20px;
+  }
+  
+  .dropdown {
+    margin: 10px 0;
+  }

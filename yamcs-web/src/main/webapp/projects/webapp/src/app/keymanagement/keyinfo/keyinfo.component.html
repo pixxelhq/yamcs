@@ -1,0 +1,15 @@
+<div class="container">
+    <div *ngFor="let section of sections" class="section">
+      <h2>{{ section }}</h2>
+      <div class="dropdown">
+        <label for="keyIdDropdown-{{ section }}">Update Key Id:</label>
+        <select id="keyIdDropdown-{{ section }}" [(ngModel)]="selectedKeyIds[section]">
+          <option *ngFor="let i of [].constructor(50); let index = index" [value]="(index + 1)">
+            {{ 'KeyId_' + (index + 1) }}
+          </option>
+        </select>
+      </div>
+      <button (click)="submitKeyId(section)">Submit</button>
+      <p>Current Key Id: {{ currentKeyIds[section] || 'Loading...' }}</p>
+    </div>
+  </div>
