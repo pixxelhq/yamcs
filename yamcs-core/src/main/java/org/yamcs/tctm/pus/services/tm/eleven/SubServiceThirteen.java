@@ -66,7 +66,7 @@ public class SubServiceThirteen implements PusSubService {
 
         try {
             for (Map.Entry<Integer, String> folderN: folders.entrySet())
-                timetagScheduleSummaryReportBucket.putObject(yamcsInstance + "/timetagScheduleSummaryReport/" + folderN.getValue() + "/", "application/octet-stream", new HashMap<>(), new byte[0]);
+                timetagScheduleSummaryReportBucket.putObject("timetagScheduleSummaryReport/" + folderN.getValue() + "/", "application/octet-stream", new HashMap<>(), new byte[0]);
 
         } catch (IOException e) {
             log.error("Unable to create a directory `" + timetagScheduleSummaryReportBucket.getName() + "/timetagScheduleSummaryReport` for (Service - 11 | SubService - 13)", e);
@@ -99,7 +99,7 @@ public class SubServiceThirteen implements PusSubService {
         Map<String, String> metadata;
 
         if (foundObject == null) {
-            filename = yamcsInstance + "/timetagScheduleSummaryReport/" + folders.get(apid) + "/" + LocalDateTime.ofInstant(
+            filename = "timetagScheduleSummaryReport/" + folders.get(apid) + "/" + LocalDateTime.ofInstant(
                 Instant.ofEpochSecond(gentime),
                 ZoneId.of("GMT")
             ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")) + ".csv";
@@ -232,7 +232,7 @@ public class SubServiceThirteen implements PusSubService {
             ObjectProperties foundObject = findObject(uniqueSignature);
 
             if (foundObject == null) {
-                String filename = yamcsInstance + "/timetagScheduleSummaryReport/" + folders.get(apid) + "/" + LocalDateTime.ofInstant(
+                String filename = "timetagScheduleSummaryReport/" + folders.get(apid) + "/" + LocalDateTime.ofInstant(
                     Instant.ofEpochSecond(generationTime),
                     ZoneId.of("GMT")
                 ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")) + ".csv";
