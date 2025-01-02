@@ -23,7 +23,7 @@ import org.yamcs.tctm.pus.PusTcManager;
 import org.yamcs.tctm.pus.PusTmManager;
 import org.yamcs.tctm.pus.services.PusSubService;
 import org.yamcs.tctm.pus.services.tm.PusTmCcsdsPacket;
-import org.yamcs.tctm.pus.services.tm.one.ServiceOne.CcsdsApid;
+import org.yamcs.tctm.pus.services.tm.one.ServiceOne;
 import org.yamcs.utils.ByteArrayUtils;
 import org.yamcs.yarch.Bucket;
 import org.yamcs.yarch.YarchException;
@@ -175,7 +175,7 @@ public class SubServiceThirteen implements PusSubService {
                 ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"));
 
                 int sourceId = requestId.get(0);
-                String commandApid = CcsdsApid.fromValue(requestId.get(1)).name();
+                String commandApid = ServiceOne.ccsdsApids.get(requestId.get(1));
                 int commandCcsdsSeqCount = requestId.get(2);
 
                 writer.write(timetagStr + "," + sourceId + "," + commandApid + "," + commandCcsdsSeqCount);
