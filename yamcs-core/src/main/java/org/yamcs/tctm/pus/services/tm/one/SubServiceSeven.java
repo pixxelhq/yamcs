@@ -36,7 +36,7 @@ public class SubServiceSeven implements PusSubService {
             return null;
 
         eventProducer.sendEvent(EventSeverity.INFO, TC_COMPLETION_EXECUTION_SUCCESS,
-                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + ServiceOne.CcsdsApid.fromValue(tcCcsdsApid) + " | Packet Seq Count: " + tcCcsdsSeqCount + ") has succeeded execution",
+                "TC with (Source ID: " + pPkt.getDestinationID() + " | Apid: " + ServiceOne.ccsdsApids.get(tcCcsdsApid) + " | Packet Seq Count: " + tcCcsdsSeqCount + ") has succeeded execution",
                 tmPacket.getGenerationTime());
 
         ArrayList<TmPacket> pktList = new ArrayList<>();
