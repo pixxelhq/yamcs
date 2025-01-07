@@ -85,7 +85,7 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
     private Parameter spDataInCount, spDataInRate, vcDelta;
 
     // List of published vcDelta's
-    private ArrayList<ParameterValue> vcDeltas = new ArrayList<>();    
+    private ArrayList<ParameterValue> vcDeltas = new ArrayList<>(1);    
 
 
     public VcTmPacketHandler(String yamcsInstance, String name, VcDownlinkManagedParameters vmp) {
@@ -120,7 +120,7 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
         }
     }
 
-    public synchronized void publishVcDelta(long prevCount, long currentCount, int vcDifference) throws InterruptedException {
+    public void publishVcDelta(long prevCount, long currentCount, int vcDifference) {
         long time = timeService.getMissionTime();
         AggregateValue v = new AggregateValue(vcDeltaType.getMemberNames());
 
@@ -132,10 +132,6 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
         ParameterValue pv = getNewPv(vcDelta, time);
         pv.setAcquisitionStatus(AcquisitionStatus.ACQUIRED);
         pv.setEngValue(v);
-
-        while (Thread.holdsLock(vcDeltas)) {
-            wait();
-        }
 
         vcDeltas.add(pv);
     }
@@ -152,12 +148,20 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
         lastFrameSeq = frame.getVcFrameSeq();
 
         // Publish the vcDelta
-        try {
-            if (frameLoss != 0)
+        synchronized (vcDeltas) {
+            if (frameLoss != 0) {
+                while (vcDeltas.size() == 1) {
+                    // Wait till consumed
+                    try {
+                        vcDeltas.wait();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        log.error("Interrupted while waiting for vcDeltas to be consumed", e);
+                    }
+                }
+                // Produce the vcDelta
                 publishVcDelta(prevFrameSeq, lastFrameSeq, frameLoss);
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            }
         }
 
         if (frame.containsOnlyIdleData()) {
@@ -450,11 +454,9 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
     }
 
 
-    public synchronized void consumeVcDelta(List<ParameterValue> list) throws InterruptedException {
+    public void consumeVcDelta(List<ParameterValue> list) {
         list.addAll(vcDeltas);
         vcDeltas.clear();
-
-        notify();
     }
 
     @Override
@@ -463,13 +465,11 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
         try {
             collectSystemParameters(time, list);
             synchronized (vcDeltas) {
-                if (!vcDeltas.isEmpty())
+                if (!vcDeltas.isEmpty()) {
                     consumeVcDelta(list);
+                    vcDeltas.notify();
+                }
             }
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-
         } catch (Exception e) {
             log.error("Exception caught when collecting link system parameters", e);
         }

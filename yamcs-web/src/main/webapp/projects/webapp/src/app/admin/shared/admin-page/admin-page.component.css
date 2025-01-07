@@ -36,6 +36,7 @@ mat-toolbar {
 .navbar-logo {
   text-align: center;
   line-height: 0;
+  width: 98%;
 }
 
 .navbar-logo img {
