@@ -94,8 +94,6 @@ export class TransferFileDialogComponent implements OnDestroy {
 
       // Filter out displays and stacks buckets
       for (let i = 0; i < buckets.length; i++) {
-        if (buckets[i].name == 'displays' || buckets[i].name == 'stacks')
-          continue;
         newBuckets.push(buckets[i]);
       }
 

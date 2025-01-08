@@ -2,6 +2,7 @@ package org.yamcs.tctm.pus.services.tm.one;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.yamcs.TmPacket;
@@ -13,96 +14,8 @@ import org.yamcs.tctm.pus.services.PusSubService;
 import org.yamcs.tctm.pus.services.tm.PusTmCcsdsPacket;
 
 public class ServiceOne implements PusService {
-
-    public enum CcsdsApid {
-        GROUND(0),
-        AOCS(3),
-        PROPULSION(4),
-        SBAND(6),
-        XBAND(7),
-        EPS(12),
-        AVIONICS(13),
-        THERMAL(24),
-        PAYLOAD(48),
-        FSW_OBC(96),
-        FSW_ARBITRATOR(97),
-        FSW_TIC(98),
-        IDLE(127),
-        UNDEFINED(128);
-
-        private final int value;
-
-        CcsdsApid(int value) {
-            this.value = value;
-        }
-
-        public static CcsdsApid fromValue(int value) {
-            for (CcsdsApid enumValue : CcsdsApid.values()) {
-                if (enumValue.value == value) {
-                    return enumValue;
-                }
-            }
-            return UNDEFINED;
-        }
-
-        public int getValue() {
-            return value;
-        }
-    }
-
-
-    protected enum FailureCode {
-        // Common to all
-        TbUTLER_TC_EXC_STATUS_SUCCESS(0),
-        TbUTLER_TC_EXC_STATUS_NULL_PTR_DETECTED(1),
-        TbUTLER_TC_EXC_STATUS_2_10_DEVICE_NOT_FOUND(2),
-        TbUTLER_TC_EXC_STATUS_3_SID_NOT_FOUND(3),
-        TbUTLER_TC_EXC_STATUS_9_INVALID_RATE_EXP(4),
-        TbUTLER_TC_EXC_STATUS_11_EMPTY_SCHEDULE(5),
-        TbUTLER_TC_EXC_STATUS_11_LIST_FULL(6),
-        TbUTLER_TC_EXC_STATUS_11_INVALID_TIMERANGE(7),
-        TbUTLER_TC_EXC_STATUS_11_TIMETAG_REPEATED(8),
-        TbUTLER_TC_EXC_STATUS_11_TIMETAG_NOT_FOUND(9),
-        TbUTLER_TC_EXC_STATUS_11_TIMERANGE_NOT_FOUND(10),
-        TbUTLER_TC_EXC_STATUS_13_RECEPTION_TIMER_INIT_FAILED(11),
-        TbUTLER_TC_EXC_STATUS_13_RECEPTION_TIMER_ACTIVATION_FAILED(12),
-        TbUTLER_TC_EXC_STATUS_13_RECEPTION_TIMER_DEACTIVATION_FAILED(13),
-        TbUTLER_TC_EXC_STATUS_13_ABORTED(14),
-        TbUTLER_TC_EXC_STATUS_13_SC_DISCONTINUITY(15),
-        TbUTLER_TC_EXC_STATUS_13_INVALID_TID(16),
-        TbUTLER_TC_EXC_STATUS_13_MEMORY_ERR(17),
-        TbUTLER_TC_EXC_STATUS_13_INVALID_REQ(18),
-        TbUTLER_TC_EXC_STATUS_6_INVALID_MEM_ID(19),
-        TbUTLER_TC_EXC_STATUS_6_INVALID_BASE_ID(20),
-        TbUTLER_TC_EXC_STATUS_6_CKSM_FAILED(21),
-        TbUTLER_STATUS_APID_NOT_SUPPORTED(22),
-        TbUTLER_STATUS_TC_PACKET_DECODING_FAILED(23),
-        TbUTLER_STATUS_TC_EXC_STATUS_11_OLD_TIMETAG(24),
-
-        TbUTLER_TC_EXC_STATUS_20_INVALID_PARAM_ID(75),
-        TbUTLER_TC_EXC_STATUS_20_INVALID_VALUE(76),
-        TbUTLER_TC_EXC_STATUS_11_UNSUPPORTED_TYPE(77),
-        TbUTLER_TC_EXC_STATUS_6_INVALID_VALUE(78);
-
-        private final int value;
-        
-        FailureCode(int value) {
-            this.value = value;
-        }
-
-        public static FailureCode fromValue(int value) {
-            for (FailureCode enumValue : FailureCode.values()) {
-                if (enumValue.value == value) {
-                    return enumValue;
-                }
-            }
-            return null;
-        }
-
-        public int getValue() {
-            return value;
-        }
-    }
+    public static Map<Integer, String> ccsdsApids = new HashMap<>();
+    public static Map<Integer, String> failureCodes = new HashMap<>();
 
     Log log;
     Map<Integer, PusSubService> pusSubServices = new HashMap<>();
@@ -122,6 +35,23 @@ public class ServiceOne implements PusService {
 
         failureCodeSize = config.getInt("failureCodeSize", DEFAULT_FAILURE_CODE_SIZE);
         failureDataSize = config.getInt("failureDataSize", DEFAULT_FAILURE_DATA_SIZE);
+
+        YConfiguration apidConfig = YConfiguration.getConfiguration("apids", "pus");
+        YConfiguration errorCodeConfig = YConfiguration.getConfiguration("errorCodes", "pus");
+
+        if (apidConfig.containsKey("apids")) {
+            List<YConfiguration> apids = apidConfig.getConfigList("apids");
+            for (YConfiguration apid : apids) {
+                ccsdsApids.put(apid.getInt("value"), apid.getString("name"));
+            }
+        }
+
+        if (errorCodeConfig.containsKey("apids")) {
+            List<YConfiguration> errorCodes = errorCodeConfig.getConfigList("errorCodes");
+            for (YConfiguration errorCode : errorCodes) {
+                failureCodes.put(errorCode.getInt("value"), errorCode.getString("name"));
+            }
+        }
 
         initializeSubServices();
     }

@@ -14,7 +14,7 @@ import org.yamcs.protobuf.Event.EventSeverity;
 import org.yamcs.tctm.pus.services.PusSubService;
 import org.yamcs.tctm.pus.services.tm.PusTmCcsdsPacket;
 import org.yamcs.tctm.pus.services.tm.five.ServiceFive.Endianess;
-import org.yamcs.tctm.pus.services.tm.one.ServiceOne.CcsdsApid;
+import org.yamcs.tctm.pus.services.tm.one.ServiceOne;
 import org.yamcs.tctm.pus.tuples.Pair;
 import org.yamcs.tctm.pus.tuples.Quattro;
 import org.yamcs.utils.ByteArrayUtils;
@@ -98,10 +98,10 @@ public class SubServiceOne implements PusSubService {
         }
 
         eventProducer = EventProducerFactory.getEventProducer(yamcsInstance, this.getClass().getSimpleName(), 120000);
-        eventProducer.setSource(source + " | " + CcsdsApid.fromValue(apid).name());
+        eventProducer.setSource(source + " | " + ServiceOne.ccsdsApids.get(apid));
 
         eventDec += " is thrown";
-        eventProducer.sendEvent(EventSeverity.WATCH, CcsdsApid.fromValue(apid).name(), eventDec, tmPacket.getGenerationTime());
+        eventProducer.sendEvent(EventSeverity.WATCH, ServiceOne.ccsdsApids.get(apid), eventDec, tmPacket.getGenerationTime());
 
         ArrayList<TmPacket> pPkts = new ArrayList<>();
         pPkts.add(tmPacket);

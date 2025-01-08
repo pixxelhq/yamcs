@@ -14,6 +14,8 @@ import org.yamcs.tctm.srs3.Srs3ManagedParameters;
 
 
 public abstract class GenericTcFrameLink extends AbstractTcDataLink implements Runnable {
+    Thread thread;
+
     Semaphore dataAvailableSemaphore = new Semaphore(0);
     BlockingQueue<PreparedCommand> commandQueue;
 
@@ -206,7 +208,7 @@ public abstract class GenericTcFrameLink extends AbstractTcDataLink implements R
     protected void doStart() {
         if (!isDisabled()) {
             try {
-                Thread thread = new Thread(this);
+                thread = new Thread(this);
                 thread.setName(getClass().getSimpleName() + "-" + linkName);
                 thread.start();
 
@@ -219,10 +221,17 @@ public abstract class GenericTcFrameLink extends AbstractTcDataLink implements R
     }
 
     @Override
-    protected void doEnable() {
-        Thread thread = new Thread(this);
+    protected void doEnable() throws Exception {
+        thread = new Thread(this);
         thread.setName(getClass().getSimpleName() + "-" + linkName);
         thread.start();
+    }
+
+    @Override
+    protected void doDisable() throws Exception {
+        if (thread != null) {
+            thread.interrupt();
+        }
     }
 
     /**
