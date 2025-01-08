@@ -33,50 +33,68 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
 
     private String tcKey;
     private String tmKey;
-    private String payKey;
 
     String spacecraftId;
     Stream stream;
 
     private String tmKeyId;
     private String tcKeyId;
-    private String payKeyId;
 
     KeyParser parser;
-    VaultClient client;
+    VaultClient client = null;
     YarchDatabaseInstance ydb;
 
     @Override
     public Spec getSpec() {
         Spec spec = new Spec();
-        spec.addOption("vaultToken", OptionType.STRING);
-        spec.addOption("vaultNamespace", OptionType.STRING);
-        spec.addOption("vaultAddress", OptionType.STRING);
-        spec.addOption("cipherText", OptionType.STRING);
-        spec.addOption("spacecraftIdSrs", OptionType.STRING);
-        spec.addOption("defaultTmKeyId", OptionType.STRING);
-        spec.addOption("defaultTcKeyId", OptionType.STRING);
-        spec.addOption("defaultPayKeyId", OptionType.STRING);
+
+        Spec vault = new Spec();
+        Spec df = new Spec();
+
+        df.addOption("tm", OptionType.STRING);
+        df.addOption("tc", OptionType.STRING);
+
+        vault.addOption("token", OptionType.STRING);
+        vault.addOption("namespace", OptionType.STRING);
+        vault.addOption("address", OptionType.STRING);
+        vault.addOption("cipher", OptionType.STRING);
+        vault.addOption("spacecraftId", OptionType.STRING);
+        vault.addOption("fallback", OptionType.MAP).withSpec(df);
+
+        spec.addOption("vault", OptionType.MAP).withSpec(vault);
+        spec.addOption("default", OptionType.MAP).withSpec(df);
         spec.addOption("stream", OptionType.STRING).withDefault("active_key");
+
         return spec;
     }
 
     @Override
     public void init(String yamcsInstance, String serviceName, YConfiguration config) throws InitException {
         super.init(yamcsInstance, serviceName, config);
-
         this.yamcsInstance = yamcsInstance;
-        this.client = new VaultClient(config.getString("vaultToken"), config.getString("vaultNamespace"), config.getString("vaultAddress"));
-        this.spacecraftId = config.getString("spacecraftIdSrs");
 
-        String decryptedData = null;
-        try {
-            decryptedData = client.decrypt(config.getString("cipherText"));
-            this.parser = new KeyParser();
-            parser.parse(decryptedData);
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
+        String cipherText;
+        if (config.containsKey("vault")) {
+            YConfiguration vc = config.getConfig("vault");
+            client = new VaultClient(
+                vc.getString("token"), vc.getString("namespace"), vc.getString("address"));
+            spacecraftId = vc.getString("spacecraftId");
+            cipherText = vc.getString("cipher");
+
+            // Load from vault
+            parser = new KeyParser();
+            try {
+                parser.parse(client.decrypt(cipherText));
+
+            } catch (Exception e) {
+                // FIXME: 
+                throw new RuntimeException(e);
+            }
+
+        } else {
+            YConfiguration dc = config.getConfig("default");
+            tmKey = dc.getString("tm");
+            tcKey = dc.getString("tc");
         }
 
         ydb = YarchDatabase.getInstance(yamcsInstance);
@@ -87,6 +105,7 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
                 ydb.execute(query);
             }
             ydb.execute("create stream " + STREAM_NAME + ACTIVE_KEY_TUPLE_DEFINITION.getStringDefinition());
+
         } catch (ParseException | StreamSqlException e) {
             throw new InitException(e);
         }
@@ -107,6 +126,7 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
         try {
             String query = String.format("select keyid from %s where family='%s' order desc limit 1", tableName, family);
             result = ydb.execute(query);
+
             if (result.hasNext()) {
                 return Optional.ofNullable(result.next().getColumn("keyid"));
             }
@@ -121,30 +141,29 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
 
     @Override
     protected void doStart() {
-        stream.addSubscriber(this);
-        try {
-            Optional<Integer> tmKeyId = fetchKeyId(TABLE_NAME, "tm");
-            Optional<Integer> tcKeyId = fetchKeyId(TABLE_NAME, "tc");
-            Optional<Integer> payKeyId = fetchKeyId(TABLE_NAME, "pay");
-            // Process TM Key
-            this.tmKeyId = tmKeyId
-                    .map(String::valueOf)
-                    .orElseGet(() -> config.getString("defaultTmKeyId"));
-            setDefaultTmKey(this.tmKeyId);
+        if (client != null) {
+            stream.addSubscriber(this);
+            YConfiguration fallback = config.getConfig("vault").getConfig("fallback");
 
-            // Process TC Key
-            this.tcKeyId = tcKeyId
-                    .map(String::valueOf)
-                    .orElseGet(() -> config.getString("defaultTcKeyId"));
-            setDefaultTcKey(this.tcKeyId);
+            try {
+                Optional<Integer> tmKeyId = fetchKeyId(TABLE_NAME, "tm");
+                Optional<Integer> tcKeyId = fetchKeyId(TABLE_NAME, "tc");
 
-            this.payKeyId = payKeyId
-                    .map(String::valueOf)
-                    .orElseGet(() -> config.getString("defaultPayKeyId"));
-            setDefaultPayloadKey(this.payKeyId);
-        
-        } catch (StreamSqlException | ParseException e) {
-            throw new RuntimeException(e);
+                // Process TM Key
+                this.tmKeyId = tmKeyId
+                        .map(String::valueOf)
+                        .orElseGet(() -> fallback.getString("tm"));
+                setTmKey(this.tmKeyId);
+
+                // Process TC Key
+                this.tcKeyId = tcKeyId
+                        .map(String::valueOf)
+                        .orElseGet(() -> fallback.getString("tc"));
+                setTcKey(this.tcKeyId);
+            
+            } catch (StreamSqlException | ParseException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         notifyStarted();
@@ -159,10 +178,6 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
         return this.tmKey;
     }
 
-    public String getPayloadKey(){
-        return this.payKey;
-    }
-
     // Key ID GET
     public String getTcKeyId() {
         return this.tcKeyId;
@@ -172,50 +187,26 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
         return this.tmKeyId;
     }
 
-    public String getPayloadKeyId(){
-        return this.payKeyId;
-    }
-
-    public void setTcKeyId(String tcKeyId) {
-        this.tcKeyId = tcKeyId;
-        this.tcKey = this.parser.getKeySections().get("TC Keys").get(config.getString("spacecraftIdSrs")+"_TC_"+tcKeyId).getKey();
-    }
-
-    public void setTmKeyId(String tmKeyId) {
-        this.tmKeyId = tmKeyId;
-        this.tmKey = this.parser.getKeySections().get("TM Keys").get(config.getString("spacecraftIdSrs")+"_TM_"+tmKeyId).getKey();
-    }
-
-    public void setPayloadKeyId(String payloadKeyId){
-        this.payKeyId = payloadKeyId;
-    }
-
     public Stream getStream(){
         return stream;
     }
 
-    private void setDefaultTcKey(String keyId) {
-        log.debug("New TC KEY ID: {}", keyId);
-        this.tcKey = this.parser.getKeySections()
-                .get("TC Keys")
-                .get(config.getString("spacecraftIdSrs") + "_TC_" + keyId)
-                .getKey();
+    private void setTcKey(String keyId) {
+        if (client != null) {
+            this.tcKey = this.parser.getKeySections()
+                    .get("TC Keys")
+                    .get(spacecraftId + "_TC_" + keyId)
+                    .getKey();
+        }
     }
 
-    private void setDefaultTmKey(String keyId) {
-        log.debug("New TM KEY ID: {}", keyId);
-        this.tmKey = this.parser.getKeySections()
-                .get("TM Keys")
-                .get(config.getString("spacecraftIdSrs") + "_TM_" + keyId)
-                .getKey();
-    }
-
-    private void setDefaultPayloadKey(String keyId) {
-        log.debug("New PAY KEY ID: {}", keyId);
-        this.payKey = this.parser.getKeySections()
-                .get("PAY Keys")
-                .get(config.getString("spacecraftIdSrs") + "_PAY_" + keyId)
-                .getKey();
+    private void setTmKey(String keyId) {
+        if (client != null) {
+            this.tmKey = this.parser.getKeySections()
+                    .get("TM Keys")
+                    .get(spacecraftId + "_TM_" + keyId)
+                    .getKey();
+        }
     }
 
     @Override
@@ -230,18 +221,17 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
 
     @Override
     public void onTuple(Stream stream, Tuple tuple) {
-
         try {
             long inserttime = (Long) tuple.getColumn("inserttime");
             String keyId = (String) tuple.getColumn("keyid");
             String family = (String) tuple.getColumn("family");
 
-            ydb.execute("insert into " + TABLE_NAME + "(inserttime, keyid, family) values("+inserttime + ",'" + keyId +"','"+ family + "')");
+            ydb.execute("insert into " + TABLE_NAME + "(inserttime, keyid, family) values(" + inserttime + ",'" + keyId + "','" + family + "')");
             switch (family) {
-                case "tc" -> this.setTcKeyId(keyId);
-                case "tm" -> this.setTmKeyId(keyId);
-                case "pay" -> this.setPayloadKeyId(keyId);
+                case "tc" -> this.setTcKey(keyId);
+                case "tm" -> this.setTmKey(keyId);
             }
+
         } catch (StreamSqlException | ParseException e) {
             throw new RuntimeException(e);
         }
