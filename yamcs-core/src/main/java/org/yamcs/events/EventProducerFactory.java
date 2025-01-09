@@ -78,4 +78,24 @@ public class EventProducerFactory {
 
         return eventProducer;
     }
+
+    /**
+     *
+     * @param yamcsInstance
+     * @param source
+     *            source for the events
+     * @param repeatedEventTimeoutMillisec
+     *            suppress events that repeat in this interval
+     * @param repeatedEventReduction
+     *            supress event generation count
+     * @return an event producer for the given instance, source and with the repeated event reduction turned on.
+     */
+    public static EventProducer getEventProducer(String yamcsInstance, String source,
+            long repeatedEventTimeoutMillisec, boolean repeatedEventReduction) {
+        EventProducer eventProducer = getEventProducer(yamcsInstance);
+        eventProducer.setRepeatedEventReduction(repeatedEventReduction, repeatedEventTimeoutMillisec);
+        eventProducer.setSource(source);
+
+        return eventProducer;
+    }
 }

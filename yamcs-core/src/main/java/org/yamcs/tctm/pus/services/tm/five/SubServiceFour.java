@@ -24,11 +24,13 @@ public class SubServiceFour implements PusSubService {
     Log log;
 
     EventProducer eventProducer;
-    static String source = "s(5,4) | High Severity Events";
+    static String preSource = "s(5,4) | High Severity Events";
 
     public SubServiceFour(String yamcsInstance, YConfiguration subServiceSixConfig) {
         this.yamcsInstance = yamcsInstance;
         log = new Log(getClass(), yamcsInstance);
+
+        eventProducer = EventProducerFactory.getEventProducer(yamcsInstance, this.getClass().getSimpleName(), 10_000, false);
     }
 
     @Override
@@ -95,8 +97,7 @@ public class SubServiceFour implements PusSubService {
             }
         }
 
-        eventProducer = EventProducerFactory.getEventProducer(yamcsInstance, this.getClass().getSimpleName(), 120000);
-        eventProducer.setSource(source + " | " + ServiceOne.ccsdsApids.get(apid));
+        eventProducer.setSource(preSource + " | " + ServiceOne.ccsdsApids.get(apid));
 
         eventDec += " is thrown";
         eventProducer.sendEvent(EventSeverity.CRITICAL, ServiceOne.ccsdsApids.get(apid), eventDec, tmPacket.getGenerationTime());

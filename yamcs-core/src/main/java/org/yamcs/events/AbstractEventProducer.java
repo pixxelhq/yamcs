@@ -130,7 +130,10 @@ public abstract class AbstractEventProducer implements EventProducer {
             log.debug("event: {}; {}; {}", severity, type, msg);
         }
 
-        Event.Builder eventb = newEvent().setSeverity(severity).setMessage(msg).setGenerationTime(gentime);
+        Event.Builder eventb = newEvent()
+                            .setSeverity(severity)
+                            .setMessage(msg)
+                            .setGenerationTime(gentime);
         if (type != null) {
             eventb.setType(type);
         }

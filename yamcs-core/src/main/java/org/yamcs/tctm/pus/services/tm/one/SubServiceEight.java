@@ -16,14 +16,14 @@ import org.yamcs.utils.ByteArrayUtils;
 
 public class SubServiceEight implements PusSubService {
     EventProducer eventProducer;
+    String yamcsInstance;
 
     static final String source = "Service: 1 | SubService: 8 | Failure";
     static final String TC_COMPLETION_EXECUTION_FAILED = "TC_COMPLETION_EXECUTION_FAILED";
 
     public SubServiceEight(String yamcsInstance) {        
-        // FIXME: Confirm the repeatedEventTimeoutMillisec value, which most likely depends on the datarate of TM
-        eventProducer = EventProducerFactory.getEventProducer(yamcsInstance, this.getClass().getSimpleName(), 10);
-        eventProducer.setSource(source);
+        this.yamcsInstance = yamcsInstance;
+        eventProducer = EventProducerFactory.getEventProducer(yamcsInstance, source, 10_000, false);
     }
 
     @Override
