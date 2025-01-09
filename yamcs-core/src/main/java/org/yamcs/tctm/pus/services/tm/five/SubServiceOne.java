@@ -25,11 +25,13 @@ public class SubServiceOne implements PusSubService {
 
     EventProducer eventProducer;
 
-    static String source = "s(5,1) | Informative Events";
+    static String preSource = "s(5,1) | Informative Events";
 
     public SubServiceOne(String yamcsInstance, YConfiguration subServiceSixConfig) {
         this.yamcsInstance = yamcsInstance;
         log = new Log(getClass(), yamcsInstance);
+
+        eventProducer = EventProducerFactory.getEventProducer(yamcsInstance, this.getClass().getSimpleName(), 10_000, false);
     }
 
     @Override
@@ -97,8 +99,7 @@ public class SubServiceOne implements PusSubService {
             }
         }
 
-        eventProducer = EventProducerFactory.getEventProducer(yamcsInstance, this.getClass().getSimpleName(), 120000);
-        eventProducer.setSource(source + " | " + ServiceOne.ccsdsApids.get(apid));
+        eventProducer.setSource(preSource + " | " + ServiceOne.ccsdsApids.get(apid));
 
         eventDec += " is thrown";
         eventProducer.sendEvent(EventSeverity.WATCH, ServiceOne.ccsdsApids.get(apid), eventDec, tmPacket.getGenerationTime());
