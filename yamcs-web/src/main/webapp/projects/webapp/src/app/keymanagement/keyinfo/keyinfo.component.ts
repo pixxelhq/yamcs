@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { Title, DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { KeyInfo, UpdateKeyRequest, ActiveKeyRequest, WebappSdkModule, YamcsService } from '@yamcs/webapp-sdk';
 import { InstancePageTemplateComponent } from '../../shared/instance-page-template/instance-page-template.component';
 import { InstanceToolbarComponent } from '../../shared/instance-toolbar/instance-toolbar.component';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 @Component({
   standalone: true,
@@ -15,56 +16,58 @@ import { InstanceToolbarComponent } from '../../shared/instance-toolbar/instance
   ],
 })
 export class KeyinfoComponent implements OnInit {
-  currentKeyIds: { [family: string]: string } = {};
-  selectedKeyIds: { [key: string]: string } = {};
+  tmKeyId: string | null = null;
+  tcKeyId: string | null = null;
 
-  sections = [
-    { title: 'Telemetry (TM)', family: 'tm' },
-    { title: 'Telecommand (TC)', family: 'tc' },
-    { title: 'Payload (PAY)', family: 'pay' }
-  ];
+  form: FormGroup;
+  fb: FormBuilder;
 
   constructor(
     readonly yamcs: YamcsService,
     title: Title,
+    fb: FormBuilder,
+    private cdr: ChangeDetectorRef,
     private sanitizer: DomSanitizer
   ) {
     title.setTitle('Key Management');
-  }
+    this.fb = fb;
 
-  ngOnInit(): void {
-    this.sections.forEach((section) => {
-      this.fetchCurrentKeyId(section);
+    // Setup forms
+    this.form = this.fb.group({
+      family: ['tm', Validators.required],
+      value: [null,
+        [Validators.required, Validators.min(1), Validators.max(25)],
+      ],
     });
   }
 
-  fetchCurrentKeyId(section: any) {
+  ngOnInit(): void {
+    this.fetchKeyIds();
+  }
+
+  fetchKeyIds(): void {
     this.yamcs.yamcsClient
-        .getActiveKeyId(this.yamcs.instance!, {family: section.family})
-        .then(keyInfo => {
-          this.currentKeyIds[section.family] = keyInfo.keyId;
-        });
+      .getActiveKeyId(this.yamcs.instance!, {family: 'tm'})
+      .then(keyInfo => {
+        this.tmKeyId = keyInfo.keyId;
+        this.cdr.detectChanges(); // Trigger Angular's change detection
+      });
+
+    this.yamcs.yamcsClient
+      .getActiveKeyId(this.yamcs.instance!, {family: 'tc'})
+      .then(keyInfo => {
+        this.tcKeyId = keyInfo.keyId;
+        this.cdr.detectChanges(); // Trigger Angular's change detection
+      });
   }
 
-  submitKeyId(section: any) {
-    const ulOptions: UpdateKeyRequest = {
-      family: section.family,
-      keyId: this.selectedKeyIds[section.family]
+  updateKeyIdd(): void {
+    if (this.form.valid) {
+      this.yamcs.yamcsClient
+        .updateKeyId(this.yamcs.instance!, {family: this.form.get('family')?.value, keyId: this.form.get('value')?.value.toString()})
+        .then(resp => {
+          this.fetchKeyIds();
+        })
     }
-    console.log(ulOptions);
-    this.yamcs.yamcsClient.updateKeyId(this.yamcs.instance!, ulOptions)
-        .then(() => {
-            window.location.reload();
-          }
-        ).catch(err => {
-            console.log('Failed to update keyID for family: ' + section.family, err);
-          }
-        );
-  }
-
-  onKeyIdChange(event: Event, section: any): void {
-    const target = event.target as HTMLSelectElement;
-    const selectedValue = target.value;
-    this.submitKeyId(section);
   }
 }

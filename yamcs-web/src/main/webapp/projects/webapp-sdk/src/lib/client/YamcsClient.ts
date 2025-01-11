@@ -1062,11 +1062,9 @@ export default class YamcsClient implements HttpHandler {
   }
 
   async updateKeyId(instance: string, options: UpdateKeyRequest) {
-    const body = JSON.stringify(options);
     const url = `${this.apiUrl}/keymanagement/${instance}:updateKey`;
-    return await this.doFetch(url, {
-      body,
-      method: 'POST',
+    return await this.doFetch(url + this.queryString(options), {
+      method: 'POST'
     });
   }
 

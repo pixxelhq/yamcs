@@ -68,6 +68,10 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
         return spec;
     }
 
+    public VaultClient getClient() {
+        return client;
+    }
+
     @Override
     public void init(String yamcsInstance, String serviceName, YConfiguration config) throws InitException {
         super.init(yamcsInstance, serviceName, config);
@@ -121,7 +125,7 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
      * @return an Optional containing the key ID if found, or empty if not
      * @throws StreamSqlException if a database error occurs
      */
-    private Optional<Integer> fetchKeyId(String tableName, String family) throws StreamSqlException, ParseException {
+    private Optional<String> fetchKeyId(String tableName, String family) throws StreamSqlException, ParseException {
         StreamSqlResult result = null;
         try {
             String query = String.format("select keyid from %s where family='%s' order desc limit 1", tableName, family);
@@ -146,8 +150,8 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
             YConfiguration fallback = config.getConfig("vault").getConfig("fallback");
 
             try {
-                Optional<Integer> tmKeyId = fetchKeyId(TABLE_NAME, "tm");
-                Optional<Integer> tcKeyId = fetchKeyId(TABLE_NAME, "tc");
+                Optional<String> tmKeyId = fetchKeyId(TABLE_NAME, "tm");
+                Optional<String> tcKeyId = fetchKeyId(TABLE_NAME, "tc");
 
                 // Process TM Key
                 this.tmKeyId = tmKeyId
@@ -197,6 +201,7 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
                     .get("TC Keys")
                     .get(spacecraftId + "_TC_" + keyId)
                     .getKey();
+            this.tcKeyId = keyId;
         }
     }
 
@@ -206,6 +211,7 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
                     .get("TM Keys")
                     .get(spacecraftId + "_TM_" + keyId)
                     .getKey();
+            this.tmKeyId = keyId;
         }
     }
 
@@ -230,6 +236,7 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
             switch (family) {
                 case "tc" -> this.setTcKey(keyId);
                 case "tm" -> this.setTmKey(keyId);
+                default -> throw new ParseException("Key Family not found");
             }
 
         } catch (StreamSqlException | ParseException e) {
