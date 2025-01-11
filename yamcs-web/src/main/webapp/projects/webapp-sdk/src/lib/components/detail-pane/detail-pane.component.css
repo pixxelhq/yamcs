@@ -1,5 +1,6 @@
 :host {
   --panel-width: 450px;
+  --collapsed-width: 65px; /* Width when collapsed */
 }
 
 .detail {
@@ -11,6 +12,23 @@
   border-left: 1px solid rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
   font: 400 12px / 20px Roboto, sans-serif;
+  transition: width 0.3s ease, padding 0.3s ease; /* Smooth collapse/expand */
+}
+
+.detail.collapsed {
+  width: var(--collapsed-width);
+  overflow: hidden;
+  padding: 0; /* Optional: Remove padding when collapsed */
+}
+
+.toggle-button {
+  position: relative;
+  left: -40px; /* Adjust to position outside the panel */
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
 }
 
 .detail.hidden {
