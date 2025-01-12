@@ -19,6 +19,7 @@ import org.yamcs.utils.YObjectLoader;
  */
 public class TcManagedParameters extends UplinkManagedParameters {
     int maxFrameLength;
+    String yamcsInstance;
 
     public enum PriorityScheme {
         FIFO, ABSOLUTE, POLLING_VECTOR
@@ -30,8 +31,10 @@ public class TcManagedParameters extends UplinkManagedParameters {
     // Encryption parameters
     SymmetricEncryption se;
 
-    public TcManagedParameters(YConfiguration config) {
+    public TcManagedParameters(String yamcsInstance, YConfiguration config) {
         super(config);
+
+        this.yamcsInstance = yamcsInstance;
         maxFrameLength = config.getInt("maxFrameLength");
 
         if (maxFrameLength < 8 || maxFrameLength > 0xFFFF) {
@@ -50,7 +53,7 @@ public class TcManagedParameters extends UplinkManagedParameters {
             YConfiguration enConfig = en.getConfigOrEmpty("args");
 
             se = YObjectLoader.loadObject(className);
-            se.init(enConfig);
+            se.init("FF1", enConfig);
         }
 
         List<YConfiguration> l = config.getConfigList("virtualChannels");
@@ -183,12 +186,12 @@ public class TcManagedParameters extends UplinkManagedParameters {
                 YConfiguration enConfig = en.getConfigOrEmpty("args");
     
                 se = YObjectLoader.loadObject(className);
-                se.init(enConfig);
+                se.init(tcParams.yamcsInstance, enConfig);
             }
 
             if (config.containsKey("srs3")) {
                 YConfiguration c = config.getConfig("srs3");
-                this.srs3Mp = new Srs3ManagedParameters(c, maxFrameLength);
+                this.srs3Mp = new Srs3ManagedParameters(tcParams.yamcsInstance, c, maxFrameLength);
             }
         }
 

@@ -12,6 +12,18 @@ options:
         multiple Yamcs servers in distributed deployments.
     type: STRING
 
+  extra:
+    title: Extra
+    type: MAP
+    suboptions:
+      keyManagementService:
+        title: Key Management Service
+        type: MAP
+        suboptions:
+          enabled:
+            title: Enabled
+            type: BOOLEAN
+
   logo:
     title: Logo
     description:
