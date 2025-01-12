@@ -18,29 +18,31 @@ import java.security.spec.InvalidKeySpecException;
 import org.yamcs.YConfiguration;
 import org.yamcs.security.encryption.SymmetricEncryption;
 import org.yamcs.utils.StringConverter;
+import org.yamcs.YamcsServer;
 
 
 public class GCM implements SymmetricEncryption {
+
     private static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
 
     private static final int TAG_LENGTH = 16;
     private static final int IV_LENGTH = 12;
 
-    String key;
+    protected KeyManagementService keyMgmService;
+
     byte[] aad;
 
     @Override
-    public void init(YConfiguration config) {
-        this.key = config.getString("key");
-        if (config.containsKey("associatedData"))
-            this.aad = config.getBinary("associatedData");
+    public void init(String yamcsInstance, YConfiguration config) {
+        String keyMgmServiceName = config.getString("keyManagementService");
+        keyMgmService = YamcsServer.getServer().getInstance(yamcsInstance).getService(KeyManagementService.class, keyMgmServiceName);
     }
 
     public byte[] encrypt(byte[] plainMessage)
             throws NoSuchAlgorithmException,InvalidKeySpecException, InvalidKeyException, InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
         byte[] iv = getRandomNonce(IV_LENGTH);
+        SecretKey secretKey = getSecretKey(keyMgmService.getTcKey());
 
-        SecretKey secretKey = getSecretKey(key);
         Cipher cipher = initCipher(Cipher.ENCRYPT_MODE, secretKey, iv);
         if (aad != null)
             cipher.updateAAD(aad);
@@ -75,7 +77,7 @@ public class GCM implements SymmetricEncryption {
     @Override
     public byte[] decrypt(byte[] cipherContent) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException,
             InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException  {
-        SecretKey secretKey = getSecretKey(key);
+        SecretKey secretKey = getSecretKey(keyMgmService.getTmKey());
         ByteBuffer bb = ByteBuffer.wrap(cipherContent);
 
         byte[] iv = new byte[IV_LENGTH];

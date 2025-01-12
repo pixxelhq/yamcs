@@ -125,7 +125,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                 YConfiguration enConfig = en.getConfigOrEmpty("args");
 
                 se = YObjectLoader.loadObject(className);
-                se.init(enConfig);
+                se.init(instance, enConfig);
             }
         }
 

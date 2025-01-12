@@ -59,6 +59,10 @@ export const APP_ROUTES: Routes = [{
     loadChildren: () => import('projects/webapp/src/app/alarms/alarms.routes').then(m => m.ROUTES),
     canActivate: [authGuardFn],
   }, {
+    path: 'keymanagement',
+    loadChildren: () => import('projects/webapp/src/app/keymanagement/keymanagement.routes').then(m => m.ROUTES),
+    canActivate: [authGuardFn],
+  }, {
     path: 'algorithms',
     loadChildren: () => import('projects/webapp/src/app/algorithms/algorithms.routes').then(m => m.ROUTES),
     canActivate: [authGuardFn],

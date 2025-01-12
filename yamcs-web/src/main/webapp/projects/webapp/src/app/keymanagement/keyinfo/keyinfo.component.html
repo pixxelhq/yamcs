@@ -1,0 +1,67 @@
+<div>
+  <app-instance-toolbar>Satellite Key Management</app-instance-toolbar>
+
+  <h3 style="font-family: Roboto; font-size: medium; margin-left: 30px; margin-top: 10px; margin-bottom: 10px;">Current Key Id's</h3>
+  <p style="font-family: Roboto; font-size: small; margin-top: 5px; margin-left: 45px;"><strong>Tm Key Id:</strong> {{ tmKeyId }}</p>
+  <p style="font-family: Roboto; font-size: small; margin-top: 5px; margin-left: 45px;"><strong>Tc Key Id:</strong> {{ tcKeyId }}</p>
+
+  <h3 style="margin-left: 30px; font-family: Roboto; font-size: medium; margin-bottom: 10px;">Update Tm Key</h3>
+
+  <form style="margin-left: 45px;" [formGroup]="formTm" (ngSubmit)="updateKeyTmId()">
+    <div style="margin-bottom: 10px;">
+      <label style="font-family: Roboto; font-size: small;" for="family">Family:</label>
+      <select id="family" style="margin-left: 49px; width: 100px;" formControlName="family">
+
+        <option style="font-family: Roboto;" value="tm">Tm</option>
+      </select>
+    </div>
+
+    <div>
+      <label style="font-family: Roboto; margin-bottom: 20px; font-size: small;" for="value">Value (1-25):</label>
+      <input
+        id="value"
+        style="width: 300px; min-height: 13px; margin-left: 15px;"
+        formControlName="value" 
+        min="1"
+        max="25"
+        type="number" />
+    </div>
+
+    <div class="form-group" style="margin-top: 22px;">
+      <ya-button appearance="primary" type="button" [disabled]="formTm.invalid">
+        Submit
+      </ya-button>
+    </div>
+  </form>
+
+  <br /><br />
+  <h3 style="margin-left: 30px; font-family: Roboto; font-size: medium; margin-bottom: 10px;">Update Tc Key</h3>
+
+  <form style="margin-left: 45px;" [formGroup]="formTc" (ngSubmit)="updateKeyTcId()">
+    <div style="margin-bottom: 10px;">
+      <label style="font-family: Roboto; font-size: small;" for="family">Family:</label>
+      <select id="family" style="margin-left: 49px; width: 100px;" formControlName="family">
+
+        <option style="font-family: Roboto;" value="tc">Tc</option>
+      </select>
+    </div>
+
+    <div>
+      <label style="font-family: Roboto; margin-bottom: 20px; font-size: small;" for="value">Value (26-50):</label>
+      <input
+        id="value"
+        style="width: 300px; min-height: 13px; margin-left: 15px;"
+        formControlName="value" 
+        min="26"
+        max="50"
+        type="number" />
+    </div>
+
+    <div class="form-group" style="margin-top: 22px;">
+      <ya-button appearance="primary" type="button" [disabled]="formTc.invalid">
+        Submit
+      </ya-button>
+    </div>
+  </form>
+
+<div>
