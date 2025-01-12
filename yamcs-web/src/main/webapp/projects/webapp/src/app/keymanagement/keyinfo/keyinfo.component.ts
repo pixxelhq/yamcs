@@ -19,7 +19,8 @@ export class KeyinfoComponent implements OnInit {
   tmKeyId: string | null = null;
   tcKeyId: string | null = null;
 
-  form: FormGroup;
+  formTm: FormGroup;
+  formTc: FormGroup;
   fb: FormBuilder;
 
   constructor(
@@ -33,10 +34,17 @@ export class KeyinfoComponent implements OnInit {
     this.fb = fb;
 
     // Setup forms
-    this.form = this.fb.group({
+    this.formTm = this.fb.group({
       family: ['tm', Validators.required],
       value: [null,
         [Validators.required, Validators.min(1), Validators.max(25)],
+      ],
+    });
+
+    this.formTc = this.fb.group({
+      family: ['tc', Validators.required],
+      value: [null,
+        [Validators.required, Validators.min(26), Validators.max(50)],
       ],
     });
   }
@@ -61,10 +69,20 @@ export class KeyinfoComponent implements OnInit {
       });
   }
 
-  updateKeyIdd(): void {
-    if (this.form.valid) {
+  updateKeyTmId(): void {
+    if (this.formTm.valid) {
       this.yamcs.yamcsClient
-        .updateKeyId(this.yamcs.instance!, {family: this.form.get('family')?.value, keyId: this.form.get('value')?.value.toString()})
+        .updateKeyId(this.yamcs.instance!, {family: this.formTm.get('family')?.value, keyId: this.formTm.get('value')?.value.toString()})
+        .then(resp => {
+          this.fetchKeyIds();
+        })
+    }
+  }
+
+  updateKeyTcId(): void {
+    if (this.formTc.valid) {
+      this.yamcs.yamcsClient
+        .updateKeyId(this.yamcs.instance!, {family: this.formTc.get('family')?.value, keyId: this.formTc.get('value')?.value.toString()})
         .then(resp => {
           this.fetchKeyIds();
         })

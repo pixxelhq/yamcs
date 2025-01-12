@@ -288,7 +288,11 @@ export class InstancePageComponent implements OnInit, OnDestroy {
   }
 
   showKeyManagementItem() {
-    return this.user.hasSystemPrivilege('ControlServices');
+    if (!this.config.extra.hasOwnProperty("keyManagementService")) {
+      return false;
+    }
+
+    return this.user.hasSystemPrivilege('ControlServices') &&  this.config.extra["keyManagementService"]["enabled"];
   }
 
   handleKeydown(event: KeyboardEvent) {
