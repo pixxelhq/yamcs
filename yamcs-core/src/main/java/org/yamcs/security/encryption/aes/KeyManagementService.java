@@ -63,6 +63,10 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
 
         spec.addOption("vault", OptionType.MAP).withSpec(vault);
         spec.addOption("default", OptionType.MAP).withSpec(df);
+
+        spec.requireOneOf("vault", "default");
+        spec.mutuallyExclusive("vault", "default");
+
         spec.addOption("stream", OptionType.STRING).withDefault("active_key");
 
         return spec;

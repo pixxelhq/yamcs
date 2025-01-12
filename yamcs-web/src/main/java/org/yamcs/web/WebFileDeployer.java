@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.yamcs.Experimental;
 import org.yamcs.ProcessorFactory;
@@ -280,6 +281,29 @@ public class WebFileDeployer {
         }
         webConfig.put("queueNames", queueNames);
 
+        // Incase someone has extended the extra field from the plugin's default global or instance level spec
+        YConfiguration extra = config.getConfig("extra");
+        Map<String, Map<String, Object>> fromConfig = extra.getKeys().stream()
+            .collect(Collectors.toMap(
+                key -> key,
+                key -> extra.getConfig(key).getKeys().stream()
+                    .collect(Collectors.toMap(
+                        subKey -> subKey,
+                        subKey -> extra.getConfig(key).get(subKey)
+                    ))
+            ));
+
+        // Combine that with the extraConfigs
+        /*
+         * FIXME: Not sure what key overrides what?
+         */
+        fromConfig.forEach((key, innerMap) -> 
+            extraConfigs.merge(key, new HashMap<>(innerMap), (existing, toMerge) -> {
+                existing.putAll(toMerge);
+                return existing;
+            })
+        );
+            
         // May be used by web extensions to pass arbitrary information
         webConfig.put("extra", extraConfigs);
 
