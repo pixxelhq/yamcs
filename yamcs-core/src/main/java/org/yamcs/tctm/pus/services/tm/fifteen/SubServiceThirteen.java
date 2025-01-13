@@ -78,15 +78,6 @@ public class SubServiceThirteen implements PusSubService {
     }
 
     public void generatePacketStoredSummaryReport(long generationTime, Map<Integer, byte[]> packetStoreReportMap) {
-        long missionTime = PusTmManager.timeService.getMissionTime();
-
-        // Populate metadata
-        HashMap<String, String> metadata = new HashMap<>();
-        metadata.put("CreationTime", LocalDateTime.ofInstant(
-            Instant.ofEpochMilli(missionTime),
-            ZoneId.of("GMT")
-        ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")));
-
         for (Map.Entry<Integer, byte[]> packetStoreReport: packetStoreReportMap.entrySet()) {
             String filename = "packetStoreSummaryReport/" + packetStoreMap.get(packetStoreReport.getKey()) + "/" + LocalDateTime.ofInstant(
                 Instant.ofEpochSecond(generationTime),
@@ -124,7 +115,7 @@ public class SubServiceThirteen implements PusSubService {
                 writer.flush();
 
                 // Put report in the bucket
-                packetStoreSummaryReportBucket.putObject(filename, "csv", metadata, stringWriter.getBuffer().toString().getBytes(StandardCharsets.UTF_8));
+                packetStoreSummaryReportBucket.putObject(filename, "csv", null, stringWriter.getBuffer().toString().getBytes(StandardCharsets.UTF_8));
 
             } catch (IOException e) {
                 throw new UncheckedIOException("S(15, 13) | Cannot save packet store summary report in bucket: " + filename + (packetStoreSummaryReportBucket != null ? " -> " + packetStoreSummaryReportBucket.getName() : ""), e);
