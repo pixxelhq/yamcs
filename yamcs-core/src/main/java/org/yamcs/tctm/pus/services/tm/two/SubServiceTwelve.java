@@ -90,20 +90,11 @@ public class SubServiceTwelve implements PusSubService {
         int parameterIDData = ByteArrayUtils.decodeUnsignedShort(auxillaryData, (pactIDSize + logicalDeviceIDSize));
 
         long generationTime = ByteArrayUtils.decodeCustomInteger(pPkt.getGenerationTime(), 0, PusTmManager.absoluteTimeLength);
-        long missionTime = PusTmManager.timeService.getMissionTime();
 
         String filename = "logicalDeviceReport/" + LocalDateTime.ofInstant(
             Instant.ofEpochSecond(generationTime),
             ZoneId.of("GMT")
         ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")) + ".json";
-        
-        // Populate metadata
-        HashMap<String, String> metadata = new HashMap<>();
-        metadata.put("CreationTime", LocalDateTime.ofInstant(
-            Instant.ofEpochMilli(missionTime),
-            ZoneId.of("GMT")
-        ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")));
-        
 
         // Save file to logicalDeviceReport bucket
         try {
@@ -124,7 +115,7 @@ public class SubServiceTwelve implements PusSubService {
             currentDeviceReport.put("dataAcquired", dataAcquired);
 
             logicalDeviceReportJSON.put(currentDeviceReport);
-            logicalDeviceReportBucket.putObject(filename, "json", metadata, logicalDeviceReportJSON.toString().getBytes(StandardCharsets.UTF_8));
+            logicalDeviceReportBucket.putObject(filename, "json", null, logicalDeviceReportJSON.toString().getBytes(StandardCharsets.UTF_8));
 
         } catch(IOException e) {
             throw new UncheckedIOException("S(2, 12) | Cannot save / update logical device ID dump report in bucket: " + filename + (logicalDeviceReportBucket != null ? " -> " + logicalDeviceReportBucket.getName() : ""), e);

@@ -77,27 +77,19 @@ public class SubServiceSix implements PusSubService {
             registerValues.put(address, value);
         }
 
-        long missionTime = PusTmManager.timeService.getMissionTime();
         long generationTime = ByteArrayUtils.decodeCustomInteger(pPkt.getGenerationTime(), 0, PusTmManager.absoluteTimeLength);
 
         String filename = "deviceRegisterReport/" + LocalDateTime.ofInstant(
             Instant.ofEpochSecond(generationTime),
             ZoneId.of("GMT")
         ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")) + ".json";
-        
-        // Populate metadata
-        HashMap<String, String> metadata = new HashMap<>();
-        metadata.put("CreationTime", LocalDateTime.ofInstant(
-            Instant.ofEpochMilli(missionTime),
-            ZoneId.of("GMT")
-        ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")));
-        
+
         // Serialize the HashMap to JSONString
         String registerDump = gson.toJson(registerValues);
 
         // Save file to deviceRegisterReport bucket
         try {
-            registerDumpBucket.putObject(filename, "json", metadata, registerDump.getBytes(StandardCharsets.UTF_8));
+            registerDumpBucket.putObject(filename, "json", null, registerDump.getBytes(StandardCharsets.UTF_8));
         } catch(IOException e) {
             throw new UncheckedIOException("S(2, 6) | Cannot save device register dump report in bucket: " + filename + (registerDumpBucket != null ? " -> " + registerDumpBucket.getName() : ""), e);
         }

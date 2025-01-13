@@ -90,20 +90,11 @@ public class SubServiceNine implements PusSubService {
         int protocolSpecificData = ByteArrayUtils.decodeUnsignedShort(auxillaryData, (pactIDSize + physicalDeviceIDSize));
 
         long generationTime = ByteArrayUtils.decodeCustomInteger(pPkt.getGenerationTime(), 0, PusTmManager.absoluteTimeLength);
-        long missionTime = PusTmManager.timeService.getMissionTime();
 
         String filename = "physicalDeviceReport/" + LocalDateTime.ofInstant(
             Instant.ofEpochSecond(generationTime),
             ZoneId.of("GMT")
         ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")) + ".json";
-        
-        // Populate metadata
-        HashMap<String, String> metadata = new HashMap<>();
-        metadata.put("CreationTime", LocalDateTime.ofInstant(
-            Instant.ofEpochMilli(missionTime),
-            ZoneId.of("GMT")
-        ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")));
-        
 
         // Save file to physicalDeviceReport bucket
         try {
@@ -124,7 +115,7 @@ public class SubServiceNine implements PusSubService {
             currentDeviceReport.put("dataAcquired", dataAcquired);
 
             physicalDeviceReportJSON.put(currentDeviceReport);
-            physicalDeviceReportBucket.putObject(filename, "json", metadata, physicalDeviceReportJSON.toString().getBytes(StandardCharsets.UTF_8));
+            physicalDeviceReportBucket.putObject(filename, "json", null, physicalDeviceReportJSON.toString().getBytes(StandardCharsets.UTF_8));
 
         } catch(IOException e) {
             throw new UncheckedIOException("S(2, 9)| Cannot save / update physical device ID dump report in bucket: " + filename + (physicalDeviceReportBucket != null ? " -> " + physicalDeviceReportBucket.getName() : ""), e);
