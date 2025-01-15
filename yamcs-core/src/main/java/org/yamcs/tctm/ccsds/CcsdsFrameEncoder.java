@@ -201,11 +201,11 @@ public class CcsdsFrameEncoder implements RawFrameEnDec {
                 data[i] = newData[i];
             }
         }
-    
+
         if (randomize) {
-            Randomizer.randomizeTm(data, 0, encodedFrameLength);
+            Randomizer.randomizeTm(data, vf, encodedFrameLength - vf);
         }
-        
+
         return encodedFrameLength;
     }
 
