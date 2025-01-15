@@ -1,9 +1,13 @@
 package org.yamcs.tctm.ccsds.error;
 
+import org.yamcs.logging.Log;
+import org.yamcs.security.encryption.SymmetricEncryption;
 import org.yamcs.tctm.ccsds.Randomizer;
 import org.yamcs.utils.ByteArrayUtils;
 
 public class Ldpc64CltuGenerator extends CltuGenerator {
+    private static final Log log = new Log(Ldpc64CltuGenerator.class);
+
     static public final byte[] CCSDS_START_SEQ = { 0x03, 0x47, 0x76, (byte) 0xC7, 0x27, 0x28, (byte) 0x95,
             (byte) 0xB0 };
     static public final byte[] CCSDS_TAIL_SEQ = { 0x55, 0x55, 0x55, 0x56, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA,
@@ -48,7 +52,12 @@ public class Ldpc64CltuGenerator extends CltuGenerator {
                 encData[outOffset + d + i] = 0x55;
             }
             Ldpc64Encoder.encode(encData, outOffset, encData, outOffset + 8);
-            Randomizer.randomizeTc(encData, outOffset, 16);
+//            Randomizer.randomizeTc(encData, outOffset, 16);
+
+            boolean is64QAM = true;
+            MyCltuGenerator randomizer = new MyCltuGenerator(is64QAM);
+            encData = randomizer.randomize(encData);
+
             outOffset += 16;
         }
         if (tailSeq.length > 0) { // tail sequence
