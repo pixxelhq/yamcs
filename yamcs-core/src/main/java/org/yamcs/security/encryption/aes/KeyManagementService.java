@@ -93,7 +93,6 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
             parser = new KeyParser();
             try {
                 parser.parse(client.decrypt(cipherText));
-
             } catch (Exception e) {
                 // FIXME: 
                 throw new RuntimeException(e);
@@ -205,7 +204,7 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
                     .get("TC Keys")
                     .get(spacecraftId + "_TC_" + keyId)
                     .getKey();
-            log.error("TC Key: {}", this.tmKey);
+            log.error("TC Key: {}", this.tcKey);
             this.tcKeyId = keyId;
         }
     }
