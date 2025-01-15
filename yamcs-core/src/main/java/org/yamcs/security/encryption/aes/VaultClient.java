@@ -58,7 +58,7 @@ public class VaultClient {
         }
 
         JSONObject jsonResponse = new JSONObject(response.toString());
-        console.log("Vault JSON Response: {}", jsonResponse)
+        console.log("Vault JSON Response: {}", jsonResponse);
         String base64EncodedData = jsonResponse.getJSONObject("data").getString("plaintext");
 
         // Decode the base64 encoded string
