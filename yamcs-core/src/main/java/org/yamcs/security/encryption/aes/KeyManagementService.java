@@ -205,6 +205,7 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
                     .get("TC Keys")
                     .get(spacecraftId + "_TC_" + keyId)
                     .getKey();
+            log.error("TC Key: {}", this.tmKey);
             this.tcKeyId = keyId;
         }
     }
@@ -215,6 +216,7 @@ public class KeyManagementService extends AbstractYamcsService implements Stream
                     .get("TM Keys")
                     .get(spacecraftId + "_TM_" + keyId)
                     .getKey();
+            log.error("TM Key: {}", this.tmKey);
             this.tmKeyId = keyId;
         }
     }
