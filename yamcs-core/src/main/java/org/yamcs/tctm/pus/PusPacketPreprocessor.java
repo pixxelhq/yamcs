@@ -7,6 +7,7 @@ import org.yamcs.YConfiguration;
 import org.yamcs.tctm.CcsdsPacket;
 import org.yamcs.tctm.CcsdsPacketPreprocessor;
 import org.yamcs.tctm.ccsds.time.CucTimeDecoder;
+import org.yamcs.tctm.pus.services.tm.PusTmCcsdsPacket;
 import org.yamcs.time.Instant;
 import org.yamcs.utils.ByteArrayUtils;
 import org.yamcs.utils.TimeEncoding;
@@ -146,11 +147,23 @@ public class PusPacketPreprocessor extends CcsdsPacketPreprocessor {
 
     private void extactAndSetTime(TmPacket tmPacket) {
         byte[] packet = tmPacket.getPacket();
-        if (!useLocalGenerationTime && timeEpoch == null || timeEpoch == TimeEpochs.NONE) {
-            long obt = timeDecoder.decodeRaw(packet, pktTimeOffset);
+
+        PusTmCcsdsPacket pTmPacket = new PusTmCcsdsPacket(packet);
+        boolean isReqPacket = pTmPacket.getMessageType() == 9 && pTmPacket.getMessageSubType() == 2 && pTmPacket.getAPID() == 96;
+
+        if ((!useLocalGenerationTime && timeEpoch == null || timeEpoch == TimeEpochs.NONE) && isReqPacket) {
+            long obt = timeDecoder.decode(packet, pktTimeOffset);
             Instant ert = tmPacket.getEarthReceptionTime();
             log.debug("Adding tco sample obt: {} , ert: {}", obt, ert);
-            tcoService.addSample(obt, ert);
+
+            try {
+                tcoService.addSample(obt, ert);
+
+            } catch (IllegalArgumentException e) {
+                /*
+                 * FIXME: Don't do anything right now? Set the packet time normally if the sample addition does not happen
+                 */
+            }
         }
 
         setRealtimePacketTime(tmPacket, pktTimeOffset);
