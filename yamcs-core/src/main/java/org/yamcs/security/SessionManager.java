@@ -30,7 +30,7 @@ public class SessionManager {
      * 
      * In terms of OAuth this corresponds to the lifetime of a refresh token.
      */
-    private static final long SESSION_IDLE = 2 * 60 * 60 * 1000L; // 2 hours
+    private static final long SESSION_IDLE = 12 * 60 * 60 * 1000L; // 12 hours
 
     private ConcurrentMap<String, UserSession> sessions = new ConcurrentHashMap<>();
     private CopyOnWriteArraySet<SessionListener> sessionListeners = new CopyOnWriteArraySet<>();
