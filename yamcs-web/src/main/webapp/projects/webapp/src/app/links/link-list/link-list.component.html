@@ -93,11 +93,13 @@
               [checked]="selection.hasValue() && isAllSelected()" />
           </th>
           <td mat-cell *cdkCellDef="let row" class="checkbox">
-            <input
-              type="checkbox"
-              (click)="$event.stopPropagation()"
-              (change)="$event ? selection.toggle(row) : null"
-              [checked]="selection.isSelected(row)" />
+            @if(!row.link.parentName) {
+              <input
+                type="checkbox"
+                (click)="$event.stopPropagation()"
+                (change)="$event ? selection.toggle(row) : null"
+                [checked]="selection.isSelected(row)" />
+            }
           </td>
         </ng-container>
 
@@ -162,18 +164,20 @@
           <td mat-cell *matCellDef="let row">
             @if (mayControlLinks()) {
               <ya-more>
-                <button
-                  mat-menu-item
-                  (click)="enableLink(row.link.name)"
-                  [disabled]="row.link.status !== 'DISABLED'">
-                  Enable link
-                </button>
-                <button
-                  mat-menu-item
-                  (click)="disableLink(row.link.name)"
-                  [disabled]="row.link.status === 'DISABLED'">
-                  Disable link
-                </button>
+                @if (!row.link.parentName) {
+                  <button
+                    mat-menu-item
+                    (click)="enableLink(row.link.name)"
+                    [disabled]="row.link.status !== 'DISABLED'">
+                    Enable link
+                  </button>
+                  <button
+                    mat-menu-item
+                    (click)="disableLink(row.link.name)"
+                    [disabled]="row.link.status === 'DISABLED'">
+                    Disable link
+                  </button>
+                }
                 <mat-divider />
                 <button mat-menu-item (click)="resetCounters(row.link.name)">Reset counters</button>
                 @if (row.link.actions) {
