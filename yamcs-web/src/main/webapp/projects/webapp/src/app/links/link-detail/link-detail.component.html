@@ -55,11 +55,13 @@
 
 @if (mayControlLinks()) {
   <div class="action-bar">
-    @if (link.status === "DISABLED") {
-      <ya-button (click)="enableLink()">ENABLE LINK</ya-button>
-    }
-    @if (link.status !== "DISABLED") {
-      <ya-button (click)="disableLink()">DISABLE LINK</ya-button>
+    @if (!link.parentName) {
+      @if (link.status === "DISABLED") {
+        <ya-button (click)="enableLink()">ENABLE LINK</ya-button>
+      }
+      @if (link.status !== "DISABLED") {
+        <ya-button (click)="disableLink()">DISABLE LINK</ya-button>
+      }
     }
     <ya-button [matMenuTriggerFor]="moreActions" dropdown="true">MORE</ya-button>
     <mat-menu #moreActions class="ya-menu" yPosition="below" [overlapTrigger]="false">

@@ -262,7 +262,7 @@ export class LinkListComponent implements AfterViewInit, OnDestroy {
   allowGroupDisable() {
     // Allow if at least one of the selected links is enabled
     for (const item of this.selection.selected) {
-      if (!item.link.disabled) {
+      if (!item.link.disabled && !item.link.parentName) {
         return true;
       }
     }
@@ -296,7 +296,9 @@ export class LinkListComponent implements AfterViewInit, OnDestroy {
 
   disableSelectedLinks() {
     for (const item of this.selection.selected) {
-      this.disableLink(item.link.name);
+      if (!item.link.parentName) {
+        this.disableLink(item.link.name);
+      }
     }
   }
 
