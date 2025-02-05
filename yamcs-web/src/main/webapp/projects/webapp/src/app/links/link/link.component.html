@@ -70,7 +70,12 @@
               @if (getEntriesForValue(entry.value); as subentries) {
                 @if (subentries.length) {
                   @for (subentry of subentries; track subentry) {
-                    {{ subentry || "-" }}
+                    @if (subentry.startsWith("http://")) {
+                      <a href="{{ subentry }}">{{ subentry }}</a>
+                    }
+                    @else {
+                      {{ subentry || "-" }}
+                    }
                     <br />
                   }
                 }
