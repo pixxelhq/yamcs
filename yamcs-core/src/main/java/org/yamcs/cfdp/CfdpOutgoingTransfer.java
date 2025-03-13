@@ -296,6 +296,9 @@ public class CfdpOutgoingTransfer extends OngoingCfdpTransfer {
             }
             return;
         }
+        if (eofAckReceived) {
+            rescheduleInactivityTimer();
+        }
         if (packet instanceof AckPacket) {
             processAckPacket((AckPacket) packet);
         } else if (packet instanceof FinishedPacket) {
@@ -311,18 +314,10 @@ public class CfdpOutgoingTransfer extends OngoingCfdpTransfer {
                             .collect(Collectors.toList()));
                 }
             }
-            // Resume
-            resume();
-            eofAckReceived = false;
-            eofSent = false;
         } else if (packet instanceof KeepAlivePacket) {
             log.info("TXID{} Ignoring Keep Alive PDU: {}", cfdpTransactionId, packet); // Handling not implemented
         } else {
             log.warn("TXID{} unexpected packet {} ", cfdpTransactionId, packet);
-        }
-
-        if (eofAckReceived) {
-            rescheduleInactivityTimer();
         }
     }
 
@@ -337,7 +332,7 @@ public class CfdpOutgoingTransfer extends OngoingCfdpTransfer {
         }
         eofTimer.cancel();
 
-        eofAckReceived = true;  // FIXME: Should this be added?
+        eofAckReceived = true;
         if (outTxState == OutTxState.CANCELING) {
             complete(reasonForCancellation);
         }
