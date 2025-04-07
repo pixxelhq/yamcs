@@ -154,7 +154,6 @@ public class PGSegment {
             }
             idx2++;
         }
-
     }
 
     public void consolidate() {
@@ -209,7 +208,6 @@ public class PGSegment {
         } else {
             currentFullGaps = prevSegment.currentFullGaps.clone();
         }
-
         previousFullGaps = new IntHashSet();
         while (idx1 < pvl1.size() && idx2 < pvl2.size()) {
             var pid1 = pvl1.get(idx1).pid;
@@ -220,8 +218,11 @@ public class PGSegment {
                 currentFullGaps.add(pid1);
                 idx1++;
             } else if (pid1 > pid2) {
-                // pid2 not part of the previous segment
-                previousFullGaps.add(pid2);
+                // if pid2 was part of the prevSegment.currentFullGaps, we have to remove it from
+                // this segment currentFullGaps
+                if (!currentFullGaps.remove(pid2)) {
+                    previousFullGaps.add(pid2);
+                } // else pid2 was part of the prevSegment.currentFullGaps so it cannot be part of this segment
                 idx2++;
             } else {
                 // happy case, parameter exists both in the segments and in the new data
@@ -236,10 +237,13 @@ public class PGSegment {
 
             idx1++;
         }
-
         while (idx2 < pvl2.size()) {
             var pid2 = pvl2.get(idx2).pid;
-            previousFullGaps.add(pid2);
+            // if pid2 was part of the prevSegment.currentFullGaps, we have to remove it from
+            // this segment currentFullGaps
+            if (!currentFullGaps.remove(pid2)) {
+                previousFullGaps.add(pid2);
+            } // else pid2 was part of the prevSegment.currentFullGaps so it cannot be part of this segment
             idx2++;
         }
     }
@@ -337,7 +341,8 @@ public class PGSegment {
 
     public String toString() {
         return "PGsegment[groupId: " + parameterGroupId + ", [" + TimeEncoding.toString(getSegmentStart()) + ", "
-                + TimeEncoding.toString(getSegmentEnd()) + "], size: " + size()
+                + TimeEncoding.toString(getSegmentEnd()) + "], num of rows: " + size()
+                + ", num of params: " + pvSegments.size()
                 + ", segmentIdxInsideInterval: " + segmentIdxInsideInterval
                 + ", previousFullGaps: " + previousFullGaps
                 + ", currentFullGaps: " + currentFullGaps

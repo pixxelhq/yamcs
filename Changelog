@@ -1,3 +1,9 @@
+Version 5.10.12 released 5-Mar-2025
+- Fixed another parameter archive corruption bug related to the realtime archive filler.
+
+Version 5.10.11 released 4-Mar-2025
+- Fixed parameter archive corruption bug
+
 Version 5.10.9 released 1-Dec-2024
 - Add stack step to insert arbitrary text
 - Add stack step to insert telemetry verifications
