@@ -1,9 +1,6 @@
-name: Create package on push to release branch
+name: Maven Publish
 
 on:
-  push:
-    branches: [ release ]
-  
   workflow_dispatch:
 
 jobs:
