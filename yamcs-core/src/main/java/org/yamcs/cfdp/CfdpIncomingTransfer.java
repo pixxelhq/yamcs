@@ -391,26 +391,22 @@ public class CfdpIncomingTransfer extends OngoingCfdpTransfer {
 
             else if (proxyPutResponse != null) {
                 var conditionCode = proxyPutResponse.getConditionCode();
-                var isComplete = proxyPutResponse.isDataComplete() ? "Complete" : "Incomplete";
+                var completionStatus = proxyPutResponse.isDataComplete() ? "Complete" : "Incomplete";
                 var fileStatus = proxyPutResponse.getFileStatus();
+                var statusMessage = String.format("%s %s %s", conditionCode, fileStatus, completionStatus);
             
                 if (conditionCode != ConditionCode.NO_ERROR) {
-                    log.warn("TXID{} ProxyPutResponse indicates failure: {}, {}, {}", 
-                            cfdpTransactionId, conditionCode, isComplete, fileStatus);
-            
-                    sendWarnEvent(ETYPE_TRANSFER_FINISHED, 
-                        String.format("ProxyPutResponse failure: %s %s %s", conditionCode, fileStatus, isComplete));
-            
-                    handleFault(conditionCode);
+                    log.warn("TXID{} ProxyPutResponse indicates failure: {}, {}, {}",
+                            cfdpTransactionId, conditionCode, completionStatus, fileStatus);
+                    sendWarnEvent(ETYPE_TRANSFER_FINISHED, "ProxyPutResponse downlink failure: " + statusMessage);
                 } else {
-                    if (needsFinish) {
-                        finish(ConditionCode.NO_ERROR);
-                    } else {
-                        complete(ConditionCode.NO_ERROR);
-                    }
+                    sendInfoEvent(ETYPE_TRANSFER_FINISHED, "ProxyPutResponse downlink finished: " + statusMessage);
+                }
             
-                    sendInfoEvent(ETYPE_TRANSFER_FINISHED, 
-                        String.format("ProxyPutResponse downlink finished: %s %s %s", conditionCode, fileStatus, isComplete));
+                if (needsFinish) {
+                    finish(ConditionCode.NO_ERROR);
+                } else {
+                    complete(ConditionCode.NO_ERROR);
                 }
             }
 
