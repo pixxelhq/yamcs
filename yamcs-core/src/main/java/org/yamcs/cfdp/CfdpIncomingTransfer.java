@@ -32,6 +32,7 @@ import org.yamcs.cfdp.pdu.FinishedPacket.FileStatus;
 import org.yamcs.cfdp.pdu.MetadataPacket;
 import org.yamcs.cfdp.pdu.NakPacket;
 import org.yamcs.cfdp.pdu.OriginatingTransactionId;
+import org.yamcs.cfdp.pdu.ProxyPutResponse;
 import org.yamcs.cfdp.pdu.SegmentRequest;
 import org.yamcs.cfdp.pdu.TLV;
 import org.yamcs.events.EventProducer;
@@ -47,6 +48,7 @@ public class CfdpIncomingTransfer extends OngoingCfdpTransfer {
     private final FileSaveHandler fileSaveHandler;
     private CfdpTransactionId originatingTransactionId;
     private DirectoryListingResponse directoryListingResponse;
+    private ProxyPutResponse proxyPutResponse;
 
     private enum InTxState {
         /**
@@ -298,6 +300,8 @@ public class CfdpIncomingTransfer extends OngoingCfdpTransfer {
                     this.originatingTransactionId = ((OriginatingTransactionId) option).toCfdpTransactionId();
                 } else if (option instanceof DirectoryListingResponse) {
                     this.directoryListingResponse = (DirectoryListingResponse) option;
+                } else if (option instanceof ProxyPutResponse) {
+                    this.proxyPutResponse = (ProxyPutResponse) option;
                 }
             }
         }
@@ -380,8 +384,36 @@ public class CfdpIncomingTransfer extends OngoingCfdpTransfer {
     }
 
     private void checkFileComplete() {
-        if (incomingDataFile.isComplete() && eofReceived()) {
-            onFileCompleted();
+        if (eofReceived()) {
+            if (incomingDataFile.isComplete()) {
+                onFileCompleted();
+            }
+
+            else if (proxyPutResponse != null) {
+                var conditionCode = proxyPutResponse.getConditionCode();
+                var isComplete = proxyPutResponse.isDataComplete() ? "Complete" : "Incomplete";
+                var fileStatus = proxyPutResponse.getFileStatus();
+            
+                if (conditionCode != ConditionCode.NO_ERROR) {
+                    log.warn("TXID{} ProxyPutResponse indicates failure: {}, {}, {}", 
+                            cfdpTransactionId, conditionCode, isComplete, fileStatus);
+            
+                    sendWarnEvent(ETYPE_TRANSFER_FINISHED, 
+                        String.format("ProxyPutResponse failure: %s %s %s", conditionCode, fileStatus, isComplete));
+            
+                    handleFault(conditionCode);
+                } else {
+                    if (needsFinish) {
+                        finish(ConditionCode.NO_ERROR);
+                    } else {
+                        complete(ConditionCode.NO_ERROR);
+                    }
+            
+                    sendInfoEvent(ETYPE_TRANSFER_FINISHED, 
+                        String.format("ProxyPutResponse downlink finished: %s %s %s", conditionCode, fileStatus, isComplete));
+                }
+            }
+
         } else {
             if (acknowledged) {
                 sendOrScheduleNak();
