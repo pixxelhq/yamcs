@@ -1,10 +1,6 @@
 package org.yamcs.tctm.ccsds;
 
-import static org.yamcs.parameter.SystemParametersService.getNewPv;
 import static org.yamcs.parameter.SystemParametersService.getPV;
-import static org.yamcs.utils.ValueUtility.getUint64Value;
-import static org.yamcs.utils.ValueUtility.getSint64Value;
-
 
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -23,14 +19,12 @@ import org.yamcs.events.EventProducerFactory;
 import org.yamcs.logging.Log;
 import org.yamcs.tctm.AggregatedDataLink;
 import org.yamcs.tctm.PacketPreprocessor;
-import org.yamcs.parameter.AggregateValue;
 import org.yamcs.parameter.ParameterValue;
 import org.yamcs.parameter.SystemParametersProducer;
 import org.yamcs.parameter.SystemParametersService;
 import org.yamcs.tctm.TcTmException;
 import org.yamcs.tctm.TmPacketDataLink;
 import org.yamcs.tctm.TmSink;
-import org.yamcs.protobuf.Pvalue.AcquisitionStatus;
 import org.yamcs.protobuf.Yamcs.Value.Type;
 import org.yamcs.tctm.ccsds.VcDownlinkManagedParameters.TMDecoder;
 import org.yamcs.tctm.pus.PusTmManager;
@@ -38,8 +32,6 @@ import org.yamcs.time.Instant;
 import org.yamcs.time.TimeService;
 import org.yamcs.utils.StringConverter;
 import org.yamcs.utils.YObjectLoader;
-import org.yamcs.xtce.AggregateParameterType;
-import org.yamcs.xtce.Member;
 import org.yamcs.xtce.Parameter;
 import org.yamcs.xtce.UnitType;
 import org.yamcs.utils.DataRateMeter;
@@ -82,11 +74,7 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
     boolean isIdleVcid;
 
     // Create as systemParameters for data collection
-    private AggregateParameterType vcDeltaType;
-    private Parameter spDataInCount, spDataInRate, vcDelta;
-
-    // List of published vcDelta's
-    private ArrayList<ParameterValue> vcDeltas = new ArrayList<>();    
+    private Parameter spDataInCount, spDataInRate;
 
 
     public VcTmPacketHandler(String yamcsInstance, String name, VcDownlinkManagedParameters vmp) {
@@ -121,44 +109,11 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
         }
     }
 
-    public synchronized void publishVcDelta(long prevCount, long currentCount, int vcDifference) throws InterruptedException {
-        long time = timeService.getMissionTime();
-        AggregateValue v = new AggregateValue(vcDeltaType.getMemberNames());
-
-        v.setMemberValue("prevCount", getUint64Value(prevCount));
-        v.setMemberValue("currentCount", getUint64Value(currentCount));
-        v.setMemberValue("vcDifference", getSint64Value(vcDifference));
-
-        // Create a parameterValue to be publushed
-        ParameterValue pv = getNewPv(vcDelta, time);
-        pv.setAcquisitionStatus(AcquisitionStatus.ACQUIRED);
-        pv.setEngValue(v);
-
-        while (Thread.holdsLock(vcDeltas)) {
-            wait();
-        }
-
-        vcDeltas.add(pv);
-    }
-
     @Override
     public void handle(DownlinkTransferFrame frame) {
         if (disabled) {
             log.trace("Dropping frame for VC {} because the link is disabled", frame.getVirtualChannelId());
             return;
-        }
-
-        int frameLoss = frame.lostFramesCount(lastFrameSeq);
-        long prevFrameSeq = lastFrameSeq;
-        lastFrameSeq = frame.getVcFrameSeq();
-
-        // Publish the vcDelta
-        try {
-            if (frameLoss != 0)
-                publishVcDelta(prevFrameSeq, lastFrameSeq, frameLoss);
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
         }
 
         if (frame.containsOnlyIdleData()) {
@@ -195,6 +150,9 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
 
         if (vmp.tmDecoder == TMDecoder.CCSDS) {     // Multiple packets from frame | With Segmentation
             try {
+                int frameLoss = frame.lostFramesCount(lastFrameSeq);
+                lastFrameSeq = frame.getVcFrameSeq();
+
                 if (packetDecoder.hasIncompletePacket()) {
                     if (frameLoss != 0) {
                         log.warn("Incomplete packet dropped because of frame loss ");
@@ -221,7 +179,10 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
             }
 
         } else if (vmp.tmDecoder == TMDecoder.SINGLE) {     // Single packet per frame | No Segmentation
-            try {
+            try {   
+                int frameLoss = frame.lostFramesCount(lastFrameSeq);
+                lastFrameSeq = frame.getVcFrameSeq();
+
                 if (frameLoss != 0) {
                     log.warn("Frames have been dropped in transit, sigh");
                 }
@@ -244,6 +205,9 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
             }
         } else {    // Multiple packets per frame | No segmentation
             try {
+                int frameLoss = frame.lostFramesCount(lastFrameSeq);
+                lastFrameSeq = frame.getVcFrameSeq();
+
                 if (frameLoss != 0) {
                     log.warn("Frames have been dropped in transit, sigh");
                 }
@@ -430,32 +394,6 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
 
         spDataInRate = sysParamService.createSystemParameter(LINK_NAMESPACE + name + "/dataInRate", Type.DOUBLE,
                 bps, "The number of incoming bytes per second computed over a five second interval");
-    
-        // Create an aggregated systemParameter
-
-        Member prevCount = new Member("prevCount", sysParamService.getBasicType(Type.UINT64));
-        prevCount.setShortDescription("Value of the virtual channel counter of the previous frame");
-        Member currentCount = new Member("currentCount", sysParamService.getBasicType(Type.UINT64));
-        currentCount.setShortDescription("Value of the virtual channel counter of the current frame");
-        Member vcDifference = new Member("vcDifference", sysParamService.getBasicType(Type.SINT64));
-        vcDifference.setShortDescription("Difference in the virtual channel counter between two successively received frames");
-
-        vcDeltaType = new AggregateParameterType.Builder().setName("vcDelta")
-                .addMember(prevCount)
-                .addMember(currentCount)
-                .addMember(vcDifference)
-                .build();
-
-        vcDelta = sysParamService.createSystemParameter(LINK_NAMESPACE + name + "/virtualCounterDelta", vcDeltaType,
-                "The delta of the virual channel frame counter between successive frames received by the MCS");
-    }
-
-
-    public synchronized void consumeVcDelta(List<ParameterValue> list) throws InterruptedException {
-        list.addAll(vcDeltas);
-        vcDeltas.clear();
-
-        notify();
     }
 
     @Override
@@ -463,14 +401,6 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
         ArrayList<ParameterValue> list = new ArrayList<>();
         try {
             collectSystemParameters(time, list);
-            synchronized (vcDeltas) {
-                if (!vcDeltas.isEmpty())
-                    consumeVcDelta(list);
-            }
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-
         } catch (Exception e) {
             log.error("Exception caught when collecting link system parameters", e);
         }
