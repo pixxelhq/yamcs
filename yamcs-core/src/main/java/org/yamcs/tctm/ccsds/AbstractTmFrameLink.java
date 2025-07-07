@@ -187,7 +187,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
 
                 int c2 = (int) ByteArrayUtils.decodeCustomInteger(data, dataEnd, crcSize);
                 if (c1 != c2) {
-                    throw new CorruptedFrameException("Bad SRS3 CRC computed: " + c1 + " in the frame: " + c2);
+                    throw new CorruptedFrameException("Bad SRS3 CRC computed");
                 }
 
                 // Reduce length by removing CRC

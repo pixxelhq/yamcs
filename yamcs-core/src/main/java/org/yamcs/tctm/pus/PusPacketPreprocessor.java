@@ -121,10 +121,15 @@ public class PusPacketPreprocessor extends CcsdsPacketPreprocessor {
             // if the CRC has failed, do not go further
             return null;
         }
-        int apidseqcount = ByteArrayUtils.decodeInt(packet, 0);
-        int apid = (apidseqcount >> 16) & 0x07FF;
-        int seq = (apidseqcount) & 0x3FFF;
-        checkSequence(apid, seq);
+
+        /*
+         * Commenting out the below code as it is not needed for PUS packets. The APID and sequence count are
+         * extracted from the CCSDS primary header, which is already done in the CcsdsPacket class.
+         */
+        // int apidseqcount = ByteArrayUtils.decodeInt(packet, 0);
+        // int apid = (apidseqcount >> 16) & 0x07FF;
+        // int seq = (apidseqcount) & 0x3FFF;
+        // checkSequence(apid, seq);
 
         if (packet.length < 12) {
             eventProducer.sendWarning("Short packet received, length: " + packet.length

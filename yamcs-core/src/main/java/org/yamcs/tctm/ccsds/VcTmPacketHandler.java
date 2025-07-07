@@ -14,8 +14,6 @@ import org.yamcs.ConfigurationException;
 import org.yamcs.TmPacket;
 import org.yamcs.YConfiguration;
 import org.yamcs.YamcsServer;
-import org.yamcs.events.EventProducer;
-import org.yamcs.events.EventProducerFactory;
 import org.yamcs.logging.Log;
 import org.yamcs.tctm.AggregatedDataLink;
 import org.yamcs.tctm.PacketPreprocessor;
@@ -50,7 +48,6 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
 
     volatile boolean disabled = false;
     long lastFrameSeq = -1;
-    EventProducer eventProducer;
 
     PacketDecoder packetDecoder;
     PixxelPacketDecoder pPacketDecoder;
@@ -82,7 +79,6 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
         this.name = name;
         timeService = YamcsServer.getTimeService(yamcsInstance);
 
-        eventProducer = EventProducerFactory.getEventProducer(yamcsInstance, this.getClass().getSimpleName(), 10000);
         log = new Log(this.getClass(), yamcsInstance);
         log.setContext(name);
 
@@ -167,15 +163,12 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
                 }
                 if (packetStart != -1) {
                     if (packetDecoder.hasIncompletePacket()) {
-                        eventProducer
-                                .sendWarning("Incomplete packet decoded when reaching the beginning of another packet");
                         packetDecoder.reset();
                     }
                     packetDecoder.process(data, packetStart, dataEnd - packetStart);
                 }
             } catch (TcTmException e) {
                 packetDecoder.reset();
-                eventProducer.sendWarning(e.toString());
             }
 
         } else if (vmp.tmDecoder == TMDecoder.SINGLE) {     // Single packet per frame | No Segmentation
@@ -193,7 +186,6 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
                 }   
             } catch (TcTmException e) {
                 pPacketDecoder.reset();
-                eventProducer.sendWarning(e.toString());
             } catch (ArrayIndexOutOfBoundsException e) {
                 pPacketDecoder.reset();
                 log.warn(e.toString() + "\n"
@@ -201,7 +193,6 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
                         + "     Packet Start: " + packetStart + "\n"
                         + "     Data (i.e Frame) End: " + dataEnd + "\n"
                 );
-                eventProducer.sendWarning(e.toString());
             }
         } else {    // Multiple packets per frame | No segmentation
             try {
@@ -229,8 +220,6 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
                 String message = "Full Frame: %s\n\nPacket Start: %s\n\nData (i.e Frame) End: %s\n\nLink: %s";
                 log.logSentryFatal(e, message, getClass().getName(), params);
 
-                eventProducer.sendWarning(e.toString());
-
             } catch (ArrayIndexOutOfBoundsException e) {
                 pMultipleDecoder.reset();
                 log.warn(e.toString() + "\n"
@@ -248,8 +237,6 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
                 String message = "Full Frame: %s\n\nPacket Start: %s\n\nData (i.e Frame) End: %s\n\nLink: %s";
                 log.logSentryFatal(e, message, getClass().getName(), params);
 
-                eventProducer.sendWarning(e.toString());
-
             } catch (Exception e) {
                 pMultipleDecoder.reset();
                 log.warn(e.toString() + "\n"
@@ -257,7 +244,6 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
                         + "     Packet Start: " + packetStart + "\n"
                         + "     Data (i.e Frame) End: " + dataEnd + "\n"
                 );
-                eventProducer.sendWarning(e.toString());
 
                 List<String> params = List.of(
                     StringConverter.arrayToHexString(data, true),
