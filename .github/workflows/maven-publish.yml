@@ -2,7 +2,7 @@ name: Maven Publish
 
 on:
   push:
-    branches: [ release ]
+    branches: [ pixxel/5.10.x ]
   
   pull_request:
 
