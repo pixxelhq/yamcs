@@ -3,7 +3,7 @@
   <parent>
     <groupId>org.yamcs</groupId>
     <artifactId>yamcs</artifactId>
-    <version>5.10.12-Pixxel-8.8.1</version>
+    <version>5.10.12-Pixxel-jTYU-1.0.0</version>
   </parent>
 
   <artifactId>yamcs-client</artifactId>
