@@ -292,24 +292,24 @@ public abstract class AlarmServer<S, T> extends AbstractService {
                 }
             }
         } else { // alarm
-            boolean newAlarm;
             if (activeAlarm == null) {
                 activeAlarm = new ActiveAlarm<>(value, autoAck, latching);
                 activeAlarms.put(alarmId, activeAlarm);
-                newAlarm = true;
             } else {
                 activeAlarm.setCurrentValue(value);
                 activeAlarm.incrementViolations();
                 activeAlarm.incrementValueCount();
-                newAlarm = false;
             }
             if (activeAlarm.getViolations() < minViolations) {
                 return;
             }
-            activeAlarm.trigger();
 
-            if (newAlarm) {
-                activeAlarms.put(alarmId, activeAlarm);
+            if (!activeAlarm.isTriggered()) {
+                activeAlarm.trigger();
+
+                if (!activeAlarms.containsKey(alarmId))
+                    activeAlarms.put(alarmId, activeAlarm);
+
                 for (AlarmListener<T> l : alarmListeners) {
                     l.notifyUpdate(AlarmNotificationType.TRIGGERED, activeAlarm);
                 }
