@@ -5,7 +5,7 @@
   <parent>
     <groupId>org.yamcs.examples</groupId>
     <artifactId>examples</artifactId>
-    <version>5.10.12-Pixxel-8.8.2</version>
+    <version>5.10.12-Pixxel-9.0.0</version>
   </parent>
 
   <artifactId>replication1</artifactId>
