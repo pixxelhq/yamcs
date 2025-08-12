@@ -150,7 +150,7 @@
 <div class="block-title">Completion</div>
 <div class="block">
   @if (command.completed?.status === "OK") {
-    SUCCESS
+    {{ command.completed?.returnValue?.stringValue }}
   }
   @if (command.completed?.status === "NOK") {
     FAILURE: {{ command.completed?.message }}
@@ -177,7 +177,7 @@
   <div class="block-title">{{ upstream.key | cascadingPrefix }} completion</div>
   <div class="block">
     @if (upstream.value.completed?.status === "OK") {
-      SUCCESS
+      {{ command.completed?.returnValue?.stringValue }}
     }
     @if (upstream.value.completed?.status === "NOK") {
       FAILURE: {{ upstream.value.completed?.message }}

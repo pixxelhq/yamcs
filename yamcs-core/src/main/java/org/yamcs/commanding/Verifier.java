@@ -7,7 +7,7 @@ import org.yamcs.parameter.ParameterValue;
 import org.yamcs.xtce.CommandVerifier;
 import org.yamcs.mdb.Mdb;
 
-abstract class Verifier {
+public abstract class Verifier {
     /**
      * Imaginary parameter for publishing an optional return value to cmdhist
      */
