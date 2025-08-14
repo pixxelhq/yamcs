@@ -117,6 +117,13 @@
             @if (dataSource.loading$ | async) {
               <ya-dots />
             }
+            <mat-divider style="margin-left: 5px;" [vertical]="true"></mat-divider>
+            
+            <mat-slide-toggle style="margin-left: 8px;" class="ya-table-toggle" formControlName="ttonly" [disableRipple]="true">TT Only</mat-slide-toggle>
+            <ya-select [shouldDisable]="filterForm.get('ttonly')?.disabled  || !filterForm.get('ttonly')?.value" style="margin-left: 7px;" icon="access_time" formControlName="ttorder">
+              <ya-option id="OBR" label="Order by release time" />
+              <ya-option id="OBE" label="Order by execution time" />
+            </ya-select>
 
             @if (dataSource.streaming$ | async) {
               <div style="text-align: right; flex: 1 1 150px">
@@ -341,7 +348,7 @@
                 {{ item.completed?.returnValue?.stringValue }}
               }
               @if (item.completed?.status === "NOK") {
-                <span [matTooltip]="item.completed?.message">FAILURE</span>
+                <span [matTooltip]="item.completed?.message">{{ item.completed?.message }}</span>
               }
               @if (!item.completed) {
                 -

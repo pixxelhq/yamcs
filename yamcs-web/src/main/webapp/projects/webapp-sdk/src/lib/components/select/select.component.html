@@ -1,4 +1,4 @@
-<ya-button [matMenuTriggerFor]="selMenu" [icon]="icon()" dropdown="true">
+<ya-button [matMenuTriggerFor]="selMenu" [disabled]="shouldDisable()" [icon]="icon()" dropdown="true">
   @if (label(); as label) {
     {{ label }}
   } @else {

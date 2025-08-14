@@ -55,8 +55,15 @@ export class CommandHistoryDataSource extends DataSource<CommandHistoryRecord> {
       limit: this.pageSize,
     }).then(entries => {
       this.buffer.reset();
+      this.buffer.sortByExecutionTime = options.ttorder === 'OBE';
       this.blockHasMore = false;
-      this.buffer.addArchiveData(entries.map(entry => new CommandHistoryRecord(entry)));
+      let records = entries.map(entry => new CommandHistoryRecord(entry));
+      if (options.ttonly) {
+        records = records.filter(record => 
+          record.extra.some(et => et.name === 'Timetag_CommandApid')
+        );
+      }
+      this.buffer.addArchiveData(records);
 
       // Quick emit, don't wait on sync tick
       this.emitCommands();
@@ -89,7 +96,12 @@ export class CommandHistoryDataSource extends DataSource<CommandHistoryRecord> {
       next: this.continuationToken,
       limit: this.pageSize,
     }).then(entries => {
-      const records = entries.map(entry => new CommandHistoryRecord(entry));
+      let records = entries.map(entry => new CommandHistoryRecord(entry));
+      if (options.ttonly) {
+        records = records.filter(record => 
+          record.extra.some(et => et.name === 'Timetag_CommandApid')
+        );
+      }
       this.buffer.addArchiveData(records);
 
       // Quick emit, don't wait on sync tick
