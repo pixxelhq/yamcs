@@ -12,6 +12,7 @@ export type WatermarkObserver = () => void;
 export class CommandHistoryBuffer {
 
   public dirty = false;
+  public sortByExecutionTime = false;
 
   private archiveRecords: CommandHistoryRecord[] = [];
 
@@ -64,13 +65,26 @@ export class CommandHistoryBuffer {
       }
     });
 
-    splicedRecords.sort((r1, r2) => {
-      let res = -r1.generationTime.localeCompare(r2.generationTime);
-      if (res === 0) {
-        res = -r1.origin.localeCompare(r2.origin);
-      }
-      return res !== 0 ? res : (r2.sequenceNumber - r1.sequenceNumber);
-    });
+    if (!this.sortByExecutionTime) {
+      splicedRecords.sort((r1, r2) => {
+        let res = -r1.generationTime.localeCompare(r2.generationTime);
+        if (res === 0) {
+          res = -r1.origin.localeCompare(r2.origin);
+        }
+        return res !== 0 ? res : (r2.sequenceNumber - r1.sequenceNumber);
+      });
+    } else {
+      splicedRecords.sort((r1, r2) => {
+        const t1 = r1.extra.find(et => et.name === 'Timetag')?.value?.stringValue ?? '';
+        const t2 = r2.extra.find(et => et.name === 'Timetag')?.value?.stringValue ?? '';
+        let res = -t1.localeCompare(t2);
+        if (res === 0) {
+          res = -r1.origin.localeCompare(r2.origin);
+        }
+        return res !== 0 ? res : (r2.sequenceNumber - r1.sequenceNumber);
+      });
+    }
+
     return splicedRecords;
   }
 

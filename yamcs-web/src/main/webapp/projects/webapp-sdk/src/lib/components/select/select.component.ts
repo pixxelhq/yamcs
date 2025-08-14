@@ -41,6 +41,7 @@ export class YaSelect implements ControlValueAccessor {
   icon = input<string>();
   emptyOption = input<string>('-- select an option --');
   showClear = input<boolean>(false);
+  shouldDisable = input<boolean>(false); // add this
 
   // Options are allowed to be provided as children, or
   // in a single attribute.

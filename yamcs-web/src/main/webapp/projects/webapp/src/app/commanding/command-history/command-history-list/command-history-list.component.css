@@ -58,3 +58,7 @@ tr.item-detail td {
 tr.item-detail:not(.expanded) {
   display: none;
 }
+
+::ng-deep .ya-table-toggle.mat-mdc-slide-toggle .mdc-label {
+  font-size: 12px !important;
+}

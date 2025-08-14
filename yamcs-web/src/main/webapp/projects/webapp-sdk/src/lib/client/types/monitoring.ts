@@ -145,6 +145,8 @@ export interface GetCommandHistoryOptions {
   q?: string;
   queue?: string;
   order?: 'asc' | 'desc';
+  ttonly?: boolean;
+  ttorder?: string;
 }
 
 export interface CreateProcessorRequest {
