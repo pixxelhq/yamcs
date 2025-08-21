@@ -56,7 +56,9 @@ public class FloatParameterType extends FloatDataType implements NumericParamete
         }
 
         Set<Parameter> dependentParameters = new HashSet<>();
-        dependentParameters.addAll(encoding.getDependentParameters());
+        if (encoding != null) {
+            dependentParameters.addAll(encoding.getDependentParameters());
+        }
 
         for (NumericContextAlarm nca : contextAlarmList) {
             dependentParameters.addAll(nca.getContextMatch().getDependentParameters());
