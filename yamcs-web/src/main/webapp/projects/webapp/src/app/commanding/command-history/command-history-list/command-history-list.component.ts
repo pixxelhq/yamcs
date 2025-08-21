@@ -22,6 +22,7 @@ import { CommandHistoryDataSource } from './command-history.datasource';
 
 
 const defaultInterval = 'PT1H';
+const defaultTtOrder = "OBR";
 
 @Component({
   standalone: true,
@@ -58,6 +59,8 @@ export class CommandHistoryListComponent implements OnInit, AfterViewInit, OnDes
     interval: new FormControl<string | null>(defaultInterval),
     customStart: new FormControl<string | null>(null),
     customStop: new FormControl<string | null>(null),
+    ttonly: new FormControl<boolean | null>(false), // Time Tag Only toggle
+    ttorder: new FormControl<string | null>(defaultTtOrder), // Time Tag Order toggle
   });
 
   dataSource: CommandHistoryDataSource;
@@ -122,6 +125,15 @@ export class CommandHistoryListComponent implements OnInit, AfterViewInit, OnDes
       this.loadData();
     });
 
+    this.filterForm.get('ttonly')!.valueChanges.forEach(ttonly => {
+      this.filterForm.get('ttorder')!.reset(defaultTtOrder);
+      this.loadData();
+    });
+  
+    this.filterForm.get('ttorder')!.valueChanges.forEach(ttorder => {
+      this.loadData();
+    });
+
     this.filterForm.get('interval')!.valueChanges.forEach(nextInterval => {
       if (nextInterval === 'CUSTOM') {
         const customStart = this.validStart || this.yamcs.getMissionTime();
@@ -173,6 +185,18 @@ export class CommandHistoryListComponent implements OnInit, AfterViewInit, OnDes
       const queue = queryParams.get('queue')!;
       this.filterForm.get('queue')!.setValue(queue);
     }
+    if (queryParams.has('ttonly')) {
+      const ttonly = queryParams.get('ttonly') === 'true';
+      this.filterForm.get('ttonly')!.setValue(ttonly);
+    } else {
+      this.filterForm.get('ttonly')!.setValue(false);
+    }
+    if (queryParams.has('ttorder')) {
+      const ttorder = queryParams.get('ttorder');
+      if (ttorder) {
+        this.filterForm.get('ttorder')!.setValue(ttorder);
+      }
+    }
     if (queryParams.has('interval')) {
       this.appliedInterval = queryParams.get('interval')!;
       this.filterForm.get('interval')!.setValue(this.appliedInterval);
@@ -215,11 +239,14 @@ export class CommandHistoryListComponent implements OnInit, AfterViewInit, OnDes
 
   startStreaming() {
     this.filterForm.get('interval')!.setValue('NO_LIMIT');
+    this.filterForm.get('ttonly')!.setValue(false);
+    this.filterForm.get('ttonly')!.disable();
     this.dataSource.startStreaming();
   }
 
   stopStreaming() {
     this.dataSource.stopStreaming();
+    this.filterForm.get('ttonly')!.enable();
   }
 
   // Used in table trackBy to prevent continuous row recreation
@@ -250,6 +277,15 @@ export class CommandHistoryListComponent implements OnInit, AfterViewInit, OnDes
     if (queue) {
       options.queue = queue;
     }
+    const ttonly = controls['ttonly'].value;
+    if (ttonly) {
+      options.ttonly = true;
+    }
+    const ttorder = controls['ttorder'].value;
+    if (ttorder) {
+      options.ttorder = ttorder;
+    }
+
     this.dataSource.loadEntries(options)
       .catch(err => this.messageService.showError(err));
   }
@@ -268,7 +304,14 @@ export class CommandHistoryListComponent implements OnInit, AfterViewInit, OnDes
     if (queue) {
       options.queue = queue;
     }
-
+    const ttonly = controls['ttonly'].value;
+    if (ttonly) {
+      options.ttonly = true;
+    }
+    const ttorder = controls['ttorder'].value;
+    if (ttorder) {
+      options.ttorder = ttorder;
+    }
     this.dataSource.loadMoreData(options)
       .catch(err => this.messageService.showError(err));
   }
@@ -292,6 +335,8 @@ export class CommandHistoryListComponent implements OnInit, AfterViewInit, OnDes
         interval: this.appliedInterval,
         customStart: this.appliedInterval === 'CUSTOM' ? controls['customStart'].value : null,
         customStop: this.appliedInterval === 'CUSTOM' ? controls['customStop'].value : null,
+        ttonly: controls['ttonly'].value ? 'true' : 'false',
+        ttorder: controls['ttorder'].value || defaultTtOrder,
       },
       queryParamsHandling: 'merge',
     });

@@ -80,9 +80,9 @@ public class ProcessingData {
      * Used in TC processing when command history events are received, they will be added to the cmdParams.
      */
     public static ProcessingData createForCmdProcessing(LastValueCache tmValueCache,
-            Map<Argument, ArgumentValue> arguments, LastValueCache cmdLastValueCache) {
+            Map<Argument, ArgumentValue> arguments, LastValueCache cmdLastValueCache, ParameterValueList cmdParams) {
         return new ProcessingData(tmValueCache, new ParameterValueList(), arguments, cmdLastValueCache,
-                new ParameterValueList());
+                cmdParams);
     }
 
     /**

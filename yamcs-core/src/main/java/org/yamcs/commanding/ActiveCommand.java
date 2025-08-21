@@ -32,6 +32,7 @@ public class ActiveCommand implements CommandHistoryConsumer {
     final static Log log = new Log(ActiveCommand.class);
     // Initialised with the command attributes and updated with the command history events
     LastValueCache cmdParamCache = new LastValueCache();
+    ParameterValueList cmdParams = new ParameterValueList();
 
     // used when a command has a transmissionConstraint with timeout
     // when the command is ready to go, but is waiting for a transmission constraint, this is set to true
@@ -141,9 +142,7 @@ public class ActiveCommand implements CommandHistoryConsumer {
         }
         Mdb mdb = processor.getMdb();
         ProcessingData data = ProcessingData.createForCmdProcessing(processor.getLastValueCache(), getArguments(),
-                cmdParamCache);
-
-        ParameterValueList cmdParams = data.getCmdParams();
+                cmdParamCache, cmdParams);
 
         for (Attribute attr : attrs) {
             String fqn = Mdb.YAMCS_CMDHIST_SPACESYSTEM_NAME + "/" + attr.getKey();

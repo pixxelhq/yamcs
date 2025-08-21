@@ -34,6 +34,21 @@ tr.success td.completion {
   color: #00c752;
 }
 
+tr.dispatched td.completion {
+  background-color: #fff8e6;
+  color: #ff9800;
+}
+
+tr.deleted td.completion {
+  background-color: #fff8e6;
+  color: red;
+}
+
+tr.timeout td.completion {
+  background-color: #fff8e6;
+  color: red;
+}
+
 tr.failed td.completion {
   background-color: #ffeef0;
   color: red;
@@ -57,4 +72,8 @@ tr.item-detail td {
 
 tr.item-detail:not(.expanded) {
   display: none;
+}
+
+::ng-deep .ya-table-toggle.mat-mdc-slide-toggle .mdc-label {
+  font-size: 12px !important;
 }
