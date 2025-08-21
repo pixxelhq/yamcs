@@ -251,7 +251,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
             validFrameCount.getAndIncrement();
 
         } catch (TcTmException e) {
-            eventProducer.sendWarning("Error processing frame: " + e.toString());
+            // eventProducer.sendWarning("Error processing frame: " + e.toString());
             invalidFrameCount.getAndIncrement();
         }
     }
