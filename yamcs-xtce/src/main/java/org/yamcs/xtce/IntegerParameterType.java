@@ -61,6 +61,10 @@ public class IntegerParameterType extends IntegerDataType implements NumericPara
         }
 
         Set<Parameter> dependentParameters = new HashSet<>();
+        if (encoding != null) {
+            dependentParameters.addAll(encoding.getDependentParameters());
+        }
+
         for (NumericContextAlarm nca : contextAlarmList) {
             dependentParameters.addAll(nca.getContextMatch().getDependentParameters());
         }
