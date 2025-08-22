@@ -194,14 +194,14 @@ public class AlarmReporter extends AbstractProcessorService implements Processor
             }
 
             EventSeverity severity = getEventSeverity(pv.getMonitoringResult());
-            eventProducer.sendEvent(severity, null, message);
+            eventProducer.sendEvent(severity, null, message, pv.getGenerationTime());
         }
     }
 
     private void sendStateChangeEvent(ParameterValue pv) {
         EventSeverity severity = getEventSeverity(pv.getMonitoringResult());
         eventProducer.sendEvent(severity, null, "Parameter " + pv.getParameter().getQualifiedName()
-                + " transitioned to state " + pv.getEngValue().getStringValue());
+                + " transitioned to state " + pv.getEngValue().getStringValue(), pv.getGenerationTime());
     }
 
     EventSeverity getEventSeverity(MonitoringResult mr) {
