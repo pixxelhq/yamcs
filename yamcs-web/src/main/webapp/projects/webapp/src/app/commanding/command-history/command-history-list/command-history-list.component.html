@@ -348,7 +348,7 @@
                 {{ item.completed?.returnValue?.stringValue }}
               }
               @if (item.completed?.status === "NOK") {
-                <span [matTooltip]="item.completed?.message">{{ item.completed?.returnValue?.stringValue || "FAILURE" }}</span>
+                <span [matTooltip]="item.completed?.message">FAILURE</span>
               }
               @if (!item.completed) {
                 -
