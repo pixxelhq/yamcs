@@ -5,7 +5,7 @@
   <parent>
     <groupId>org.yamcs.examples</groupId>
     <artifactId>examples</artifactId>
-    <version>5.10.12-Pixxel-9.3.0</version>
+    <version>5.10.12-Pixxel-9.3.1</version>
   </parent>
 
   <artifactId>cfdp-udp</artifactId>
