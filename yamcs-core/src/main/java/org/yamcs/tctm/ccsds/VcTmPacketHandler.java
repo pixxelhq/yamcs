@@ -26,6 +26,7 @@ import org.yamcs.tctm.TmSink;
 import org.yamcs.protobuf.Yamcs.Value.Type;
 import org.yamcs.tctm.ccsds.VcDownlinkManagedParameters.TMDecoder;
 import org.yamcs.tctm.pus.PusTmManager;
+import org.yamcs.tctm.pus.services.tm.PusTmCcsdsPacket;
 import org.yamcs.time.Instant;
 import org.yamcs.time.TimeService;
 import org.yamcs.utils.StringConverter;
@@ -143,6 +144,9 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
         int packetStart = frame.getFirstHeaderPointer();
         int dataEnd = frame.getDataEnd();
         byte[] data = frame.getData();
+
+        if (vmp.vcId == 5)
+            System.out.println("Step_3 | ERT: " + frame.getEarthRceptionTime() + " | Time: " + Instant.get(timeService.getMissionTime()) + " | Time_raw: " + timeService.getMissionTime());
 
         if (vmp.tmDecoder == TMDecoder.CCSDS) {     // Multiple packets from frame | With Segmentation
             try {
@@ -276,6 +280,15 @@ public class VcTmPacketHandler implements TmPacketDataLink, VcDownlinkHandler, S
                 if (!PusTmManager.quickPusVerification(pwt))
                     rejectedPacketCountIn(1);
             }
+
+            PusTmCcsdsPacket pus = new PusTmCcsdsPacket(pwt.getPacket());
+            int apid = pus.getAPID();
+            int seqCount = pus.getSequenceCount();
+            int serviceType = pus.getMessageType();
+            int subServiceType = pus.getMessageSubType();
+
+            if (vmp.vcId == 5)
+                System.out.println("Step_4 | ERT: " + pwt.getEarthReceptionTime() + " | Time: " + Instant.get(pwt.getReceptionTime()) + " | Time_raw: " + pwt.getReceptionTime() + " | APID: " + apid + " | SeqCount: " + seqCount + " | ServiceType: " + serviceType + " | SubServiceType: " + subServiceType);
 
             tmSink.processPacket(pwt);
         } else {

@@ -6,10 +6,12 @@ import java.util.Map;
 
 import org.yamcs.ConfigurationException;
 import org.yamcs.YConfiguration;
+import org.yamcs.YamcsServer;
 import org.yamcs.logging.Log;
 import org.yamcs.tctm.TcTmException;
 import org.yamcs.tctm.ccsds.TransferFrameDecoder.CcsdsFrameType;
 import org.yamcs.time.Instant;
+import org.yamcs.time.TimeService;
 
 /**
  * Handles incoming TM frames by distributing them to different VirtualChannelHandlers
@@ -27,6 +29,7 @@ public class MasterChannelFrameHandler {
     DownlinkManagedParameters params;
     final ClcwStreamHelper clcwHelper;
     final FrameStreamHelper frameStreamHelper;
+    TimeService timeService;
 
     String yamcsInstance;
     Log log;
@@ -39,7 +42,7 @@ public class MasterChannelFrameHandler {
     public MasterChannelFrameHandler(String yamcsInstance, String linkName, YConfiguration config) {
         log = new Log(getClass(), yamcsInstance);
         log.setContext(linkName);
-
+        timeService = YamcsServer.getTimeService(yamcsInstance);
         frameType = config.getEnum("frameType", CcsdsFrameType.class);
 
         String clcwStreamName = config.getString("clcwStream", null);
@@ -104,6 +107,10 @@ public class MasterChannelFrameHandler {
         if (vch == null) {
             throw new TcTmException("No handler for vcId: " + vcid);
         }
+
+        if (vcid == 5)
+            System.out.println("Step_2 | ERT: " + frame.getEarthRceptionTime() + " | Time: " + Instant.get(timeService.getMissionTime()) + " | Time_raw: " + timeService.getMissionTime());
+
         vch.handle(frame);
     }
 
