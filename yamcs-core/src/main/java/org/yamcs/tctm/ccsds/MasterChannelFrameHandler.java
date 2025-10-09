@@ -108,9 +108,6 @@ public class MasterChannelFrameHandler {
             throw new TcTmException("No handler for vcId: " + vcid);
         }
 
-        if (vcid == 5)
-            System.out.println("Step_2 | ERT: " + frame.getEarthRceptionTime() + " | Time: " + Instant.get(timeService.getMissionTime()) + " | Time_raw: " + timeService.getMissionTime());
-
         vch.handle(frame);
     }
 
