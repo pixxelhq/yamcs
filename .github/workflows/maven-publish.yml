@@ -2,7 +2,7 @@ name: Maven Publish
 
 on:
   push:
-    branches: [ pixxel/5.10.x ]
+    branches: [ pixxel/5.10.x, fix/pixxel/5.10.x/latencyPatch ]
   
   pull_request:
 
