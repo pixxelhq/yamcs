@@ -7,7 +7,6 @@ import org.yamcs.YConfiguration;
 import org.yamcs.tctm.CcsdsPacket;
 import org.yamcs.tctm.CcsdsPacketPreprocessor;
 import org.yamcs.tctm.ccsds.time.CucTimeDecoder;
-import org.yamcs.time.Instant;
 import org.yamcs.utils.ByteArrayUtils;
 import org.yamcs.utils.TimeEncoding;
 
@@ -121,15 +120,23 @@ public class PusPacketPreprocessor extends CcsdsPacketPreprocessor {
             // if the CRC has failed, do not go further
             return null;
         }
+        int apidseqcount = ByteArrayUtils.decodeInt(packet, 0);
+        int apid = (apidseqcount >> 16) & 0x07FF;
+        int seq = (apidseqcount) & 0x3FFF;
+        checkSequence(apid, seq);
 
-        /*
-         * Commenting out the below code as it is not needed for PUS packets. The APID and sequence count are
-         * extracted from the CCSDS primary header, which is already done in the CcsdsPacket class.
-         */
-        // int apidseqcount = ByteArrayUtils.decodeInt(packet, 0);
-        // int apid = (apidseqcount >> 16) & 0x07FF;
-        // int seq = (apidseqcount) & 0x3FFF;
-        // checkSequence(apid, seq);
+        boolean secondaryHeaderFlag = CcsdsPacket.getSecondaryHeaderFlag(packet);
+
+        if (!secondaryHeaderFlag) {
+            // in PUS only time packets are allowed without secondary header and they should have apid = 0
+            if (apid == 0) {
+                processTimePacket(tmPacket);
+                return tmPacket;
+            }
+            eventProducer.sendWarning("Packet with apid=" + apid
+                    + " and without secondary header received, ignoring.");
+            return null;
+        }
 
         if (packet.length < 12) {
             eventProducer.sendWarning("Short packet received, length: " + packet.length
@@ -137,7 +144,9 @@ public class PusPacketPreprocessor extends CcsdsPacketPreprocessor {
             return null;
         }
 
-        extactAndSetTime(tmPacket);
+        tmPacket.setSequenceCount(apidseqcount);
+
+        setRealtimePacketTime(tmPacket, pktTimeOffset);
 
         if (log.isTraceEnabled()) {
             log.trace("Received packet length: {}, apid: {}, seqcount: {}, gentime: {}, status: {}", packet.length,
@@ -149,18 +158,14 @@ public class PusPacketPreprocessor extends CcsdsPacketPreprocessor {
         return tmPacket;
     }
 
-    private void extactAndSetTime(TmPacket tmPacket) {
+    private void processTimePacket(TmPacket tmPacket) {
         byte[] packet = tmPacket.getPacket();
-        if (!useLocalGenerationTime && timeEpoch == null || timeEpoch == TimeEpochs.NONE) {
-            long obt = timeDecoder.decodeRaw(packet, pktTimeOffset);
-            Instant ert = tmPacket.getEarthReceptionTime();
-            log.debug("Adding tco sample obt: {} , ert: {}", obt, ert);
-            tcoService.addSample(obt, ert);
-        }
+        boolean corrupted = false;
 
-        setRealtimePacketTime(tmPacket, pktTimeOffset);
+        setRealtimePacketTime(tmPacket, timePktTimeOffset);
 
         int apidseqcount = ByteBuffer.wrap(packet).getInt(0);
+        tmPacket.setInvalid(corrupted);
         tmPacket.setSequenceCount(apidseqcount);
     }
 }
