@@ -57,6 +57,7 @@ public class PusTmManager extends AbstractYamcsService implements StreamSubscrib
     public static int PUS_HEADER_LENGTH;
 
     public static int secondaryHeaderLength;
+    public static int timePacketSecondaryHeaderLength;
     public static int absoluteTimeLength;
     public static int destinationId;
 
@@ -105,6 +106,7 @@ public class PusTmManager extends AbstractYamcsService implements StreamSubscrib
 
         spec.addOption("streamMatrix", OptionType.LIST).withElementType(OptionType.MAP).withSpec(streamMatrixSpec);
         spec.addOption("secondaryHeaderLength", OptionType.INTEGER);
+        spec.addOption("timePacketSecondaryHeaderLength", OptionType.INTEGER);
         spec.addOption("spareOffsetForFractionTime", OptionType.INTEGER);
         spec.addOption("absoluteTimeLength", OptionType.INTEGER);
         spec.addOption("destinationId", OptionType.INTEGER);
@@ -138,6 +140,7 @@ public class PusTmManager extends AbstractYamcsService implements StreamSubscrib
         serviceConfig = config.getConfigOrEmpty("services");
         spareOffsetForFractionTime = config.getInt("spareOffsetForFractionTime", DEFAULT_SPARE_OFFSET);
         secondaryHeaderLength = config.getInt("secondaryHeaderLength", DEFAULT_SECONDARY_HEADER_LENGTH);
+        timePacketSecondaryHeaderLength = config.getInt("timePacketSecondaryHeaderLength", DEFAULT_SECONDARY_HEADER_LENGTH);
         absoluteTimeLength = config.getInt("absoluteTimeLength", DEFAULT_ABSOLUTE_TIME_LENGTH);
         destinationId = config.getInt("destinationId");
         PUS_HEADER_LENGTH = 7 + absoluteTimeLength;
@@ -230,10 +233,13 @@ public class PusTmManager extends AbstractYamcsService implements StreamSubscrib
         byte[] b = tmPacket.getPacket();
         ArrayList<TmPacket> pkts = new ArrayList<>();
         try {
-            pkts.addAll(
-                pusServices.get(PusTmCcsdsPacket.getMessageType(b))
-                            .extractPusModifiers(tmPacket)
-            );
+            if (PusTmCcsdsPacket.isTimePacket(tmPacket)) { pkts.add(tmPacket); }
+            else {
+                pkts.addAll(
+                    pusServices.get(PusTmCcsdsPacket.getMessageType(b))
+                                .extractPusModifiers(tmPacket)
+                );
+            }
         } catch (NullPointerException e) {
             log.error("Invalid CCSDS packet, Service Type: {}, SubService Type: {}, Packet: {}", PusTmCcsdsPacket.getMessageType(b), PusTmCcsdsPacket.getMessageSubType(b), StringConverter.arrayToHexString(b));
 

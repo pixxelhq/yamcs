@@ -3,6 +3,7 @@ package org.yamcs.tctm.pus.services.tm;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+import org.yamcs.TmPacket;
 import org.yamcs.tctm.CcsdsPacket;
 import org.yamcs.tctm.pus.PusTmManager;
 import org.yamcs.utils.ByteArrayUtils;
@@ -16,6 +17,10 @@ public class PusTmCcsdsPacket extends CcsdsPacket {
 
     public static int messageSubTypeSize = 2;
     public static int messageTypeSize = 2;
+
+    public static boolean isTimePacket(TmPacket tmPacket) {
+        return getAPID(tmPacket.getPacket()) == 0;
+    }
 
     public PusTmCcsdsPacket(byte[] packet) {
         super(packet);
@@ -55,6 +60,11 @@ public class PusTmCcsdsPacket extends CcsdsPacket {
     public byte[] getDataField() {
         byte[] b = bb.duplicate().array();
         return Arrays.copyOfRange(b, PusTmManager.secondaryHeaderLength + PusTmManager.PRIMARY_HEADER_LENGTH, b.length);
+    }
+
+    public byte[] getTimeDataField() {
+        byte[] b = bb.duplicate().array();
+        return Arrays.copyOfRange(b, PusTmManager.timePacketSecondaryHeaderLength + PusTmManager.PRIMARY_HEADER_LENGTH, b.length);
     }
 
     public byte[] getSpareField() {
