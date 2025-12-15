@@ -185,8 +185,8 @@ public class IamApi extends AbstractIamApi<Context> {
         if (user == null) {
             throw new NotFoundException();
         }
-        var sensitiveDetails = ctx.user.hasSystemPrivilege(SystemPrivilege.ControlAccess);
-        observer.complete(toUserInfo(user, sensitiveDetails, directory));
+        // Temporary fix
+        observer.complete(toUserInfo(user, true, directory));
     }
 
     @Override

@@ -1917,11 +1917,8 @@ public class V7Loader extends V7LoaderBase {
                         algoRef.addResolvedAction(t -> {
                             // duplicate algorithm to set references to arguments
                             algos.add(makeAlgoVerifier(spaceSystem, cmd, (CustomAlgorithm) t));
+                            cmdVerifier.setAlgorithm(algos.get(0));
                         });
-                        if (algos.isEmpty())
-                            throw new SpreadsheetLoadException(ctx,
-                                    "Cannot find sequence container '" + algoName + "' required for the verifier");
-                        cmdVerifier.setAlgorithm(algos.get(0));
                     } else {
                         throw new SpreadsheetLoadException(ctx,
                                 "Command verifier type '" + type + "' not implemented ");
