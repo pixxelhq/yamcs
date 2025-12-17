@@ -34,21 +34,6 @@ tr.success td.completion {
   color: #00c752;
 }
 
-tr.dispatched td.completion {
-  background-color: #fff8e6;
-  color: #ff9800;
-}
-
-tr.deleted td.completion {
-  background-color: #fff8e6;
-  color: red;
-}
-
-tr.timeout td.completion {
-  background-color: #fff8e6;
-  color: red;
-}
-
 tr.failed td.completion {
   background-color: #ffeef0;
   color: red;
