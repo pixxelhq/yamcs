@@ -254,12 +254,8 @@ public class CommandVerificationHandler implements CommandHistoryConsumer {
             log.error("Illegal state onVerifierFinished called with state: {}", state);
         }
         if (ta == TerminationAction.SUCCESS) {
-            if (returnPv.getEngValue().getStringValue().equals("DISPATCHED"))
-                cmdHistPublisher.publishAck(activeCommand.getCommandId(), CommandHistoryPublisher.CommandComplete_KEY,
-                        processor.getCurrentTime(), AckStatus.OK, failureReason, returnPv);
-            else 
-                cmdHistPublisher.publishAck(activeCommand.getCommandId(), CommandHistoryPublisher.CommandComplete_KEY,
-                        processor.getCurrentTime(), AckStatus.OK, null, returnPv);
+            cmdHistPublisher.publishAck(activeCommand.getCommandId(), CommandHistoryPublisher.CommandComplete_KEY,
+                    processor.getCurrentTime(), AckStatus.OK, null, returnPv);
             stop();
         } else if (ta == TerminationAction.FAIL) {
 

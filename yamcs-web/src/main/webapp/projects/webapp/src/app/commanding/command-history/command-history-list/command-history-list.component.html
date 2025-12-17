@@ -345,7 +345,7 @@
               class="completion"
               style="text-align: center; padding-left: 8px">
               @if (item.completed?.status === "OK") {
-                {{ item.completed?.returnValue?.stringValue }}
+                SUCCESS
               }
               @if (item.completed?.status === "NOK") {
                 <span [matTooltip]="item.completed?.message">{{ item.completed?.message }}</span>
@@ -448,9 +448,6 @@
             [class.expanded]="args.checked || rv.checked"
             [class.selected]="(selectedRecord$ | async) === row"
             [class.success]="row.completed?.status === 'OK'"
-            [class.dispatched]="row.completed?.status === 'OK' && row.completed?.returnValue?.stringValue === 'DISPATCHED'"
-            [class.timeout]="row.completed?.status === 'TIMEOUT'"
-            [class.deleted]="row.completed?.status === 'DELETED'"
             [class.failed]="row.completed?.status === 'NOK'"></tr>
           <tr
             mat-row
