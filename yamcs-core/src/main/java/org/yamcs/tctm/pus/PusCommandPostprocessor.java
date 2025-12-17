@@ -66,9 +66,6 @@ public class PusCommandPostprocessor implements CommandPostprocessor {
                 ZoneId.of("GMT")
             );
 
-            /*
-             * ToDo: Timetag should have been published as long (i.e TIMESTAMP) instead of string. How did I mess this up? 
-             */
             commandHistoryListener.publish(
                 pc.getCommandId(),
                 CommandHistoryPublisher.Timetag_KEY,

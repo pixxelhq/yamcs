@@ -29,8 +29,6 @@ public class ServiceOne implements PusService {
     public static int failureCodeSize;
     public static int failureDataSize;
 
-    public static final String CMDHIST_TABLE = "cmdhist";
-
     public ServiceOne(String yamcsInstance, YConfiguration config) {
         this.yamcsInstance = yamcsInstance;
         serviceOneConfig = config;

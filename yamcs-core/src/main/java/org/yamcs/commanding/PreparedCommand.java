@@ -179,17 +179,6 @@ public class PreparedCommand {
         return null;
     }
 
-    public Integer getUnsignedIntegerAttribute(String attrname) {
-        CommandHistoryAttribute a = getAttribute(attrname);
-        if (a != null) {
-            Value v = ValueUtility.fromGpb(a.getValue());
-            if (v.getType() == Type.UINT32) {
-                return v.getUint32Value();
-            }
-        }
-        return null;
-    }
-
     public String getStringAttribute(String attrname) {
         CommandHistoryAttribute a = getAttribute(attrname);
         if (a != null) {
@@ -357,7 +346,7 @@ public class PreparedCommand {
         return pc;
     }
 
-    public static Argument findArgument(MetaCommand mc, String name) {
+    private static Argument findArgument(MetaCommand mc, String name) {
         Argument arg = mc.getArgument(name);
         if (arg == null && mc.getBaseMetaCommand() != null) {
             arg = findArgument(mc.getBaseMetaCommand(), name);

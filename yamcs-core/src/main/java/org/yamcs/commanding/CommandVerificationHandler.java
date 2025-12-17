@@ -21,7 +21,6 @@ import org.yamcs.parameter.ParameterValue;
 import org.yamcs.parameter.Value;
 import org.yamcs.protobuf.Commanding.CommandId;
 import org.yamcs.protobuf.Commanding.VerifierConfig;
-import org.yamcs.tctm.pus.acks.TimetagCommandHistoryManager;
 import org.yamcs.utils.StringConverter;
 import org.yamcs.xtce.Argument;
 import org.yamcs.xtce.CheckWindow;
@@ -29,8 +28,6 @@ import org.yamcs.xtce.CheckWindow.TimeWindowIsRelativeToType;
 import org.yamcs.xtce.CommandVerifier;
 import org.yamcs.xtce.CommandVerifier.TerminationAction;
 import org.yamcs.xtce.MetaCommand;
-import org.yamcs.yarch.Stream;
-import org.yamcs.yarch.YarchDatabase;
 
 /**
  * This class implements the (post transmission) command verification.
@@ -47,7 +44,6 @@ public class CommandVerificationHandler implements CommandHistoryConsumer {
     final ScheduledThreadPoolExecutor timer;
     final Map<Argument, ArgumentValue> cmdArguments;
     final CommandingManager commandingManager;
-    String yamcsInstance;
 
     private List<Verifier> verifiers = Collections.synchronizedList(new ArrayList<>());
     private final Log log;
@@ -56,7 +52,6 @@ public class CommandVerificationHandler implements CommandHistoryConsumer {
     public CommandVerificationHandler(CommandingManager commandingManager, ActiveCommand pc) {
         this.commandingManager = commandingManager;
         this.processor = commandingManager.getProcessor();
-        this.yamcsInstance = processor.getInstance();
         this.activeCommand = pc;
         this.timer = processor.getTimer();
         log = new Log(this.getClass(), processor.getInstance());
@@ -265,11 +260,6 @@ public class CommandVerificationHandler implements CommandHistoryConsumer {
             else 
                 cmdHistPublisher.publishAck(activeCommand.getCommandId(), CommandHistoryPublisher.CommandComplete_KEY,
                         processor.getCurrentTime(), AckStatus.OK, null, returnPv);
-
-            // Needed to update command history of previously sent Timetag commands
-            Stream cmdHistStream = YarchDatabase.getInstance(yamcsInstance).getStream(TimetagCommandHistoryManager.CMDHIST_REALTIME_TIMETAG_STREAM);                            
-            cmdHistStream.emitTuple(activeCommand.getPreparedCommand().toTuple());
-
             stop();
         } else if (ta == TerminationAction.FAIL) {
 
