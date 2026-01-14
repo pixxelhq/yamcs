@@ -350,10 +350,11 @@
 	</build>
 
 	<distributionManagement>
-		<snapshotRepository>
-			<id>central</id>
-			<url>https://central.sonatype.com/repository/maven-snapshots/</url>
-		</snapshotRepository>
+		<repository>
+			<id>github</id>
+			<name>GitHub PixxelHQ Apache Maven Packages</name>
+			<url>https://maven.pkg.github.com/pixxelhq/yamcs</url>
+		</repository>
 	</distributionManagement>
 
 	<profiles>
