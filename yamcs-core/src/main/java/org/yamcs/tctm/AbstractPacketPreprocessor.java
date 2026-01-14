@@ -11,6 +11,7 @@ import org.yamcs.events.EventProducer;
 import org.yamcs.events.EventProducerFactory;
 import org.yamcs.logging.Log;
 import org.yamcs.tctm.ccsds.error.CrcCciitCalculator;
+import org.yamcs.tctm.ccsds.error.CrcMcrf4xxCalculator;
 import org.yamcs.tctm.ccsds.time.CucTimeDecoder;
 import org.yamcs.time.FixedSizeTimeDecoder;
 import org.yamcs.time.Float64TimeDecoder;
@@ -246,6 +247,12 @@ public abstract class AbstractPacketPreprocessor implements PacketPreprocessor {
             return new Iso16CrcCalculator();
         } else if ("NONE".equalsIgnoreCase(type)) {
             return null;
+        } else if ("CRC-16-MCRF4XX".equalsIgnoreCase(type)) {
+            if (crcConf == null) {
+                return new CrcMcrf4xxCalculator();
+            } else {
+                return new CrcMcrf4xxCalculator(crcConf);
+            }
         } else {
             throw new ConfigurationException(
                     "Unknown errorDetectionWord type '" + type
