@@ -240,19 +240,21 @@ public abstract class AbstractPacketPreprocessor implements PacketPreprocessor {
         } else if ("CRC-16-CCIIT".equalsIgnoreCase(type)) {
             if (crcConf == null) {
                 return new CrcCciitCalculator();
-            } else {
-                return new CrcCciitCalculator(crcConf);
             }
+            return new CrcCciitCalculator(crcConf);
+
         } else if ("ISO-16".equalsIgnoreCase(type)) {
             return new Iso16CrcCalculator();
+
         } else if ("NONE".equalsIgnoreCase(type)) {
             return null;
+
         } else if ("CRC-16-MCRF4XX".equalsIgnoreCase(type)) {
             if (crcConf == null) {
                 return new CrcMcrf4xxCalculator();
-            } else {
-                return new CrcMcrf4xxCalculator(crcConf);
             }
+            return new CrcMcrf4xxCalculator(crcConf);
+
         } else {
             throw new ConfigurationException(
                     "Unknown errorDetectionWord type '" + type
