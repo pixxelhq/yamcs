@@ -1,31 +1,32 @@
 package org.yamcs.tctm.ccsds.error;
 
-import java.nio.ByteBuffer;
-
 import org.yamcs.YConfiguration;
 import org.yamcs.tctm.ErrorDetectionWordCalculator;
 
 public class CrcMcrf4xxCalculator implements ErrorDetectionWordCalculator {
     final int initialValue;
-    final int polynomial = 0x8408;
 
-    private final Crc16Mcrf4xxCalculator crc = new Crc16Mcrf4xxCalculator(polynomial);
+    private final Crc16McrfWord crc;
 
     public CrcMcrf4xxCalculator() {
         initialValue = 0xFFFF;
+        crc = new Crc16McrfWord(initialValue);
     }
 
     public CrcMcrf4xxCalculator(YConfiguration c) {
         initialValue = c.getInt("initialValue", 0xFFFF);
+        crc = new Crc16McrfWord(initialValue);
     }
 
     @Override
     public int compute(byte[] data, int offset, int length) {
-        return crc.compute(data, offset, length, initialValue);
-    }
+        crc.start_checksum();
 
-    public int compute(ByteBuffer data, int offset, int length) {
-        return crc.compute(data, offset, length, initialValue);
+        for (int i = offset; i < offset + length; i++) {
+            crc.update_checksum(data[i]);
+        }
+
+        return crc.getCurCrcValue();
     }
 
     @Override
