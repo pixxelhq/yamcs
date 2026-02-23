@@ -11,6 +11,9 @@ import org.yamcs.ProcessorConfig;
 import org.yamcs.YConfiguration;
 import org.yamcs.commanding.ArgumentValue;
 import org.yamcs.mdb.MetaCommandProcessor.CommandBuildResult;
+import org.yamcs.parameter.AggregateValue;
+import org.yamcs.parameter.ArrayValue;
+import org.yamcs.parameter.Value;
 import org.yamcs.utils.StringConverter;
 import org.yamcs.xtce.Argument;
 import org.yamcs.xtce.MetaCommand;
@@ -31,9 +34,14 @@ public class PusService3Test {
      *
      * Packet layout:
      *   funcReportingDefID (uint16) = 5        → 0005
-     *   N1                 (uint16) = 1        → 0001
+     *   N1                 (uint16) = 2        → 0002
      *   Group 1:
      *     appProcessID (uint16) = 10           → 000A
+     *     N2           (uint16) = 2            → 0002
+     *     Def 1: structType=1(0001), structID=100(0064), periodicStatus=1(0001), interval=1000(000003E8)
+     *     Def 2: structType=2(0002), structID=200(00C8), periodicStatus=0(0000), interval=2000(000007D0)
+     *   Group 2:
+     *     appProcessID (uint16) = 20           → 0014
      *     N2           (uint16) = 2            → 0002
      *     Def 1: structType=1(0001), structID=100(0064), periodicStatus=1(0001), interval=1000(000003E8)
      *     Def 2: structType=2(0002), structID=200(00C8), periodicStatus=0(0000), interval=2000(000007D0)
@@ -54,19 +62,35 @@ public class PusService3Test {
         def2.put("periodicStatus", 0);
         def2.put("interval",       2000);
 
-        Map<String, Object> group = new LinkedHashMap<>();
-        group.put("appProcessID", 10);
-        group.put("definitions",  Arrays.asList(def1, def2));
+        Map<String, Object> def3 = new LinkedHashMap<>();
+        def3.put("structType",     1);
+        def3.put("structID",       100);
+        def3.put("periodicStatus", 1);
+        def3.put("interval",       1000);
+
+        Map<String, Object> def4 = new LinkedHashMap<>();
+        def4.put("structType",     2);
+        def4.put("structID",       200);
+        def4.put("periodicStatus", 0);
+        def4.put("interval",       2000);
+
+        Map<String, Object> group1 = new LinkedHashMap<>();
+        group1.put("appProcessID", 10);
+        group1.put("definitions",  Arrays.asList(def1, def2));
+
+        Map<String, Object> group2 = new LinkedHashMap<>();
+        group2.put("appProcessID", 20);
+        group2.put("definitions",  Arrays.asList(def3, def4));
 
         Map<String, Object> args = new HashMap<>();
         args.put("funcReportingDefID", 5);
-        args.put("groups", List.of(group));
+        args.put("groups", List.of(group1, group2));
 
         CommandBuildResult result = processor.buildCommand(mc, args, 0);
         printResult("TC[3,38] CreateFuncReportingDef", result);
 
         // funcReportingDefID=5   → 0005
-        // N1=1                   → 0001
+        // N1=2                   → 0002
         // appProcessID=10        → 000A
         // N2=2                   → 0002
         // structType=1           → 0001
@@ -77,7 +101,17 @@ public class PusService3Test {
         // structID=200           → 00C8
         // periodicStatus=0       → 0000
         // interval=2000          → 000007D0
-        assertEquals("00050001000A0002000100640001000003E8000200C80000000007D0",
+        // appProcessID=20        → 0014
+        // N2=2                   → 0002
+        // structType=1           → 0001
+        // structID=100           → 0064
+        // periodicStatus=1       → 0001
+        // interval=1000          → 000003E8
+        // structType=2           → 0002
+        // structID=200           → 00C8
+        // periodicStatus=0       → 0000
+        // interval=2000          → 000007D0
+        assertEquals("00050002000A0002000100640001000003E8000200C80000000007D000140002000100640001000003E8000200C80000000007D0",
                 StringConverter.arrayToHexString(result.getCmdPacket()));
     }
 
@@ -186,9 +220,47 @@ public class PusService3Test {
         System.out.println("  Packet (hex): " + StringConverter.arrayToHexString(result.getCmdPacket()));
         System.out.println("  Resolved args:");
         Map<Argument, ArgumentValue> argMap = result.getArgs();
-        argMap.forEach((arg, av) ->
-            System.out.println("    " + av.toString())
-        );
+        argMap.forEach((arg, av) -> {
+            System.out.println("    " + arg.getName() + ":");
+            if (av.getRawValue() != null) {
+                System.out.print("      rawValue: ");
+                printValue(av.getRawValue(), "      ");
+                System.out.println();
+            }
+            if (av.getEngValue() != null) {
+                System.out.print("      engValue: ");
+                printValue(av.getEngValue(), "      ");
+                System.out.println();
+            }
+        });
         System.out.println();
+    }
+
+    private static void printValue(Value v, String indent) {
+        if (v instanceof AggregateValue) {
+            AggregateValue av = (AggregateValue) v;
+            System.out.print("{");
+            for (int i = 0; i < av.numMembers(); i++) {
+                System.out.print("\n" + indent + "  " + av.getMemberName(i) + ": ");
+                printValue(av.getMemberValue(i), indent + "  ");
+                if (i < av.numMembers() - 1) {
+                    System.out.print(",");
+                }
+            }
+            System.out.print("\n" + indent + "}");
+        } else if (v instanceof ArrayValue) {
+            ArrayValue av = (ArrayValue) v;
+            System.out.print("[");
+            for (int i = 0; i < av.flatLength(); i++) {
+                System.out.print("\n" + indent + "  ");
+                printValue(av.getElementValue(i), indent + "  ");
+                if (i < av.flatLength() - 1) {
+                    System.out.print(",");
+                }
+            }
+            System.out.print("\n" + indent + "]");
+        } else {
+            System.out.print(v.toString());
+        }
     }
 }
