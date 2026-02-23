@@ -118,3 +118,8 @@ ArrayInArrayArgCommandTest:
     - type: xtce
       args:
           file: "src/test/resources/xtce/array-in-array-arg.xml"
+
+PusService3Config:
+    - type: xtce
+      args:
+          file: "src/test/resources/xtce/PusService3.xml"

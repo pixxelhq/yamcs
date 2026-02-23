@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    name="PUS3"
+    shortDescription="PUS Service 3 – Housekeeping commands"
+    xsi:schemaLocation="http://www.omg.org/spec/XTCE/20180204 https://www.omg.org/spec/XTCE/20180204/SpaceSystem.xsd">
+
+    <CommandMetaData>
+        <ArgumentTypeSet>
+
+            <!-- ── Base scalar types ─────────────────────────────────────── -->
+
+            <IntegerArgumentType name="uint16">
+                <IntegerDataEncoding sizeInBits="16" />
+            </IntegerArgumentType>
+
+            <IntegerArgumentType name="uint32">
+                <IntegerDataEncoding sizeInBits="32" />
+            </IntegerArgumentType>
+
+            <!-- ── TC[3,38] / TC[3,39] / TC[3,40] shared: flat ID list ──── -->
+            <!--   Array of uint16 whose size is driven by a sibling arg "N". -->
+            <!--   Reused by both ReportDefinitions (3,40) and               -->
+            <!--   DeleteFuncReportingDefs (3,39).                            -->
+
+            <ArrayArgumentType name="idList_type" arrayTypeRef="uint16">
+                <DimensionList>
+                    <Dimension>
+                        <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+                        <EndingIndex>
+                            <DynamicValue>
+                                <ArgumentInstanceRef argumentRef="N" />
+                                <LinearAdjustment intercept="-1" />
+                            </DynamicValue>
+                        </EndingIndex>
+                    </Dimension>
+                </DimensionList>
+            </ArrayArgumentType>
+
+            <!-- ── TC[3,38] CreateFuncReportingDef ───────────────────────── -->
+
+            <!-- One inner definition: structType + structID + periodicStatus + interval -->
+            <AggregateArgumentType name="createInnerDef_type">
+                <MemberList>
+                    <Member name="structType"      typeRef="uint16" />
+                    <Member name="structID"        typeRef="uint16" />
+                    <Member name="periodicStatus"  typeRef="uint16" />
+                    <Member name="interval"        typeRef="uint32" />
+                </MemberList>
+            </AggregateArgumentType>
+
+            <!-- Array of inner definitions; size driven by aggregate member "N2" -->
+            <ArrayArgumentType name="createInnerDefList_type" arrayTypeRef="createInnerDef_type">
+                <DimensionList>
+                    <Dimension>
+                        <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+                        <EndingIndex>
+                            <DynamicValue>
+                                <ArgumentInstanceRef argumentRef="N2" />
+                                <LinearAdjustment intercept="-1" />
+                            </DynamicValue>
+                        </EndingIndex>
+                    </Dimension>
+                </DimensionList>
+            </ArrayArgumentType>
+
+            <!-- One application-process group: appProcessID + N2 + definitions[] -->
+            <AggregateArgumentType name="createGroup_type">
+                <MemberList>
+                    <Member name="appProcessID" typeRef="uint16" />
+                    <Member name="N2"           typeRef="uint16" />
+                    <Member name="definitions"  typeRef="createInnerDefList_type" />
+                </MemberList>
+            </AggregateArgumentType>
+
+            <!-- Array of groups; size driven by top-level argument "N1" -->
+            <ArrayArgumentType name="createGroupList_type" arrayTypeRef="createGroup_type">
+                <DimensionList>
+                    <Dimension>
+                        <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+                        <EndingIndex>
+                            <DynamicValue>
+                                <ArgumentInstanceRef argumentRef="N1" />
+                                <LinearAdjustment intercept="-1" />
+                            </DynamicValue>
+                        </EndingIndex>
+                    </Dimension>
+                </DimensionList>
+            </ArrayArgumentType>
+
+            <!-- ── TC[3,42] AddDefinitions ───────────────────────────────── -->
+
+            <!-- One inner definition: defID + structType + structID + status + interval -->
+            <AggregateArgumentType name="addInnerDef_type">
+                <MemberList>
+                    <Member name="defID"       typeRef="uint16" />
+                    <Member name="structType"  typeRef="uint16" />
+                    <Member name="structID"    typeRef="uint16" />
+                    <Member name="status"      typeRef="uint16" />
+                    <Member name="interval"    typeRef="uint32" />
+                </MemberList>
+            </AggregateArgumentType>
+
+            <!-- Array of inner definitions; size driven by aggregate member "N2" -->
+            <ArrayArgumentType name="addInnerDefList_type" arrayTypeRef="addInnerDef_type">
+                <DimensionList>
+                    <Dimension>
+                        <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+                        <EndingIndex>
+                            <DynamicValue>
+                                <ArgumentInstanceRef argumentRef="N2" />
+                                <LinearAdjustment intercept="-1" />
+                            </DynamicValue>
+                        </EndingIndex>
+                    </Dimension>
+                </DimensionList>
+            </ArrayArgumentType>
+
+            <!-- One application-process group: appProcessID + N2 + definitions[] -->
+            <AggregateArgumentType name="addGroup_type">
+                <MemberList>
+                    <Member name="appProcessID" typeRef="uint16" />
+                    <Member name="N2"           typeRef="uint16" />
+                    <Member name="definitions"  typeRef="addInnerDefList_type" />
+                </MemberList>
+            </AggregateArgumentType>
+
+            <!-- Array of groups; size driven by top-level argument "N1" -->
+            <ArrayArgumentType name="addGroupList_type" arrayTypeRef="addGroup_type">
+                <DimensionList>
+                    <Dimension>
+                        <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+                        <EndingIndex>
+                            <DynamicValue>
+                                <ArgumentInstanceRef argumentRef="N1" />
+                                <LinearAdjustment intercept="-1" />
+                            </DynamicValue>
+                        </EndingIndex>
+                    </Dimension>
+                </DimensionList>
+            </ArrayArgumentType>
+
+        </ArgumentTypeSet>
+
+        <MetaCommandSet>
+
+            <!--
+                TC[3,38] – Create a parameter functional reporting definition
+                Application data layout (Figure 8-46):
+                  funcReportingDefID (uint16)
+                  N1                 (uint16)
+                  repeated N1 times:
+                    appProcessID   (uint16)
+                    N2             (uint16)
+                    repeated N2 times:
+                      structType      (uint16 / enumerated)
+                      structID        (uint16)
+                      periodicStatus  (uint16 / enumerated)
+                      interval        (uint32)
+            -->
+            <MetaCommand name="CreateFuncReportingDef">
+                <ArgumentList>
+                    <Argument name="funcReportingDefID" argumentTypeRef="uint16" />
+                    <Argument name="N1"                 argumentTypeRef="uint16" />
+                    <Argument name="groups"             argumentTypeRef="createGroupList_type" />
+                </ArgumentList>
+                <CommandContainer name="CreateFuncReportingDef_container">
+                    <EntryList>
+                        <ArgumentRefEntry argumentRef="funcReportingDefID" />
+                        <ArgumentRefEntry argumentRef="N1" />
+                        <ArgumentRefEntry argumentRef="groups" />
+                    </EntryList>
+                </CommandContainer>
+            </MetaCommand>
+
+            <!--
+                TC[3,39] – Delete parameter functional reporting definitions
+                Application data layout (Figure 8-47):
+                  N    (uint16)
+                  repeated N times:
+                    funcReportingDefID  (uint16 / enumerated)
+            -->
+            <MetaCommand name="DeleteFuncReportingDefs">
+                <ArgumentList>
+                    <Argument name="N"   argumentTypeRef="uint16" />
+                    <Argument name="IDs" argumentTypeRef="idList_type" />
+                </ArgumentList>
+                <CommandContainer name="DeleteFuncReportingDefs_container">
+                    <EntryList>
+                        <ArgumentRefEntry argumentRef="N" />
+                        <ArgumentRefEntry argumentRef="IDs" />
+                    </EntryList>
+                </CommandContainer>
+            </MetaCommand>
+
+            <!--
+                TC[3,40] – Report housekeeping parameter report structures
+                Application data layout:
+                  N    (uint16)
+                  repeated N times:
+                    SID  (uint16)
+            -->
+            <MetaCommand name="ReportDefinitions">
+                <ArgumentList>
+                    <Argument name="N"   argumentTypeRef="uint16" />
+                    <Argument name="IDs" argumentTypeRef="idList_type" />
+                </ArgumentList>
+                <CommandContainer name="ReportDefinitions_container">
+                    <EntryList>
+                        <ArgumentRefEntry argumentRef="N" />
+                        <ArgumentRefEntry argumentRef="IDs" />
+                    </EntryList>
+                </CommandContainer>
+            </MetaCommand>
+
+            <!--
+                TC[3,42] – Add definitions to an existing housekeeping report structure
+                Application data layout:
+                  N1   (uint16)
+                  repeated N1 times:
+                    appProcessID  (uint16)
+                    N2            (uint16)
+                    repeated N2 times:
+                      defID       (uint16)
+                      structType  (uint16)
+                      structID    (uint16)
+                      status      (uint16)
+                      interval    (uint32)
+            -->
+            <MetaCommand name="AddDefinitions">
+                <ArgumentList>
+                    <Argument name="N1"     argumentTypeRef="uint16" />
+                    <Argument name="groups" argumentTypeRef="addGroupList_type" />
+                </ArgumentList>
+                <CommandContainer name="AddDefinitions_container">
+                    <EntryList>
+                        <ArgumentRefEntry argumentRef="N1" />
+                        <ArgumentRefEntry argumentRef="groups" />
+                    </EntryList>
+                </CommandContainer>
+            </MetaCommand>
+
+        </MetaCommandSet>
+    </CommandMetaData>
+</SpaceSystem>
