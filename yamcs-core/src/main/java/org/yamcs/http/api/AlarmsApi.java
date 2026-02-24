@@ -11,6 +11,7 @@ import static org.yamcs.alarms.AlarmStreamer.CNAME_TRIGGER_TIME;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
@@ -21,6 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.yamcs.Processor;
 import org.yamcs.StandardTupleDefinitions;
 import org.yamcs.YamcsServerInstance;
+import org.yamcs.alarms.AbstractAlarmMirrorServer;
 import org.yamcs.alarms.AbstractAlarmServer;
 import org.yamcs.alarms.ActiveAlarm;
 import org.yamcs.alarms.AlarmListener;
@@ -41,6 +43,7 @@ import org.yamcs.http.InternalServerErrorException;
 import org.yamcs.http.NotFoundException;
 import org.yamcs.http.api.XtceToGpbAssembler.DetailLevel;
 import org.yamcs.http.audit.AuditLog;
+import org.yamcs.logging.Log;
 import org.yamcs.mdb.Mdb;
 import org.yamcs.mdb.MdbFactory;
 import org.yamcs.parameter.ParameterValue;
@@ -86,6 +89,7 @@ import com.google.protobuf.Timestamp;
 
 public class AlarmsApi extends AbstractAlarmsApi<Context> {
 
+    private static final Log log = new Log(AlarmsApi.class);
     private static ScheduledThreadPoolExecutor timer = new ScheduledThreadPoolExecutor(1);
 
     private static final AlarmSeverity[] PARAM_ALARM_SEVERITY = new AlarmSeverity[20];
@@ -186,8 +190,12 @@ public class AlarmsApi extends AbstractAlarmsApi<Context> {
 
         var responseb = ListAlarmsResponse.newBuilder();
         // Add 1 to the limit, to detect need for continuation token
-        String q = "MERGE (" + sqlbParam.toString() + "), (" + sqlbEvent.toString() + ") USING " + CNAME_TRIGGER_TIME
-                + " ORDER DESC LIMIT " + pos + "," + (limit + 1L);
+        String q = "MERGE (" + sqlbParam.toString() + "), (" + sqlbEvent.toString() + ") USING " + CNAME_TRIGGER_TIME;
+        if (desc) {
+            q += " ORDER DESC LIMIT " + pos + "," + (limit + 1L);
+        } else {
+            q += " ORDER ASC LIMIT " + pos + "," + (limit + 1L);
+        }
 
         List<Object> sqlArgs = new ArrayList<>(sqlbParam.getQueryArguments());
         sqlArgs.addAll(sqlbEvent.getQueryArguments());
@@ -499,47 +507,55 @@ public class AlarmsApi extends AbstractAlarmsApi<Context> {
             alarmServers.add(alarmMirrorService.getParameterServer());
             alarmServers.add(alarmMirrorService.getEventServer());
         }
-        boolean sendDetail = true;
 
-        AlarmListener listener = new AlarmListener() {
-
-            @Override
-            public void notifyUpdate(org.yamcs.alarms.AlarmNotificationType notificationType, ActiveAlarm activeAlarm) {
-                if (includePending || !activeAlarm.isPending()) {
-                    AlarmNotificationType type = protoNotificationType.get(notificationType);
-                    AlarmData alarmData = toAlarmData(type, activeAlarm, false, sendDetail);
-                    observer.next(alarmData);
-                }
-            }
-
-            @Override
-            public void notifySeverityIncrease(ActiveAlarm activeAlarm) {
-                if (includePending || !activeAlarm.isPending()) {
-                    AlarmData alarmData = toAlarmData(AlarmNotificationType.SEVERITY_INCREASED, activeAlarm, false,
-                            sendDetail);
-                    observer.next(alarmData);
-                }
-            }
-
-            @Override
-            public void notifyValueUpdate(ActiveAlarm activeAlarm) {
-                if (includePending || !activeAlarm.isPending()) {
-                    AlarmData alarmData = toAlarmData(AlarmNotificationType.VALUE_UPDATED, activeAlarm, false,
-                            sendDetail);
-                    observer.next(alarmData);
-                }
-            }
-        };
+        var alarmListeners = new HashMap<AbstractAlarmServer, AlarmListener>();
 
         observer.setCancelHandler(() -> {
-            alarmServers.forEach(alarmServer -> alarmServer.removeAlarmListener(listener));
+            alarmListeners.forEach((server, listener) -> {
+                server.removeAlarmListener(listener);
+            });
         });
         for (AbstractAlarmServer<?, ?> alarmServer : alarmServers) {
+            var readonly = alarmServer instanceof AbstractAlarmMirrorServer;
+
+            var alarmListener = new AlarmListener() {
+
+                @Override
+                public void notifyUpdate(org.yamcs.alarms.AlarmNotificationType notificationType,
+                        ActiveAlarm activeAlarm) {
+                    if (includePending || !activeAlarm.isPending()) {
+                        AlarmNotificationType type = protoNotificationType.get(notificationType);
+                        AlarmData alarmData = toAlarmData(type, activeAlarm, readonly, true);
+                        observer.next(alarmData);
+                    }
+                }
+
+                @Override
+                public void notifySeverityIncrease(ActiveAlarm activeAlarm) {
+                    if (includePending || !activeAlarm.isPending()) {
+                        AlarmData alarmData = toAlarmData(AlarmNotificationType.SEVERITY_INCREASED, activeAlarm,
+                                readonly, true);
+                        observer.next(alarmData);
+                    }
+                }
+
+                @Override
+                public void notifyValueUpdate(ActiveAlarm activeAlarm) {
+                    if (includePending || !activeAlarm.isPending()) {
+                        AlarmData alarmData = toAlarmData(AlarmNotificationType.VALUE_UPDATED, activeAlarm, readonly,
+                                true);
+                        observer.next(alarmData);
+                    }
+                }
+            };
+
             for (ActiveAlarm<?> activeAlarm : alarmServer.getActiveAlarms().values()) {
-                AlarmData alarmData = toAlarmData(AlarmNotificationType.ACTIVE, activeAlarm, false, sendDetail);
+                AlarmData alarmData = toAlarmData(AlarmNotificationType.ACTIVE, activeAlarm, readonly, true);
                 observer.next(alarmData);
             }
-            alarmServer.addAlarmListener(listener);
+
+            alarmListeners.put(alarmServer, alarmListener);
+            alarmServer.addAlarmListener(alarmListener);
         }
     }
 
@@ -726,9 +742,7 @@ public class AlarmsApi extends AbstractAlarmsApi<Context> {
         alarmb.setViolations(activeAlarm.getViolations());
         alarmb.setCount(activeAlarm.getValueCount());
         alarmb.setSeverity(getAlarmSeverity(activeAlarm));
-        if (activeAlarm.isPending()) {
-            alarmb.setPending(true);
-        }
+        alarmb.setPending(activeAlarm.isPending());
 
         if (activeAlarm.getMostSevereValue() instanceof ParameterValue) {
             alarmb.setType(AlarmType.PARAMETER);
@@ -861,7 +875,9 @@ public class AlarmsApi extends AbstractAlarmsApi<Context> {
         String paraFqn = (String) tuple.getColumn(StandardTupleDefinitions.PARAMETER_COLUMN);
 
         NamedObjectId id = NamedObjectId.newBuilder().setName(paraFqn).build();
-        alarmb.setTriggerValue(pval.toGpb(id));
+        if (pval != null) { // Should not happen, but has been seen in older versions of Yamcs
+            alarmb.setTriggerValue(pval.toGpb(id));
+        }
 
         if (tuple.hasColumn(ParameterAlarmStreamer.CNAME_SEVERITY_INCREASED)) {
             pval = (ParameterValue) tuple.getColumn(ParameterAlarmStreamer.CNAME_SEVERITY_INCREASED);
@@ -905,25 +921,28 @@ public class AlarmsApi extends AbstractAlarmsApi<Context> {
             alarmb.setViolations(violationCount);
         }
 
+        var triggerTime = tuple.getTimestampColumn(ParameterAlarmStreamer.CNAME_TRIGGER_TIME);
+        alarmb.setTriggerTime(TimeEncoding.toProtobufTimestamp(triggerTime));
+
         if (tuple.hasColumn(StandardTupleDefinitions.PARAMETER_COLUMN)) {
             String paraFqn = (String) tuple.getColumn(StandardTupleDefinitions.PARAMETER_COLUMN);
 
             alarmb.setType(AlarmType.PARAMETER);
-            ParameterValue pval = (ParameterValue) tuple.getColumn(ParameterAlarmStreamer.CNAME_TRIGGER);
             alarmb.setId(NamedObjectId.newBuilder().setName(paraFqn).build());
-            alarmb.setTriggerTime(TimeEncoding.toProtobufTimestamp(pval.getGenerationTime()));
 
+            ParameterValue pval = (ParameterValue) tuple.getColumn(ParameterAlarmStreamer.CNAME_TRIGGER);
             if (tuple.hasColumn(ParameterAlarmStreamer.CNAME_SEVERITY_INCREASED)) {
                 pval = (ParameterValue) tuple.getColumn(ParameterAlarmStreamer.CNAME_SEVERITY_INCREASED);
             }
-            alarmb.setSeverity(AlarmsApi.getParameterAlarmSeverity(pval.getMonitoringResult()));
+            if (pval != null) { // Should not happen, but has been seen in older versions of Yamcs
+                alarmb.setSeverity(AlarmsApi.getParameterAlarmSeverity(pval.getMonitoringResult()));
+            }
 
             ParameterAlarmData parameterAlarmData = tupleToParameterAlarmData(tuple);
             alarmb.setParameterDetail(parameterAlarmData);
         } else {
             alarmb.setType(AlarmType.EVENT);
             Db.Event ev = (Db.Event) tuple.getColumn(EventAlarmStreamer.CNAME_TRIGGER);
-            alarmb.setTriggerTime(TimeEncoding.toProtobufTimestamp(ev.getGenerationTime()));
             alarmb.setId(AlarmsApi.getAlarmId(ev));
 
             if (tuple.hasColumn(EventAlarmStreamer.CNAME_SEVERITY_INCREASED)) {

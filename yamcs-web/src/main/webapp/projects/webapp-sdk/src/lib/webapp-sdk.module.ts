@@ -14,7 +14,6 @@ import { MatListModule } from '@angular/material/list';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatPaginatorModule } from '@angular/material/paginator';
 import { MatSidenavModule } from '@angular/material/sidenav';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
@@ -25,6 +24,7 @@ import { RouterModule } from '@angular/router';
 import { YaPrintZoneHide } from '../lib/print/print-zone-hide.directive';
 import { YaPrintZoneShow } from '../lib/print/print-zone-show.directive';
 import { YaActionLogSummary } from './components/action-log-summary/action-log-summary.component';
+import { YaAlarmLevel } from './components/alarm-level/alarm-level.component';
 import { YaAttrDivider } from './components/attr-list/attr-divider.component';
 import { YaAttrLabel } from './components/attr-list/attr-label.directive';
 import { YaAttrList } from './components/attr-list/attr-list.component';
@@ -45,13 +45,14 @@ import { YaDownloadMenuItem } from './components/download-menu-item/download-men
 import { YaDurationInput } from './components/duration-input/duration-input.component';
 import { YaEmptyMessage } from './components/empty-message/empty-message.component';
 import { YaErrors } from './components/errors/errors.component';
-import { YaExpirable } from './components/expirable/expirable.component';
 import { YaFieldDivider } from './components/field-divider/field-divider.component';
 import { YaFieldLabel } from './components/field/field-label.directive';
 import { YaField } from './components/field/field.component';
 import { YaFilterBar } from './components/filter-bar/filter-bar.component';
 import { YaFilterInput } from './components/filter/filter-input.component';
 import { YaFilterTextarea } from './components/filter/filter-textarea.component';
+import { YaFormContent } from './components/form-content/form-content.component';
+import { YaForm } from './components/form/form.component';
 import { YaHelp } from './components/help/help.component';
 import { YaHelpDialog } from './components/help/help.dialog';
 import { YaHexIntegerInput } from './components/hex-integer-input/hex-integer-input.component';
@@ -59,6 +60,7 @@ import { YaHighlight } from './components/highlight/highlight.component';
 import { YaHref } from './components/href/href.directive';
 import { YaIconAction } from './components/icon-action/icon-action.component';
 import { YaIconButton } from './components/icon-button/icon-button.component';
+import { YaInlineSelect } from './components/inline-select/inline-select.component';
 import { YaInstancePage } from './components/instance-page/instance-page.component';
 import { YaInstanceToolbarLabel } from './components/instance-toolbar/instance-toolbar-label.directive';
 import { YaInstanceToolbar } from './components/instance-toolbar/instance-toolbar.component';
@@ -75,12 +77,15 @@ import { YaPageButton } from './components/page-button/page-button.component';
 import { YaPageIconButton } from './components/page-icon-button/page-icon-button.component';
 import { YaPageTabs } from './components/page-tabs/page-tabs.component';
 import { YaPanel } from './components/panel/panel.component';
+import { YaParameterStatus } from './components/parameter-status/parameter-status.component';
 import { YaProgress } from './components/progress/progress.component';
 import { YaSearchFilter } from './components/search-filter/search-filter.component';
 import { YaSearchFilter2 } from './components/search-filter2/search-filter2.component';
 import { YaSelect } from './components/select/select.component';
 import { YaSidebarNavGroup } from './components/sidebar/sidebar-nav-group.component';
 import { YaSidebarNavItem } from './components/sidebar/sidebar-nav-item.component';
+import { YaSlideToggle } from './components/slide-toggle/slide-toggle.component';
+import { YaSliderInput } from './components/slider-input/slider-input.component';
 import { YaStepperStepActions } from './components/stepper/stepper-step-actions.component';
 import { YaStepperStep } from './components/stepper/stepper-step.component';
 import { YaStepper } from './components/stepper/stepper.component';
@@ -179,6 +184,7 @@ const directives = [
 
 const sharedComponents = [
   YaActionLogSummary,
+  YaAlarmLevel,
   YaAttr,
   YaAttrDivider,
   YaAttrList,
@@ -198,18 +204,20 @@ const sharedComponents = [
   YaDurationInput,
   YaEmptyMessage,
   YaErrors,
-  YaExpirable,
   YaField,
   YaFieldDivider,
   YaFilterBar,
   YaFilterInput,
   YaFilterTextarea,
+  YaForm,
+  YaFormContent,
   YaHelp,
   YaHelpDialog,
   YaHexIntegerInput,
   YaHighlight,
   YaIconAction,
   YaIconButton,
+  YaInlineSelect,
   YaInterval,
   YaInstancePage,
   YaInstanceToolbar,
@@ -226,6 +234,7 @@ const sharedComponents = [
   YaPageIconButton,
   YaPageTabs,
   YaPanel,
+  YaParameterStatus,
   YaProgress,
   YaPrintZone,
   YaSearchFilter,
@@ -233,6 +242,8 @@ const sharedComponents = [
   YaSelect,
   YaSidebarNavGroup,
   YaSidebarNavItem,
+  YaSliderInput,
+  YaSlideToggle,
   YaStepper,
   YaStepperStep,
   YaStepperStepActions,
@@ -264,7 +275,6 @@ const materialModules = [
   MatNativeDateModule,
   MatPaginatorModule,
   MatSidenavModule,
-  MatSlideToggleModule,
   MatSortModule,
   MatSnackBarModule,
   MatTableModule,

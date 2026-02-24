@@ -7,7 +7,7 @@ import static org.yamcs.alarms.AlarmStreamer.CNAME_VIOLATION_COUNT;
 import org.yamcs.yarch.Stream;
 import org.yamcs.yarch.Tuple;
 
-abstract class AbstractAlarmMirrorServer<S, T> extends AbstractAlarmServer<S, T> {
+public abstract class AbstractAlarmMirrorServer<S, T> extends AbstractAlarmServer<S, T> {
 
     AbstractAlarmMirrorServer(String yamcsInstance, double alarmLoadDays) {
         super(yamcsInstance);
@@ -107,8 +107,7 @@ abstract class AbstractAlarmMirrorServer<S, T> extends AbstractAlarmServer<S, T>
     }
 
     protected void processSeverityIncrease(S subject, ActiveAlarm<T> activeAlarm, Tuple tuple) {
-        activeAlarm.setMostSevereValue(tuple
-                .getColumn(ParameterAlarmStreamer.CNAME_SEVERITY_INCREASED));
+        activeAlarm.setMostSevereValue(tuple.getColumn(getColNameSeverityIncreased()));
     }
 
     @Override
@@ -125,5 +124,9 @@ abstract class AbstractAlarmMirrorServer<S, T> extends AbstractAlarmServer<S, T>
 
     protected abstract ActiveAlarm<T> createNewAlarm(S subject, Tuple tuple);
 
+    @Override
     protected abstract String getColNameLastEvent();
+
+    @Override
+    protected abstract String getColNameSeverityIncreased();
 }

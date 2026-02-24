@@ -2,7 +2,7 @@
   <app-admin-page>
     <app-admin-toolbar [label]="'Edit user: ' + (user.displayName || user.name)" />
 
-    <div class="form-content ya-form">
+    <ya-form-content>
       <form [formGroup]="form" novalidate autocomplete="off">
         <ya-field label="Username">
           <input disabled type="text" [value]="user.name" />
@@ -29,7 +29,7 @@
         </ya-field>
 
         <ya-field label="Active">
-          <mat-slide-toggle formControlName="active" />
+          <ya-slide-toggle formControlName="active" />
           <br />
           <span class="hint">
             Inactive users are considered "blocked". They are not or no longer able to login.
@@ -37,7 +37,7 @@
         </ya-field>
 
         <ya-field label="Superuser">
-          <mat-slide-toggle formControlName="superuser" />
+          <ya-slide-toggle formControlName="superuser" />
           <br />
           <span class="hint">
             Superusers bypass any permission checks. This attribute is intended for system
@@ -82,6 +82,6 @@
           SAVE CHANGES
         </ya-button>
       </ya-toolbar>
-    </div>
+    </ya-form-content>
   </app-admin-page>
 }

@@ -94,6 +94,16 @@ export interface ParameterType {
   oneStringValue?: string;
   zeroStringValue?: string;
   usedBy?: Parameter[];
+  initialValue?: string;
+  rawValidRange?: ValidRange;
+  engValidRange?: ValidRange;
+}
+
+export interface ValidRange {
+  minimum: number;
+  maximum: number;
+  minimumInclusive: boolean;
+  maximumInclusive: boolean;
 }
 
 export interface ArrayInfo {
