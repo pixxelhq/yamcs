@@ -125,6 +125,12 @@
             <goals>
               <goal>protoc</goal>
             </goals>
+            <configuration>
+              <includeArtifactIds>
+                <includeArtifactId>yamcs-client</includeArtifactId>
+                <includeArtifactId>yamcs-xtce</includeArtifactId>
+              </includeArtifactIds>
+            </configuration>
           </execution>
         </executions>
       </plugin>
