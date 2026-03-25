@@ -233,10 +233,14 @@ public abstract class AlarmServer<S, T> extends AbstractAlarmServer<S, T> {
     }
 
     public void update(T pv, int minViolations) {
-        update(pv, minViolations, false, false);
+        update(pv, minViolations, false, false, null);
     }
 
     public void update(T value, int minViolations, boolean autoAck, boolean latching) {
+        update(value, minViolations, autoAck, latching, null);
+    }
+
+    public void update(T value, int minViolations, boolean autoAck, boolean latching, String triggerCondition) {
         S subject = getSubject(value);
         var lock = getLock(subject);
 
@@ -277,7 +281,7 @@ public abstract class AlarmServer<S, T> extends AbstractAlarmServer<S, T> {
                 }
             } else { // alarm
                 if (activeAlarm == null) {
-                    activeAlarm = new ActiveAlarm<>(value, autoAck, latching);
+                    activeAlarm = new ActiveAlarm<>(value, autoAck, latching, triggerCondition);
                     activeAlarms.put(subject, activeAlarm);
 
                     if (activeAlarm.getViolations() >= minViolations) {

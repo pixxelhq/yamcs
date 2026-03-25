@@ -1102,6 +1102,10 @@ public class XtceStaxReader extends AbstractStaxReader {
             int minViolations = Integer.parseInt(value);
             alarm.setMinViolations(minViolations);
         }
+        String triggerCondition = readAttribute("context", xmlEvent.asStartElement(), "NA");
+        if (triggerCondition != null) {
+            alarm.setTriggeredCondition(triggerCondition);
+        }
     }
 
     private IncompleteType readBinaryParameterType(SpaceSystem spaceSystem)

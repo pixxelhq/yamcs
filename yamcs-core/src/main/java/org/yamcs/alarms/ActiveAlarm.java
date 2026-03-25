@@ -68,21 +68,29 @@ public class ActiveAlarm<T> {
     boolean shelved;
     private long shelveDuration;
 
+    final String triggerCondition;
+
     /**
      * Pending is when the minViolations has not been reached
      */
     boolean pending = true;
 
-    ActiveAlarm(T pv, boolean autoAck, boolean latching, int id) {
+    ActiveAlarm(T pv, boolean autoAck, boolean latching, int id, String triggerCondition) {
         this.autoAcknowledge = autoAck;
         this.latching = latching;
 
         this.triggerValue = this.currentValue = this.setMostSevereValue(pv);
         this.id = id;
+        this.triggerCondition = triggerCondition;
     }
-
+    ActiveAlarm(T pv, boolean autoAck, boolean latching, int id) {
+        this(pv, autoAck, latching, id, null);
+    }
+    ActiveAlarm(T pv, boolean autoAck, boolean latching, String triggerCondition) {
+        this(pv, autoAck, latching, counter.getAndIncrement(), triggerCondition);
+    }
     ActiveAlarm(T pv, boolean autoAck, boolean latching) {
-        this(pv, autoAck, latching, counter.getAndIncrement());
+        this(pv, autoAck, latching, counter.getAndIncrement(), "NA");
     }
 
     public boolean isAutoAcknowledge() {
@@ -339,15 +347,20 @@ public class ActiveAlarm<T> {
         this.pending = pending;
     }
 
+    public String getTriggerCondition() {
+        return this.triggerCondition;
+    }
+
     @Override
     public String toString() {
         return "ActiveAlarm [autoAcknowledge=" + autoAcknowledge + ", latching=" + latching + ", id=" + id
                 + ", processOK=" + processOK + ", triggered=" + triggered + ", ackEvent=" + ackEvent
                 + ", clearEvent=" + clearEvent + ", triggerValue=" + triggerValue
+                + ", triggerCondition=" + triggerCondition
                 + ", mostSevereValue=" + getMostSevereValue() + ", currentValue=" + currentValue
                 + ", violations=" + violations + ", valueCount=" + valueCount + ", usernameThatAcknowledged="
                 + ", shelved=" + shelved + ", shelveEvent=" + shelveEvent + ", shelveTime=" + shelveTime
-                + ", shelveDuration=" + shelveDuration + ", pending: " + pending + "]";
+                + ", shelveDuration=" + shelveDuration + ", pending: " + pending + "]" ;
     }
 
 

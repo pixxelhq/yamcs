@@ -167,7 +167,8 @@ public class ParameterAlarmChecker {
             alarmReporter.reportNumericParameterEvent(pv, alarmType, minViolations);
         }
         if (alarmServer != null) {
-            alarmServer.update(pv, minViolations, autoAck, latching);
+            String triggerCondition = alarmType != null ? alarmType.getTriggeredCondition() : null;
+            alarmServer.update(pv, minViolations, autoAck, latching, triggerCondition);
         }
     }
 
@@ -226,7 +227,8 @@ public class ParameterAlarmChecker {
             alarmReporter.reportNumericParameterEvent(pv, alarmType, minViolations);
         }
         if (alarmServer != null) {
-            alarmServer.update(pv, minViolations, autoAck, latching);
+            String triggerCondition = alarmType != null ? alarmType.getTriggeredCondition() : null;
+            alarmServer.update(pv, minViolations, autoAck, latching, triggerCondition);
         }
     }
 
@@ -335,7 +337,8 @@ public class ParameterAlarmChecker {
         }
 
         if (alarmServer != null) {
-            alarmServer.update(pv, minViolations, autoAck, latching);
+            String triggerCondition = alarm != null ? alarm.getTriggeredCondition() : null;
+            alarmServer.update(pv, minViolations, autoAck, latching, triggerCondition);
         }
     }
 }

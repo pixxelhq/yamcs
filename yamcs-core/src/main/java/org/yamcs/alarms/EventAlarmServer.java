@@ -149,4 +149,5 @@ public class EventAlarmServer extends AlarmServer<EventId, Event> {
     protected String getColNameSeverityIncreased() {
         return CNAME_SEVERITY_INCREASED;
     }
+
 }

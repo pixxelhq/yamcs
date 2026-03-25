@@ -2,6 +2,7 @@ package org.yamcs.alarms;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -40,9 +41,9 @@ public class AlarmServerTest {
     ParameterValue getParameterValue(Parameter p, MonitoringResult mr) {
         ParameterValue pv = new ParameterValue(p);
         pv.setMonitoringResult(mr);
-
         return pv;
     }
+
 
     @BeforeEach
     public void before() {
@@ -218,10 +219,124 @@ public class AlarmServerTest {
         assertFalse(AlarmServer.moreSevere(MonitoringResult.CRITICAL, MonitoringResult.CRITICAL));
     }
 
+    // ---- triggerCondition tests ----
+    // triggerCondition is a pass-through value read from the MDB AlarmType.triggeredConditionColumn
+    // and supplied by the caller of update(). These tests verify it flows correctly through
+    // the alarm lifecycle without being modified.
+
+    @Test
+    public void testTriggerConditionPassedThrough() {
+        // The condition supplied to update() must appear on the triggered alarm.
+        MyListener l = new MyListener();
+        alarmServer.addAlarmListener(l);
+
+        ParameterValue pv = getParameterValue(p1, MonitoringResult.WARNING);
+        alarmServer.update(pv, 1, false, false, "voltage_out_of_range");
+
+        ActiveAlarm<ParameterValue> aa = l.triggered.remove();
+        assertEquals("voltage_out_of_range", aa.getTriggerCondition());
+    }
+
+    @Test
+    public void testTriggerConditionNullWhenNotProvided() {
+        // When update() is called without a condition (legacy callers), triggerCondition is null.
+        MyListener l = new MyListener();
+        alarmServer.addAlarmListener(l);
+
+        ParameterValue pv = getParameterValue(p1, MonitoringResult.WARNING);
+        alarmServer.update(pv, 1);
+
+        ActiveAlarm<ParameterValue> aa = l.triggered.remove();
+        assertNull(aa.getTriggerCondition());
+    }
+
+    @Test
+    public void testTriggerConditionFrozenAtFirstTrigger() {
+        // triggerCondition is set from the first alarm creation call and must not
+        // change even when a more-severe value arrives (with a different condition).
+        MyListener l = new MyListener();
+        alarmServer.addAlarmListener(l);
+
+        ParameterValue pv0 = getParameterValue(p1, MonitoringResult.WARNING);
+        alarmServer.update(pv0, 1, false, false, "condition_A");
+        ActiveAlarm<ParameterValue> aa = l.triggered.remove();
+        assertEquals("condition_A", aa.getTriggerCondition());
+
+        // severity increases — condition must stay "condition_A"
+        ParameterValue pv1 = getParameterValue(p1, MonitoringResult.CRITICAL);
+        alarmServer.update(pv1, 1, false, false, "condition_B");
+        assertEquals(1, l.severityIncreased.size());
+        assertEquals("condition_A", l.severityIncreased.remove().getTriggerCondition());
+    }
+
+    @Test
+    public void testTriggerConditionPreservedThroughAcknowledgeAndClear() {
+        MyListener l = new MyListener();
+        alarmServer.addAlarmListener(l);
+
+        ParameterValue pv0 = getParameterValue(p1, MonitoringResult.CRITICAL);
+        alarmServer.update(pv0, 1, false, false, "temp_limit_exceeded");
+        ActiveAlarm<ParameterValue> aa = l.triggered.remove();
+        assertEquals("temp_limit_exceeded", aa.getTriggerCondition());
+
+        alarmServer.acknowledge(aa, "operator", 100L, null);
+        assertEquals("temp_limit_exceeded", l.acknowledged.remove().getTriggerCondition());
+
+        ParameterValue pvOk = getParameterValue(p1, MonitoringResult.IN_LIMITS);
+        alarmServer.update(pvOk, 1);
+        assertEquals("temp_limit_exceeded", l.cleared.remove().getTriggerCondition());
+    }
+
+    @Test
+    public void testTriggerConditionWithMinViolations() {
+        // The condition supplied on the first update() call must appear on the alarm
+        // once minViolations is met (not swapped out for a later call's condition).
+        MyListener l = new MyListener();
+        alarmServer.addAlarmListener(l);
+
+        ParameterValue pv0 = getParameterValue(p1, MonitoringResult.WARNING);
+        alarmServer.update(pv0, 3, false, false, "pressure_high"); // 1st violation → pending
+
+        assertTrue(l.triggered.isEmpty());
+
+        ParameterValue pv1 = getParameterValue(p1, MonitoringResult.WARNING);
+        alarmServer.update(pv1, 3, false, false, "pressure_high"); // 2nd → still pending
+        assertTrue(l.triggered.isEmpty());
+
+        ParameterValue pv2 = getParameterValue(p1, MonitoringResult.WARNING);
+        alarmServer.update(pv2, 3, false, false, "pressure_high"); // 3rd → triggered
+        ActiveAlarm<ParameterValue> aa = l.triggered.remove();
+        assertEquals("pressure_high", aa.getTriggerCondition());
+    }
+
+    @Test
+    public void testTriggerConditionNewAlarmAfterClear() {
+        // After an alarm clears, a new alarm for the same parameter gets its own condition.
+        MyListener l = new MyListener();
+        alarmServer.addAlarmListener(l);
+
+        ParameterValue pv0 = getParameterValue(p1, MonitoringResult.WARNING);
+        alarmServer.update(pv0, 1, false, false, "condition_first");
+        ActiveAlarm<ParameterValue> aa = l.triggered.remove();
+        assertEquals("condition_first", aa.getTriggerCondition());
+
+        alarmServer.acknowledge(aa, "op", 100L, null);
+        l.acknowledged.clear();
+        alarmServer.update(getParameterValue(p1, MonitoringResult.IN_LIMITS), 1);
+        l.cleared.clear();
+
+        ParameterValue pv1 = getParameterValue(p1, MonitoringResult.CRITICAL);
+        alarmServer.update(pv1, 1, false, false, "condition_second");
+        ActiveAlarm<ParameterValue> aa2 = l.triggered.remove();
+        assertEquals("condition_second", aa2.getTriggerCondition());
+        assertNotEquals(aa.getId(), aa2.getId());
+    }
+
     class MyListener implements AlarmListener<ParameterValue> {
         Queue<ActiveAlarm<ParameterValue>> valueUpdates = new LinkedList<>();
         Queue<ActiveAlarm<ParameterValue>> severityIncreased = new LinkedList<>();
         Queue<ActiveAlarm<ParameterValue>> triggered = new LinkedList<>();
+        Queue<ActiveAlarm<ParameterValue>> triggeredPending = new LinkedList<>();
         Queue<ActiveAlarm<ParameterValue>> acknowledged = new LinkedList<>();
         Queue<ActiveAlarm<ParameterValue>> cleared = new LinkedList<>();
         Queue<ActiveAlarm<ParameterValue>> rtn = new LinkedList<>();
@@ -244,6 +359,9 @@ public class AlarmServerTest {
             switch (notificationType) {
             case TRIGGERED:
                 triggered.add(activeAlarm);
+                break;
+            case TRIGGERED_PENDING:
+                triggeredPending.add(activeAlarm);
                 break;
             case ACKNOWLEDGED:
                 acknowledged.add(activeAlarm);

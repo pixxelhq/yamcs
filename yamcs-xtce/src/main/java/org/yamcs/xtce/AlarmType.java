@@ -25,6 +25,12 @@ public abstract class AlarmType implements Serializable {
     // This can be seen as a generalisation of latching: latching = true <=> minConformance = Infinite
     private boolean latching;
 
+    /**
+     * Name of the MDB column that holds the condition description for this alarm definition.
+     * Read from the MDB and passed through to {@link org.yamcs.alarms.ActiveAlarm#getTriggerCondition()}.
+     */
+    private String triggeredConditionColumn;
+
     public int getMinViolations() {
         return minViolations;
     }
@@ -52,6 +58,14 @@ public abstract class AlarmType implements Serializable {
 
     public boolean isAutoAck() {
         return autoAck;
+    }
+
+    public String getTriggeredCondition() {
+        return triggeredConditionColumn;
+    }
+
+    public void setTriggeredCondition(String triggeredCondition) {
+        this.triggeredConditionColumn = triggeredCondition;
     }
 
     @Override

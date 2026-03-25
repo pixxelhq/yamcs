@@ -116,4 +116,5 @@ public class ParameterAlarmServer extends AlarmServer<Parameter, ParameterValue>
     protected String getColNameSeverityIncreased() {
         return CNAME_SEVERITY_INCREASED;
     }
+
 }
