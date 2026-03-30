@@ -729,6 +729,15 @@ message RepeatInfo {
   optional int32 bitsBetween = 3;
 }
 
+message TimeAssociationInfo {
+  optional ParameterInfo parameter = 1;
+  optional int32 instance = 2;
+  optional bool useCalibratedValue = 3;
+  optional bool interpolateTime = 4;
+  optional double offset = 5;
+  optional string unit = 6;
+}
+
 message SequenceEntryInfo {
   enum ReferenceLocationType {
     CONTAINER_START = 1;
@@ -747,6 +756,7 @@ message SequenceEntryInfo {
 
   optional RepeatInfo repeat = 5;
   optional IndirectParameterRefInfo indirectParameterRef = 8;
+  optional TimeAssociationInfo timeAssociation = 9;
 }
 
 message FixedValueInfo {

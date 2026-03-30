@@ -56,6 +56,7 @@ import org.yamcs.protobuf.Mdb.SignificanceInfo.SignificanceLevelType;
 import org.yamcs.protobuf.Mdb.SpaceSystemInfo;
 import org.yamcs.protobuf.Mdb.SplineCalibratorInfo;
 import org.yamcs.protobuf.Mdb.SplineCalibratorInfo.SplinePointInfo;
+import org.yamcs.protobuf.Mdb.TimeAssociationInfo;
 import org.yamcs.protobuf.Mdb.TransmissionConstraintInfo;
 import org.yamcs.protobuf.Mdb.UnitInfo;
 import org.yamcs.protobuf.Mdb.ValidRangeInfo;
@@ -154,6 +155,7 @@ import org.yamcs.xtce.StringArgumentType;
 import org.yamcs.xtce.StringDataEncoding;
 import org.yamcs.xtce.StringParameterType;
 import org.yamcs.xtce.TimeEpoch;
+import org.yamcs.xtce.TimeAssociation;
 import org.yamcs.xtce.TransmissionConstraint;
 import org.yamcs.xtce.TriggerSetType;
 import org.yamcs.xtce.UnitType;
@@ -246,6 +248,9 @@ public class XtceToGpbAssembler {
         if (e.getRepeatEntry() != null) {
             b.setRepeat(toRepeatInfo(e.getRepeatEntry(), detail));
         }
+        if (e.getTimeAssociation() != null) {
+            b.setTimeAssociation(toTimeAssociationInfo(e.getTimeAssociation(), detail));
+        }
 
         if (e instanceof ContainerEntry ce) {
             if (detail == DetailLevel.SUMMARY) {
@@ -288,6 +293,27 @@ public class XtceToGpbAssembler {
             throw new IllegalStateException("Unexpected entry " + e);
         }
 
+        return b.build();
+    }
+
+    public static TimeAssociationInfo toTimeAssociationInfo(TimeAssociation xtceTimeAssociation, DetailLevel detail) {
+        TimeAssociationInfo.Builder b = TimeAssociationInfo.newBuilder();
+        if (detail == DetailLevel.SUMMARY) {
+            b.setParameter(toParameterInfo(xtceTimeAssociation.getParameter(), DetailLevel.LINK));
+        } else if (detail == DetailLevel.FULL) {
+            b.setParameter(toParameterInfo(xtceTimeAssociation.getParameter(), DetailLevel.FULL));
+        } else {
+            b.setParameter(toParameterInfo(xtceTimeAssociation));
+        }
+        b.setInstance(xtceTimeAssociation.getInstance());
+        b.setUseCalibratedValue(xtceTimeAssociation.useCalibratedValue());
+        b.setInterpolateTime(xtceTimeAssociation.isInterpolateTime());
+        if (xtceTimeAssociation.getOffset() != null) {
+            b.setOffset(xtceTimeAssociation.getOffset());
+        }
+        if (xtceTimeAssociation.getUnit() != null) {
+            b.setUnit(xtceTimeAssociation.getUnit().xtceName());
+        }
         return b.build();
     }
 
