@@ -337,12 +337,17 @@ public class XtceToGpbAssembler {
             b.setFixedCount(val.getValue());
         } else if (xtceRepeat.getCount() instanceof DynamicIntegerValue) {
             DynamicIntegerValue val = (DynamicIntegerValue) xtceRepeat.getCount();
-            if (detail == DetailLevel.SUMMARY) {
-                b.setDynamicCount(
-                        toParameterInfo(val.getParameterInstanceRef().getParameter(), DetailLevel.LINK));
-            } else if (detail == DetailLevel.FULL) {
-                b.setDynamicCount(
-                        toParameterInfo(val.getParameterInstanceRef().getParameter(), DetailLevel.FULL));
+            ParameterOrArgumentRef ref = val.getDynamicInstanceRef();
+            if (ref instanceof ParameterInstanceRef parameterRef) {
+                if (detail == DetailLevel.SUMMARY) {
+                    b.setDynamicCount(toParameterInfo(parameterRef.getParameter(), DetailLevel.LINK));
+                } else if (detail == DetailLevel.FULL) {
+                    b.setDynamicCount(toParameterInfo(parameterRef.getParameter(), DetailLevel.FULL));
+                }
+            } else if (ref instanceof ArgumentInstanceRef argumentRef) {
+                b.setDynamicCountArgument(toArgumentInfo(argumentRef));
+            } else {
+                throw new IllegalStateException("Unexpected repeat count reference " + ref);
             }
         } else {
             throw new IllegalStateException("Unexpected repeat count " + xtceRepeat.getCount());
@@ -484,18 +489,22 @@ public class XtceToGpbAssembler {
 
     public static ArgumentInfo toArgumentInfo(ArgumentInstanceRef ref) {
         ArgumentInfo.Builder b = ArgumentInfo.newBuilder();
+        b.setName(toArgumentReference(ref));
+        return b.build();
+    }
+
+    private static String toArgumentReference(ArgumentInstanceRef ref) {
         Argument arg = ref.getArgument();
         PathElement[] path = ref.getMemberPath();
         if (path == null) {
-            b.setName(arg.getName());
-        } else {
-            String memberPath = "";
-            for (PathElement el : path) {
-                memberPath += "." + el.toString();
-            }
-            b.setName(arg.getName() + memberPath);
+            return arg.getName();
         }
-        return b.build();
+
+        String memberPath = "";
+        for (PathElement el : path) {
+            memberPath += "." + el.toString();
+        }
+        return arg.getName() + memberPath;
     }
 
     public static ArgumentAssignmentInfo toArgumentAssignmentInfo(ArgumentAssignment xtceArgument) {

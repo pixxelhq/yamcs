@@ -727,6 +727,7 @@ message RepeatInfo {
   optional int64 fixedCount = 1;
   optional ParameterInfo dynamicCount = 2;
   optional int32 bitsBetween = 3;
+  optional ArgumentInfo dynamicCountArgument = 4;
 }
 
 message TimeAssociationInfo {

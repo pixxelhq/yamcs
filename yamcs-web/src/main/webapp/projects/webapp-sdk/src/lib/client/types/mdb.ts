@@ -423,6 +423,7 @@ export interface RepeatInfo {
   fixedCount: number;
   dynamicCount: Parameter;
   bitsBetween: number;
+  dynamicCountArgument: Argument;
 }
 
 export interface GetParametersOptions {

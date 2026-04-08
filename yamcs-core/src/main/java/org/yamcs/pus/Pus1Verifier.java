@@ -80,7 +80,7 @@ public class Pus1Verifier extends AbstractAlgorithmExecutor {
                 return NO_RESULT;
             }
         }
-        int sentApid = inputValues.get(0).getRawValue().getUint32Value();
+        long sentApid = inputValues.get(0).getRawValue().getSint64Value();
 
         // the sequence count set by the post-processor has no raw value
         int sentSeq = inputValues.get(1).getEngValue().getSint32Value();

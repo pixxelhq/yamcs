@@ -123,3 +123,8 @@ ArrayInArrayArgCommandTest:
     - type: xtce
       args:
           file: "src/test/resources/xtce/array-in-array-arg.xml"
+
+RepeatEntryCommandTest:
+    - type: xtce
+      args:
+          file: "src/test/resources/xtce/repeat-entry-cmd.xml"
