@@ -1,40 +1,15 @@
 package org.yamcs.simulator.pus;
 
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.yamcs.simulator.SimulatorCcsdsPacket;
 import org.yamcs.tctm.ccsds.error.CrcCciitCalculator;
 
-/**
- * TM packets according to PUS standard
- * ECSS-E-ST-70-41C 15 April 2016
- * 
- * 
- * <pre>
- * Secondary header (16 bytes)
- * 
- *  version number - 4 bits
- *  spacecraft time reference status - 4 bits
- *  service type  -   8 bits
- *  message subtype  - 8 bits
- *  message type counter - 16 bits
- *  destination Id - 16 bits
- *  time - variable size but we use 9 bytes
- * </pre>
- * 
- * 
- * @author nm
- *
- */
 public class PusTmPacket extends SimulatorCcsdsPacket {
     public static final int SH_OFFSET = 6;
-    public static final int DATA_OFFSET = SH_OFFSET + 7 + PusTime.LENGTH_BYTES;
+    // PUS secondary header (5 bytes) + TM CUC time (6 bytes) = 11 bytes after CCSDS primary header.
+    public static final int DATA_OFFSET = SH_OFFSET + 5 + PusTime.TM_CUC_LENGTH_BYTES;
 
     static final CrcCciitCalculator crcCalculator = new CrcCciitCalculator();
-
-    protected static HashMap<Integer, AtomicInteger> countMap = new HashMap<>(2); // destination -> msgCounter
 
     public PusTmPacket(byte[] packet) {
         super(packet);
@@ -48,23 +23,29 @@ public class PusTmPacket extends SimulatorCcsdsPacket {
         bb.put((byte) type);
         bb.put((byte) subtype);
         int destination = 0;
-        bb.putShort((short) getCount(destination));
         bb.putShort((short) destination);
         PusTime now = PusTime.now();
-        now.encode(bb);
+        now.encodeTmCuc(bb);
     }
 
     public void setType(int type) {
         bb.put(SH_OFFSET + 1, (byte) type);
+    }
 
+    public int getType() {
+        return bb.get(SH_OFFSET + 1) & 0xFF;
     }
 
     public void setSubtype(int subtype) {
         bb.put(SH_OFFSET + 2, (byte) subtype);
     }
 
+    public int getSubtype() {
+        return bb.get(SH_OFFSET + 2) & 0xFF;
+    }
+
     private static int getPacketLength(int userDataLength) {
-        return DATA_OFFSET + userDataLength + 2;// 2 bytes for the CRC
+        return DATA_OFFSET + userDataLength + 2;
     }
 
     @Override
@@ -80,8 +61,4 @@ public class PusTmPacket extends SimulatorCcsdsPacket {
         bb.putShort((short) crc);
     }
 
-    protected static int getCount(int apid) {
-        AtomicInteger count = countMap.computeIfAbsent(apid, a -> new AtomicInteger(0));
-        return count.getAndIncrement() & 0xFFFF;
-    }
 }
