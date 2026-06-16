@@ -87,7 +87,11 @@ public class Pus1Verifier extends AbstractAlgorithmExecutor {
         int rcvdApid = inputValues.get(2).getRawValue().getUint32Value();
         int rcvdSeq = inputValues.get(3).getRawValue().getUint32Value();
         int reportSubType = inputValues.get(4).getRawValue().getUint32Value();
+        boolean ackFlag = inputValues.get(5).getEngValue().getBooleanValue();
 
+        if (!ackFlag) {
+            return NO_RESULT;
+        }
         if (sentApid != rcvdApid || sentSeq != rcvdSeq) {
             return NO_RESULT;
         }
