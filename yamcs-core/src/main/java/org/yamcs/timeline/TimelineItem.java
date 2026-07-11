@@ -1,5 +1,6 @@
 package org.yamcs.timeline;
 
+import static org.yamcs.timeline.TimelineBandDb.EXTRA_PREFIX;
 import static org.yamcs.timeline.TimelineBandDb.PROP_PREFIX;
 import static org.yamcs.timeline.TimelineItemDb.CNAME_DESCRIPTION;
 import static org.yamcs.timeline.TimelineItemDb.CNAME_DURATION;
@@ -33,8 +34,6 @@ import com.google.protobuf.util.Durations;
  * <p>
  * Each item is identified by an id (UUID).
  * 
- * @author nm
- *
  */
 public abstract class TimelineItem {
     protected final String id;
@@ -57,6 +56,7 @@ public abstract class TimelineItem {
     protected String description;
     protected List<String> tags;
     protected Map<String, String> properties = new HashMap<>();
+    protected Map<String, String> extra = new HashMap<>();
 
     protected TimelineItem(TimelineItemType type, Tuple tuple) {
         this.id = ((UUID) tuple.getColumn(CNAME_ID)).toString();
@@ -79,6 +79,10 @@ public abstract class TimelineItem {
             if (column.getName().startsWith(PROP_PREFIX)) {
                 String columnName = column.getName().substring(PROP_PREFIX.length());
                 properties.put(columnName, tuple.getColumn(column.getName()));
+            }
+            if (column.getName().startsWith(EXTRA_PREFIX)) {
+                String columnName = column.getName().substring(EXTRA_PREFIX.length());
+                extra.put(columnName, tuple.getColumn(column.getName()));
             }
         }
     }
@@ -180,9 +184,22 @@ public abstract class TimelineItem {
         return properties;
     }
 
+    public Map<String, String> getExtra() {
+        return extra;
+    }
+
+    public String displayName() {
+        return name == null ? id : name + "(" + id + ")";
+    }
+
     public void setProperties(Map<String, String> properties) {
         this.properties.clear();
         this.properties.putAll(properties);
+    }
+
+    public void setExtra(Map<String, String> extra) {
+        this.extra.clear();
+        this.extra.putAll(extra);
     }
 
     protected abstract void addToProto(boolean detail, org.yamcs.protobuf.TimelineItem.Builder protob);
@@ -193,7 +210,9 @@ public abstract class TimelineItem {
                 .setId(id.toString())
                 .setStart(TimeEncoding.toProtobufTimestamp(start))
                 .setDuration(Durations.fromMillis(duration))
-                .putAllProperties(properties);
+                .putAllProperties(properties)
+                .putAllExtra(extra);
+
         if (name != null) {
             protob.setName(name);
         }
@@ -231,6 +250,9 @@ public abstract class TimelineItem {
         }
         for (var entry : properties.entrySet()) {
             tuple.addColumn(PROP_PREFIX + entry.getKey(), entry.getValue());
+        }
+        for (var entry : extra.entrySet()) {
+            tuple.addColumn(EXTRA_PREFIX + entry.getKey(), entry.getValue());
         }
         if (tags != null) {
             tuple.addColumn(CNAME_TAGS, DataType.array(DataType.ENUM), tags);

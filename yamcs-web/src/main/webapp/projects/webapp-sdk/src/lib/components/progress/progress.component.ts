@@ -1,12 +1,15 @@
-import { AsyncPipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import {
+  booleanAttribute,
   ChangeDetectionStrategy,
   Component,
-  Input,
+  computed,
+  inject,
+  input,
   numberAttribute,
-  OnChanges,
 } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+
+export type YaProgressMode = 'determinate' | 'indeterminate';
 
 @Component({
   selector: 'ya-progress',
@@ -15,44 +18,65 @@ import { BehaviorSubject } from 'rxjs';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class: 'ya-progress',
-    '[style.height.px]': 'height',
-    '[style.width.px]': 'width',
-    // Subtract 2 to account for borders
-    '[style.lineHeight.px]': 'height - 2',
+    '[class.alarm]': 'isAlarm()',
+    '[style.height.px]': 'height()',
+    '[style.width.px]': 'width()',
   },
-  imports: [AsyncPipe, DecimalPipe],
+  imports: [DecimalPipe],
+  providers: [DecimalPipe],
 })
-export class YaProgress implements OnChanges {
-  @Input({ transform: numberAttribute })
-  value: number;
+export class YaProgress {
+  private decimalPipe = inject(DecimalPipe);
 
-  @Input({ transform: numberAttribute })
-  total: number;
+  mode = input<YaProgressMode>('determinate');
+  value = input(0, { transform: numberAttribute });
+  total = input(1, { transform: numberAttribute });
+  height = input(16, { transform: numberAttribute });
+  width = input(100, { transform: numberAttribute });
+  format = input('1.2-2');
+  unit = input('%');
 
-  @Input({ transform: numberAttribute })
-  height: number = 16;
+  /**
+   * Whether to change colors if the value exceeds the total
+   */
+  alarmSensitive = input(false, { transform: booleanAttribute });
 
-  @Input({ transform: numberAttribute })
-  width: number = 100;
+  ratio = computed(() => {
+    const ratio = this.value() / this.total();
+    return Math.max(0, ratio);
+  });
+  percentage = computed(() => 100 * this.ratio());
 
-  @Input()
-  format = '1.1';
+  clampedRatio = computed(() => {
+    const ratio = this.value() / this.total();
+    return Math.max(0, Math.min(1, ratio));
+  });
+  clampedPercentage = computed(() => 100 * this.clampedRatio());
 
-  @Input()
-  unit = '%';
-
-  ratio$ = new BehaviorSubject<number | null>(null);
-  boundedRatio$ = new BehaviorSubject<number>(0);
-
-  ngOnChanges() {
-    const ratio = this.value / this.total;
-    if (ratio === null || ratio === undefined) {
-      this.ratio$.next(null);
-      this.boundedRatio$.next(0);
-      return;
+  /**
+   * True if the value exceeds the total
+   */
+  isAlarm = computed(() => {
+    const alarmSensitive = this.alarmSensitive();
+    const ratio = this.ratio();
+    if (alarmSensitive) {
+      return ratio > 1;
+    } else {
+      return false;
     }
+  });
 
-    this.ratio$.next(ratio);
-    this.boundedRatio$.next(Math.max(0, Math.min(1, ratio)));
-  }
+  displayLabel = computed(() => {
+    const value = this.value();
+    const ratio = this.ratio();
+    const clampedPercentage = this.clampedPercentage();
+    const format = this.format();
+    const unit = this.unit();
+    if (value === null || value === undefined || isNaN(value)) {
+      return '';
+    } else {
+      const valueStr = this.decimalPipe.transform(clampedPercentage, format);
+      return (ratio > 1 ? '> ' : '') + valueStr + unit;
+    }
+  });
 }

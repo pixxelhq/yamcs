@@ -1,0 +1,186 @@
+<ya-message-bar #messageBar />
+
+<div
+  class="sidenav-container"
+  [class.fullscreen]="fullScreenMode$ | async"
+  [class.focus]="focusMode$ | async"
+  [class.message-bar-visible]="messageBar.show$ | async">
+  <ya-sidenav [collapsed]="isCollapsed()">
+    <ya-sidenav-item
+      activeWhen="/instance"
+      routerLink="/instance"
+      [queryParams]="{ c: yamcs.context }"
+      icon="home"
+      label="Home" />
+
+    @if (showLinksItem()) {
+      <ya-sidenav-item
+        activeWhen="/links"
+        routerLink="/links"
+        [queryParams]="{ c: yamcs.context }"
+        icon="swap_horiz"
+        label="Links" />
+    }
+
+    @if (telemetryItems.length) {
+      <ya-sidenav-group
+        label="Telemetry"
+        icon="speed"
+        [active]="telemetryActive"
+        [expanded]="telemetryExpanded"
+        (toggle)="toggleTelemetryGroup()">
+        @for (item of telemetryItems; track item) {
+          <ya-sidenav-item
+            [activeWhen]="'/telemetry/' + (item.activeWhen ?? item.path)"
+            [routerLink]="'/telemetry/' + item.path"
+            [queryParams]="{ c: yamcs.context }"
+            [exact]="item.path === ''"
+            [label]="item.label" />
+        }
+      </ya-sidenav-group>
+    }
+
+    @if (showAlgorithmsItem()) {
+      <ya-sidenav-item
+        activeWhen="/algorithms"
+        routerLink="/algorithms"
+        [queryParams]="{ c: yamcs.context }"
+        icon="transform"
+        label="Algorithms" />
+    }
+
+    @if (showEventsItem()) {
+      <ya-sidenav-item
+        activeWhen="/events"
+        routerLink="/events"
+        [queryParams]="{ c: yamcs.context }"
+        icon="event_note"
+        label="Events" />
+    }
+
+    @if (showAlarmsItem()) {
+      @if (
+        (connectionInfo$ | async)?.processor?.hasAlarms ||
+        ((connectionInfo$ | async)?.instance?.capabilities | arrayContains: "alarm-mirror")
+      ) {
+        <app-alarm-label />
+      } @else {
+        <ya-sidenav-item
+          activeWhen="/alarms"
+          routerLink="/alarms"
+          [queryParams]="{ c: yamcs.context }"
+          icon="notifications_none"
+          label="Alarms" />
+      }
+    }
+
+    @if (commandingItems.length) {
+      <ya-sidenav-group
+        label="Commanding"
+        icon="rss_feed"
+        [active]="commandingActive"
+        [expanded]="commandingExpanded"
+        (toggle)="toggleCommandingGroup()">
+        @for (item of commandingItems; track item) {
+          <ya-sidenav-item
+            [activeWhen]="'/commanding/' + (item.activeWhen ?? item.path)"
+            [routerLink]="'/commanding/' + item.path"
+            [queryParams]="{ c: yamcs.context }"
+            [exact]="item.path === ''"
+            [label]="item.label" />
+        }
+      </ya-sidenav-group>
+    }
+
+    @if (
+      ((connectionInfo$ | async)?.instance?.capabilities | arrayContains: "file-transfer") &&
+      showFileTransferItem()
+    ) {
+      <ya-sidenav-item
+        activeWhen="/file-transfer"
+        routerLink="/file-transfer"
+        [queryParams]="{ c: yamcs.context }"
+        icon="file_copy"
+        label="File transfer" />
+    }
+
+    @if (proceduresItems.length) {
+      <ya-sidenav-group
+        label="Procedures"
+        icon="playlist_play"
+        [active]="proceduresActive"
+        [expanded]="proceduresExpanded"
+        (toggle)="toggleProceduresGroup()">
+        @for (item of proceduresItems; track item) {
+          <ya-sidenav-item
+            [activeWhen]="'/procedures/' + (item.activeWhen ?? item.path)"
+            [routerLink]="'/procedures/' + item.path"
+            [queryParams]="{ c: yamcs.context }"
+            [exact]="item.path === ''"
+            [label]="item.label" />
+        }
+      </ya-sidenav-group>
+    }
+
+    @if ((connectionInfo$ | async)?.instance?.capabilities | arrayContains: "timeline") {
+      @if (showTimelineItem()) {
+        <ya-sidenav-item
+          activeWhen="/timeline"
+          routerLink="/timeline"
+          [queryParams]="{ c: yamcs.context }"
+          icon="view_timeline"
+          label="Timeline" />
+      }
+    }
+
+    @if (
+      showActivitiesItem() &&
+      ((connectionInfo$ | async)?.instance?.capabilities | arrayContains: "activities")
+    ) {
+      <app-activities-label />
+    }
+
+    @if (mdbItems.length) {
+      <ya-sidenav-group
+        label="Mission database"
+        icon="auto_stories"
+        [active]="mdbActive"
+        [expanded]="mdbExpanded"
+        (toggle)="toggleMdbGroup()">
+        @for (item of mdbItems; track item) {
+          <ya-sidenav-item
+            [activeWhen]="'/mdb/' + (item.activeWhen ?? item.path)"
+            [routerLink]="'/mdb/' + item.path"
+            [queryParams]="{ c: yamcs.context }"
+            [exact]="item.path === ''"
+            [label]="item.label" />
+        }
+      </ya-sidenav-group>
+    }
+
+    @if (showArchiveBrowserItem()) {
+      <ya-sidenav-item
+        activeWhen="/archive"
+        routerLink="/archive"
+        [queryParams]="{ c: yamcs.context }"
+        icon="inventory_2"
+        label="Archive browser" />
+    }
+
+    @if (extraItems.length) {
+      <ya-sidenav-divider />
+
+      @for (item of extraItems; track item) {
+        <ya-sidenav-item
+          [activeWhen]="'/' + (item.activeWhen ?? item.path)"
+          [routerLink]="'/' + item.path"
+          [queryParams]="{ c: yamcs.context }"
+          [icon]="item.icon || 'loupe'"
+          [label]="item.label" />
+      }
+    }
+  </ya-sidenav>
+  <main #pageContent class="main">
+    <router-outlet />
+  </main>
+</div>

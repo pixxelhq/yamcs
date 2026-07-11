@@ -16,7 +16,7 @@ options:
     title: Logo
     description:
       - Filesystem path to an image to be shown in the bottom of the left sidebar. Images
-        larger than the width of the sidebar (currently 250px) are resized to fit.
+        larger than the width of the sidebar (currently 220px) are resized to fit.
     type: STRING
 
   preferredNamespace:
@@ -81,6 +81,15 @@ options:
     title: Show Command Export Functionalities
     description:
       - Controls whether the button to generate an offline command report is shown.
+    type: BOOLEAN
+    default: true
+
+  showAliasColumns:
+    title: Show Alias Columns
+    description:
+      - Whether to show alias columns on listings (parameters, containers, ...).
+        Regardless of this setting, users can choose to hide/show individual columns,
+        overriding this default setting.
     type: BOOLEAN
     default: true
 
@@ -272,6 +281,14 @@ options:
           - CSS color string for the Minor color. Default is orange.
         type: STRING
         default: "#ff8000"
+      legacyFontSizing:
+        title: Legacy Font Sizing
+        description:
+          - Use legacy font sizing
+        type: BOOLEAN
+        default: false
+        # Introduced for backwards compatibility in a specific use case only
+        hidden: true
 
 #
 # Instance-specific Options

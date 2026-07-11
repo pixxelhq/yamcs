@@ -114,6 +114,9 @@ allowDownloadOverwrites (boolean)
 maxExistingFileRenames (integer)
     Maximum number appended to incoming file names in case of matching names (when ``allowDownloadOverwrites`` is false). Default: ``1000``
 
+maxFileSize (integer)
+    The maximum file size in bytes accepted for incoming transfers. If the Metadata PDU declares a file size larger than this value, or if a File Data PDU is received whose end offset exceeds this value, the transfer is aborted with a ``FileSizeError`` fault. Default: ``104857600`` (100 MB).
+
 localEntities (map)
     A list of entity definitions used to give names to the local (Yamcs) entity identifiers as well as to configure which bucket is used for storing the files received for that entity. The names can be used in the API calls when initiating transfers. The list has to contain all identifiers which will be used by the remote system to send files.  If a PDU is received to an identifier not in this map, the PDU will be dropped and no transaction will be started.
 
@@ -145,13 +148,13 @@ canChangePduSize (boolean)
     Whether a ``FileTransferOption`` can be used to set a specific transfer's PDU size. Default: ``false``
 
 pduSizePredefinedValues (list)
-    List of predefined integer values for the PDU size option when ``canChangePduSize`` is ``true``, shown as a dropdown menu in the web UI.
+    List of predefined integer values for the PDU size option when ``canChangePduSize`` is ``true``, shown as a dropdown menu in the Yamcs UI.
 
 canChangePduDelay (boolean)
     Whether a ``FileTransferOption`` can be used to set a specific transfer's PDU delay (sleep between PDUs). Default: ``false``
 
 pduDelayPredefinedValues (list)
-    List of predefined integer values for the PDU delay option when ``canChangePduDelay`` is ``true``, shown as a dropdown menu in the web UI.
+    List of predefined integer values for the PDU delay option when ``canChangePduDelay`` is ``true``, shown as a dropdown menu in the Yamcs UI.
 
 inactivityTimeout (integer)
     The time in milliseconds used by both the sender and receiver to check for inactivity. The timer is active on the receiver until EOF has been received and on class 2 sender after EOF has been sent (while waiting for the Finished PDU). If the timer expires, the InactivityDetected event will be triggered and the transaction may be cancelled or suspended (depending on the configuration of the fault handler for InactivityDetected event).

@@ -15,16 +15,8 @@ import org.yamcs.http.Context;
 import org.yamcs.http.HttpException;
 import org.yamcs.http.InternalServerErrorException;
 import org.yamcs.http.NotFoundException;
-import org.yamcs.http.api.AbstractPaginatedParameterRetrievalConsumer.PaginatedSingleParameterRetrievalConsumer;
-import org.yamcs.http.api.Downsampler.Sample;
-import org.yamcs.http.api.ParameterRanger.Range;
 import org.yamcs.logging.Log;
-import org.yamcs.mdb.Mdb;
-import org.yamcs.mdb.MdbFactory;
-import org.yamcs.parameter.ParameterRetrievalOptions;
 import org.yamcs.parameter.ParameterRetrievalService;
-import org.yamcs.parameter.ParameterValueWithId;
-import org.yamcs.parameter.ParameterWithId;
 import org.yamcs.parameterarchive.BackFiller;
 import org.yamcs.parameterarchive.BackFillerListener;
 import org.yamcs.parameterarchive.ParameterArchive;
@@ -33,9 +25,6 @@ import org.yamcs.parameterarchive.ParameterId;
 import org.yamcs.parameterarchive.ParameterIdDb;
 import org.yamcs.parameterarchive.ParameterInfoRetrieval;
 import org.yamcs.protobuf.AbstractParameterArchiveApi;
-import org.yamcs.protobuf.Archive.GetParameterSamplesRequest;
-import org.yamcs.protobuf.Archive.ListParameterHistoryRequest;
-import org.yamcs.protobuf.Archive.ListParameterHistoryResponse;
 import org.yamcs.protobuf.ArchivedParameterGroupResponse;
 import org.yamcs.protobuf.ArchivedParameterInfo;
 import org.yamcs.protobuf.ArchivedParameterSegmentsResponse;
@@ -45,10 +34,7 @@ import org.yamcs.protobuf.EnableBackfillingRequest;
 import org.yamcs.protobuf.GetArchivedParameterGroupRequest;
 import org.yamcs.protobuf.GetArchivedParameterSegmentsRequest;
 import org.yamcs.protobuf.GetArchivedParametersInfoRequest;
-import org.yamcs.protobuf.GetParameterRangesRequest;
 import org.yamcs.protobuf.PurgeRequest;
-import org.yamcs.protobuf.Pvalue.Ranges;
-import org.yamcs.protobuf.Pvalue.TimeSeries;
 import org.yamcs.protobuf.RebuildRangeRequest;
 import org.yamcs.protobuf.SubscribeBackfillingData;
 import org.yamcs.protobuf.SubscribeBackfillingData.BackfillFinishedInfo;
@@ -57,7 +43,6 @@ import org.yamcs.security.SystemPrivilege;
 import org.yamcs.utils.IntArray;
 import org.yamcs.utils.SortedIntArray;
 import org.yamcs.utils.TimeEncoding;
-import org.yamcs.utils.ValueUtility;
 
 import com.google.gson.Gson;
 import com.google.protobuf.Empty;
@@ -139,205 +124,6 @@ public class ParameterArchiveApi extends AbstractParameterArchiveApi<Context> {
         backFiller.addListener(listener);
     }
 
-    @Override
-    public void getParameterSamples(Context ctx, GetParameterSamplesRequest request,
-            Observer<TimeSeries> observer) {
-
-        YamcsServerInstance ysi = InstancesApi.verifyInstanceObj(request.getInstance());
-
-        Mdb mdb = MdbFactory.getInstance(ysi.getName());
-
-        ParameterWithId pid = MdbApi.verifyParameterWithId(ctx, mdb, request.getName());
-
-        /*
-         * TODO check commented out, in order to support sampling system parameters which don't have a type
-         * 
-         * ParameterType ptype = p.getParameterType(); if (ptype == null) { throw new
-         * BadRequestException("Requested parameter has no type"); } else if (!(ptype instanceof FloatParameterType) &&
-         * !(ptype instanceof IntegerParameterType)) { throw new
-         * BadRequestException("Only integer or float parameters can be sampled. Got " + ptype.getTypeAsString()); }
-         */
-
-        long defaultStop = TimeEncoding.getWallclockTime();
-        long defaultStart = defaultStop - (1000 * 60 * 60); // 1 hour
-
-        long start = defaultStart;
-        if (request.hasStart()) {
-            start = TimeEncoding.fromProtobufTimestamp(request.getStart());
-        }
-        long stop = defaultStop;
-        if (request.hasStop()) {
-            stop = TimeEncoding.fromProtobufTimestamp(request.getStop());
-        }
-
-        if (start > stop) {
-            throw new BadRequestException("Start date must be before stop date");
-        }
-
-        int sampleCount = request.hasCount() ? request.getCount() : 500;
-        boolean useRawValue = request.hasUseRawValue() && request.getUseRawValue();
-
-        Downsampler sampler = new Downsampler(start, stop, sampleCount);
-        sampler.setUseRawValue(useRawValue);
-        sampler.setGapTime(request.hasGapTime() ? request.getGapTime() : 120000);
-
-        ParameterRetrievalService prs = getParameterRetrievalService(ysi);
-        ParameterRetrievalOptions opts = ParameterRetrievalOptions.newBuilder()
-                .withStartStop(start, stop)
-                .withAscending(true)
-                .withRetrieveRawValues(useRawValue)
-                .withRetrieveEngineeringValues(!useRawValue)
-                .withoutRealtime(request.getNorealtime())
-                .withoutParchive(request.hasSource() && isReplayAsked(request.getSource()))
-                .build();
-        prs.retrieveScalar(pid, opts, sampler)
-                .thenRun(() -> {
-                    TimeSeries.Builder series = TimeSeries.newBuilder();
-                    for (Sample s : sampler.collect()) {
-                        series.addSample(StreamArchiveApi.toGPBSample(s));
-                    }
-                    observer.complete(series.build());
-                })
-                .exceptionally(e -> {
-                    log.warn("Received exception during parameter retrieval", e);
-                    observer.completeExceptionally(new InternalServerErrorException(e.toString()));
-                    return null;
-                });
-
-    }
-
-    @Override
-    public void getParameterRanges(Context ctx, GetParameterRangesRequest request, Observer<Ranges> observer) {
-        YamcsServerInstance ysi = InstancesApi.verifyInstanceObj(request.getInstance());
-
-        Mdb mdb = MdbFactory.getInstance(ysi.getName());
-
-        ParameterWithId pid = MdbApi.verifyParameterWithId(ctx, mdb, request.getName());
-
-        long start = 0;
-        if (request.hasStart()) {
-            start = TimeEncoding.fromProtobufTimestamp(request.getStart());
-        }
-        long stop = TimeEncoding.getWallclockTime();
-        if (request.hasStop()) {
-            stop = TimeEncoding.fromProtobufTimestamp(request.getStop());
-        }
-
-        if (start > stop) {
-            throw new BadRequestException("Start date must be before stop date");
-        }
-
-        long minGap = request.hasMinGap() ? request.getMinGap() : 0;
-        long maxGap = request.hasMaxGap() ? request.getMaxGap() : Long.MAX_VALUE;
-        long minRange = request.hasMinRange() ? request.getMinRange() : -1;
-        int maxValues = request.hasMaxValues() ? request.getMaxValues() : -1;
-
-        ParameterRanger ranger = new ParameterRanger(minGap, maxGap, minRange, maxValues);
-
-        ParameterRetrievalService prs = getParameterRetrievalService(ysi);
-        ParameterRetrievalOptions opts = ParameterRetrievalOptions.newBuilder()
-                .withStartStop(start, stop)
-                .withRetrieveRawValues(false)
-                .withoutRealtime(request.getNorealtime())
-                .build();
-
-        prs.retrieveScalar(pid, opts, ranger)
-                .thenRun(() -> {
-                    Ranges.Builder ranges = Ranges.newBuilder();
-                    for (Range r : ranger.getRanges()) {
-                        ranges.addRange(toGPBRange(r));
-                    }
-                    observer.complete(ranges.build());
-                })
-                .exceptionally(e -> {
-                    log.warn("Received exception during parameter retrieval", e);
-                    observer.completeExceptionally(new InternalServerErrorException(e.toString()));
-                    return null;
-                });
-
-    }
-
-    @Override
-    public void listParameterHistory(Context ctx, ListParameterHistoryRequest request,
-            Observer<ListParameterHistoryResponse> observer) {
-
-        YamcsServerInstance ysi = InstancesApi.verifyInstanceObj(request.getInstance());
-
-        Mdb mdb = MdbFactory.getInstance(ysi.getName());
-        ParameterWithId requestedParamWithId = MdbApi.verifyParameterWithId(ctx, mdb, request.getName());
-
-        int limit = request.hasLimit() ? request.getLimit() : 100;
-        int maxBytes = request.hasMaxBytes() ? request.getMaxBytes() : -1;
-
-        long start = 0;
-        if (request.hasStart()) {
-            start = TimeEncoding.fromProtobufTimestamp(request.getStart());
-        }
-        long stop = TimeEncoding.getWallclockTime();
-        if (request.hasStop()) {
-            stop = TimeEncoding.fromProtobufTimestamp(request.getStop());
-        }
-
-        if (start > stop) {
-            throw new BadRequestException("Start date must be before stop date");
-        }
-
-        boolean ascending = request.getOrder().equals("asc");
-        if (request.hasNext()) {
-            TimeSortedPageToken token = TimeSortedPageToken.decode(request.getNext());
-            if (ascending) {
-                start = token.time;
-            } else {
-                stop = token.time;
-            }
-        }
-        var optsb = ParameterRetrievalOptions.newBuilder()
-                .withStartStop(start, stop)
-                .withAscending(ascending)
-                .withRetrieveParameterStatus(false);
-
-        if (request.hasSource() && isReplayAsked(request.getSource())) {
-            optsb = optsb
-                    .withoutParchive(true)
-                    .withoutReplay(false);
-        } else {
-            if (request.hasNoreplay()) {
-                optsb = optsb.withoutReplay(request.getNoreplay());
-            }
-            optsb = optsb.withoutRealtime(request.getNorealtime());
-        }
-
-        ParameterRetrievalOptions opts = optsb.build();
-        ParameterRetrievalService prs = getParameterRetrievalService(ysi);
-
-        ListParameterHistoryResponse.Builder resultb = ListParameterHistoryResponse.newBuilder();
-        final int fLimit = limit + 1; // one extra to detect continuation token
-
-        PaginatedSingleParameterRetrievalConsumer replayListener = new PaginatedSingleParameterRetrievalConsumer(0,
-                fLimit) {
-            @Override
-            public void onParameterData(ParameterValueWithId pvwid) {
-                if (resultb.getParameterCount() < fLimit - 1) {
-                    resultb.addParameter(StreamArchiveApi.toGpb(pvwid, maxBytes));
-                } else {
-                    TimeSortedPageToken token = new TimeSortedPageToken(pvwid.getParameterValue().getGenerationTime());
-                    resultb.setContinuationToken(token.encodeAsString());
-                }
-            }
-        };
-
-        replayListener.setNoRepeat(request.getNorepeat());
-        prs.retrieveSingle(requestedParamWithId, opts, replayListener)
-                .thenRun(() -> {
-                    observer.complete(resultb.build());
-                })
-                .exceptionally(e -> {
-                    log.warn("Received exception during parameter retrieval", e);
-                    observer.completeExceptionally(new InternalServerErrorException(e.toString()));
-                    return null;
-                });
-    }
-
     private ParameterArchive getParameterArchive(YamcsServerInstance ysi) throws BadRequestException {
         List<ParameterArchive> l = ysi.getServices(ParameterArchive.class);
 
@@ -367,22 +153,6 @@ public class ParameterArchiveApi extends AbstractParameterArchiveApi<Context> {
             throw new BadRequestException(
                     "Bad value for parameter 'source'; valid values are: 'ParameterArchive' or 'replay'");
         }
-    }
-
-    private static Ranges.Range toGPBRange(Range r) {
-        Ranges.Range.Builder b = Ranges.Range.newBuilder();
-        b.setCount(r.totalCount());
-        b.setStart(TimeEncoding.toProtobufTimestamp(r.start));
-        b.setStop(TimeEncoding.toProtobufTimestamp(r.stop));
-        var valueCount = 0;
-        for (int i = 0; i < r.valueCount(); i++) {
-            b.addEngValues(ValueUtility.toGbp(r.getValue(i)));
-            b.addCounts(r.getCount(i));
-            valueCount += r.getCount(i);
-        }
-        b.setOtherCount(r.totalCount() - valueCount);
-
-        return b.build();
     }
 
     @Override

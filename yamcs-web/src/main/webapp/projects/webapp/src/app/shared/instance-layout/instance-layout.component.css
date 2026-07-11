@@ -1,0 +1,51 @@
+:host {
+  --top-height: 48px;
+  --message-bar-height: 48px;
+}
+
+.sidenav-container {
+  position: absolute;
+  top: var(--top-height);
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: var(--y-background-color);
+  display: flex;
+}
+
+.sidenav-container.message-bar-visible {
+  top: calc(var(--top-height) + var(--message-bar-height));
+}
+
+.sidenav-container.focus {
+  --top-height: 0;
+}
+
+.sidenav-container.focus ya-sidenav {
+  display: none;
+}
+
+.main {
+  position: absolute;
+  inset: 0 0 0 var(--y-sidenav-width);
+  flex: 1;
+}
+
+:host.collapsed .main {
+  left: var(--y-sidenav-collapsed-width);
+}
+
+:host.collapsed .sidenav-container.focus .main,
+.sidenav-container.focus .main {
+  left: 0;
+}
+
+@media print {
+  :host {
+    --top-height: 0;
+  }
+
+  .main {
+    left: 0;
+  }
+}

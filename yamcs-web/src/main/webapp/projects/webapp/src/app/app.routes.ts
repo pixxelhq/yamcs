@@ -1,5 +1,4 @@
 import { Routes } from '@angular/router';
-import { ContextSwitchComponent } from './appbase/context-switch/context-switch.component';
 import { CreateInstancePage1Component } from './appbase/create-instance-page1/create-instance-page1.component';
 import { CreateInstancePage2Component } from './appbase/create-instance-page2/create-instance-page2.component';
 import { ExtensionComponent } from './appbase/extension/extension.component';
@@ -8,13 +7,14 @@ import { ForbiddenComponent } from './appbase/forbidden/forbidden.component';
 import { HomeComponent } from './appbase/home/home.component';
 import { NotFoundComponent } from './appbase/not-found/not-found.component';
 import { ProfileComponent } from './appbase/profile/profile.component';
+import { RouteRefreshComponent } from './appbase/route-refresh/route-refresh.component';
 import { ServerUnavailableComponent } from './appbase/server-unavailable/server-unavailable.component';
 import { attachContextGuardFn } from './core/guards/AttachContextGuard';
 import { authGuardChildFn, authGuardFn } from './core/guards/AuthGuard';
 import { clearContextGuardFn } from './core/guards/ClearContextGuard';
 import { openIDCallbackGuardFn } from './core/guards/OpenIDCallbackGuard';
 import { serverSideOpenIDCallbackGuardFn } from './core/guards/ServerSideOpenIDCallbackGuard';
-import { InstancePageComponent } from './shared/instance-page/instance-page.component';
+import { InstanceLayoutComponent } from './shared/instance-layout/instance-layout.component';
 
 export const APP_ROUTES: Routes = [
   {
@@ -25,6 +25,24 @@ export const APP_ROUTES: Routes = [
         pathMatch: 'full',
         component: HomeComponent,
         canActivate: [authGuardFn, clearContextGuardFn],
+        data: { hasSidebar: false },
+      },
+      {
+        path: '403',
+        component: ForbiddenComponent,
+        canActivate: [clearContextGuardFn],
+        data: { hasSidebar: false },
+      },
+      {
+        path: 'admin',
+        loadChildren: () =>
+          import('./admin/admin.routes').then((m) => m.ROUTES),
+        canActivate: [authGuardFn],
+      },
+      {
+        path: 'cb',
+        canActivate: [clearContextGuardFn, openIDCallbackGuardFn],
+        children: [],
         data: { hasSidebar: false },
       },
       {
@@ -41,166 +59,9 @@ export const APP_ROUTES: Routes = [
         data: { hasSidebar: false },
       },
       {
-        path: 'context-switch/:context/:current',
-        component: ContextSwitchComponent,
-        canActivate: [authGuardFn, clearContextGuardFn],
-        data: { hasSidebar: false },
-      },
-      {
-        path: 'profile',
-        component: ProfileComponent,
-        canActivate: [authGuardFn, clearContextGuardFn],
-        data: { hasSidebar: false },
-      },
-      {
-        path: 'storage',
-        loadChildren: () =>
-          import('projects/webapp/src/app/storage/storage.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-        data: { hasSidebar: false },
-      },
-      {
-        path: 'activities',
-        loadChildren: () =>
-          import('projects/webapp/src/app/activities/activities.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-      },
-      {
-        path: 'alarms',
-        loadChildren: () =>
-          import('projects/webapp/src/app/alarms/alarms.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-      },
-      {
-        path: 'algorithms',
-        loadChildren: () =>
-          import('projects/webapp/src/app/algorithms/algorithms.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-      },
-      {
-        path: 'archive',
-        loadChildren: () =>
-          import('projects/webapp/src/app/archive/archive.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-      },
-      {
-        path: 'admin',
-        loadChildren: () =>
-          import('projects/webapp/src/app/admin/admin.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-      },
-      {
-        path: 'file-transfer',
-        loadChildren: () =>
-          import('projects/webapp/src/app/file-transfer/file-transfer.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-      },
-      {
-        path: 'commanding',
-        loadChildren: () =>
-          import('projects/webapp/src/app/commanding/commanding.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-      },
-      {
-        path: 'events',
-        loadChildren: () =>
-          import('projects/webapp/src/app/events/events.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-      },
-      {
-        path: 'instance',
-        loadChildren: () =>
-          import('projects/webapp/src/app/instance-home/instance-home.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-        data: { preload: true },
-      },
-      {
-        path: 'links',
-        loadChildren: () =>
-          import('projects/webapp/src/app/links/links.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-      },
-      {
-        path: 'procedures',
-        loadChildren: () =>
-          import('projects/webapp/src/app/procedures/procedures.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-      },
-      {
-        path: 'search',
-        loadChildren: () =>
-          import('projects/webapp/src/app/search/search.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-        data: { preload: true },
-      },
-      {
-        path: 'timeline',
-        loadChildren: () =>
-          import('projects/webapp/src/app/timeline/timeline.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-      },
-      {
-        path: 'telemetry',
-        loadChildren: () =>
-          import('projects/webapp/src/app/telemetry/telemetry.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-        data: { preload: true },
-      },
-      {
-        path: 'mdb',
-        loadChildren: () =>
-          import('projects/webapp/src/app/mdb/mdb.routes').then(
-            (m) => m.ROUTES,
-          ),
-        canActivate: [authGuardFn],
-      },
-      {
-        path: 'ext',
-        canActivate: [authGuardFn, attachContextGuardFn],
-        canActivateChild: [authGuardChildFn],
-        runGuardsAndResolvers: 'always',
-        component: InstancePageComponent,
-        children: [
-          {
-            matcher: extensionMatcher,
-            component: ExtensionComponent,
-          },
-        ],
-      },
-      {
-        path: 'cb',
-        canActivate: [clearContextGuardFn, openIDCallbackGuardFn],
-        children: [],
+        path: 'down',
+        component: ServerUnavailableComponent,
+        canActivate: [clearContextGuardFn],
         data: { hasSidebar: false },
       },
       {
@@ -210,16 +71,135 @@ export const APP_ROUTES: Routes = [
         data: { hasSidebar: false },
       },
       {
-        path: 'down',
-        component: ServerUnavailableComponent,
-        canActivate: [clearContextGuardFn],
+        path: 'profile',
+        component: ProfileComponent,
+        canActivate: [authGuardFn, clearContextGuardFn],
         data: { hasSidebar: false },
       },
       {
-        path: '403',
-        component: ForbiddenComponent,
-        canActivate: [clearContextGuardFn],
+        path: 'route-refresh',
+        component: RouteRefreshComponent,
+        canActivate: [authGuardFn, clearContextGuardFn],
         data: { hasSidebar: false },
+      },
+      {
+        path: 'storage',
+        loadChildren: () =>
+          import('./storage/storage.routes').then((m) => m.ROUTES),
+        canActivate: [authGuardFn],
+        data: { hasSidebar: false },
+      },
+      {
+        path: '',
+        component: InstanceLayoutComponent,
+        data: {
+          section: 'instance',
+        },
+        children: [
+          {
+            path: 'activities',
+            loadChildren: () =>
+              import('./activities/activities.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
+          },
+          {
+            path: 'alarms',
+            loadChildren: () =>
+              import('./alarms/alarms.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
+          },
+          {
+            path: 'algorithms',
+            loadChildren: () =>
+              import('./algorithms/algorithms.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
+          },
+          {
+            path: 'archive',
+            loadChildren: () =>
+              import('./archive/archive.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
+          },
+          {
+            path: 'commanding',
+            loadChildren: () =>
+              import('./commanding/commanding.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
+          },
+          {
+            path: 'events',
+            loadChildren: () =>
+              import('./events/events.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
+          },
+          {
+            path: 'ext',
+            canActivate: [authGuardFn, attachContextGuardFn],
+            canActivateChild: [authGuardChildFn],
+            runGuardsAndResolvers: 'always',
+            children: [
+              {
+                matcher: extensionMatcher,
+                component: ExtensionComponent,
+              },
+            ],
+          },
+          {
+            path: 'file-transfer',
+            loadChildren: () =>
+              import('./file-transfer/file-transfer.routes').then(
+                (m) => m.ROUTES,
+              ),
+            canActivate: [authGuardFn],
+          },
+          {
+            path: 'instance',
+            loadChildren: () =>
+              import('./instance-home/instance-home.routes').then(
+                (m) => m.ROUTES,
+              ),
+            canActivate: [authGuardFn],
+            data: { preload: true },
+          },
+          {
+            path: 'links',
+            loadChildren: () =>
+              import('./links/links.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
+          },
+          {
+            path: 'mdb',
+            loadChildren: () =>
+              import('./mdb/mdb.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
+          },
+          {
+            path: 'procedures',
+            loadChildren: () =>
+              import('./procedures/procedures.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
+          },
+          {
+            path: 'search',
+            loadChildren: () =>
+              import('./search/search.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
+            data: { preload: true },
+          },
+          {
+            path: 'telemetry',
+            loadChildren: () =>
+              import('./telemetry/telemetry.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
+            data: { preload: true },
+          },
+          {
+            path: 'timeline',
+            loadChildren: () =>
+              import('./timeline/timeline.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
+          },
+        ],
       },
       {
         path: '**',

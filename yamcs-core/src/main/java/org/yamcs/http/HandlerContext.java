@@ -22,6 +22,7 @@ import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -122,7 +123,11 @@ public class HandlerContext {
     public String getOriginalHostAddress() {
         var forwardedFor = nettyRequest.headers().get("x-forwarded-for");
         if (forwardedFor != null) {
-            return forwardedFor;
+            if (forwardedFor.contains(",")) {
+                return forwardedFor.split(",")[0].trim();
+            } else {
+                return forwardedFor;
+            }
         } else {
             var address = (InetSocketAddress) nettyContext.channel().remoteAddress();
             return address.getAddress().getHostAddress();
@@ -289,6 +294,15 @@ public class HandlerContext {
             return null;
         } else {
             return matches.get(0);
+        }
+    }
+
+    public List<String> getQueryParameterArray(String parameter) {
+        List<String> matches = qsDecoder.parameters().get(parameter);
+        if (matches == null) {
+            return Collections.emptyList();
+        } else {
+            return matches;
         }
     }
 

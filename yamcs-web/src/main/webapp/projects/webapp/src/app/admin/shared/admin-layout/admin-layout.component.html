@@ -1,0 +1,133 @@
+<ya-message-bar #messageBar />
+
+<div class="sidenav-container" [class.message-bar-visible]="messageBar.show$ | async">
+  <ya-sidenav [collapsed]="isCollapsed()">
+    <ya-sidenav-item
+      activeWhen="/admin"
+      routerLink="/admin"
+      [exact]="true"
+      icon="recent_actors"
+      label="Action log" />
+
+    @if (showAccessControlItem()) {
+      <ya-sidenav-group
+        label="Access control"
+        icon="supervised_user_circle"
+        [active]="userManagementActive"
+        [expanded]="userManagementExpanded"
+        (toggle)="toggleUserManagementGroup()">
+        <ya-sidenav-item
+          activeWhen="/admin/iam/users"
+          routerLink="/admin/iam/users"
+          label="Users" />
+        <ya-sidenav-item
+          activeWhen="/admin/iam/service-accounts"
+          routerLink="/admin/iam/service-accounts"
+          label="Service accounts" />
+        <ya-sidenav-item
+          activeWhen="/admin/iam/groups"
+          routerLink="/admin/iam/groups"
+          label="Groups" />
+        <ya-sidenav-item
+          activeWhen="/admin/iam/roles"
+          routerLink="/admin/iam/roles"
+          label="Roles" />
+      </ya-sidenav-group>
+    }
+
+    @if (showAccessControlItem()) {
+      <ya-sidenav-item
+        activeWhen="/admin/sessions"
+        routerLink="/admin/sessions"
+        icon="devices"
+        label="Sessions" />
+    }
+
+    @if (showServicesItem()) {
+      <ya-sidenav-item
+        activeWhen="/admin/services"
+        routerLink="/admin/services"
+        icon="attractions"
+        label="Services" />
+    }
+
+    @if (showSystemInfo()) {
+      <ya-sidenav-item
+        activeWhen="/admin/processor-types"
+        routerLink="/admin/processor-types"
+        icon="flip_camera_android"
+        label="Processor types" />
+    }
+
+    <ya-sidenav-item
+      activeWhen="/admin/databases"
+      routerLink="/admin/databases"
+      icon="database"
+      label="Databases" />
+
+    @if (showSystemInfo()) {
+      <ya-sidenav-item
+        activeWhen="/admin/replication"
+        routerLink="/admin/replication"
+        icon="share"
+        label="Replication" />
+    }
+
+    @if (showRocksDbItem()) {
+      <ya-sidenav-group
+        label="RocksDB"
+        icon="dataset"
+        [active]="rocksDbActive"
+        [expanded]="rocksDbExpanded"
+        (toggle)="toggleRocksDbGroup()">
+        <ya-sidenav-item
+          activeWhen="/admin/rocksdb/databases"
+          routerLink="/admin/rocksdb/databases"
+          label="Open databases" />
+      </ya-sidenav-group>
+    }
+
+    @if (showSystemInfo()) {
+      <ya-sidenav-item
+        activeWhen="/admin/http-traffic"
+        routerLink="/admin/http-traffic"
+        icon="traffic"
+        label="HTTP traffic" />
+    }
+
+    @if (showSystemInfo()) {
+      <ya-sidenav-item
+        activeWhen="/admin/routes"
+        routerLink="/admin/routes"
+        icon="api"
+        label="API routes" />
+    }
+
+    @if (showSystemInfo()) {
+      <ya-sidenav-item
+        activeWhen="/admin/leap-seconds"
+        routerLink="/admin/leap-seconds"
+        icon="access_time"
+        label="Leap seconds" />
+    }
+
+    @if (showSystemInfo()) {
+      <ya-sidenav-item
+        activeWhen="/admin/threads"
+        routerLink="/admin/threads"
+        icon="receipt"
+        label="Threads" />
+    }
+
+    @if (showSystemInfo()) {
+      <ya-sidenav-item
+        activeWhen="/admin/system"
+        routerLink="/admin/system"
+        icon="memory"
+        label="System" />
+    }
+  </ya-sidenav>
+  <main #pageContent class="main">
+    <router-outlet />
+  </main>
+</div>

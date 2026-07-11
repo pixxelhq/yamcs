@@ -12,6 +12,7 @@ import {
   AlarmSeverity,
   colorFromCssColor,
   Display,
+  Font,
   PV,
   PVProvider,
   Sample,
@@ -247,16 +248,20 @@ export class OpiDisplayViewerComponent
    */
   public init(objectName: string) {
     const container: HTMLDivElement = this.displayContainer.nativeElement;
-    this.display = new Display(container);
 
     const opiConfig = this.configService.getConfig().opi;
+    if (opiConfig.legacyFontSizing) {
+      Font.LEGACY_FONT_SIZING = true;
+    }
+
+    this.display = new Display(container);
     this.display.disconnectedColor = colorFromCssColor(
       opiConfig.disconnectedColor,
     );
     this.display.invalidColor = colorFromCssColor(opiConfig.invalidColor);
     this.display.majorColor = colorFromCssColor(opiConfig.majorColor);
     this.display.minorColor = colorFromCssColor(opiConfig.minorColor);
-    this.display.utc = this.formatter.isUTC();
+    this.display.utc = this.formatter.utc();
     this.display.imagesPrefix = this.baseHref + 'media/';
     this.display.setPathResolver(
       new OpiDisplayPathResolver(this.storageClient, this.display),
@@ -357,7 +362,7 @@ export class OpiDisplayViewerComponent
         const objectName = resolvedPath.slice(bucketRoot.length);
         this.yamcs.yamcsClient
           .startActivity(this.yamcs.instance!, {
-            type: 'COMMAND_STACK',
+            type: 'STACK',
             args: {
               processor: this.yamcs.processor!,
               bucket: this.bucket,

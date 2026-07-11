@@ -35,6 +35,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.jcommander</groupId>
+      <artifactId>jcommander</artifactId>
+      <version>3.0</version>
+    </dependency>
+    <dependency>
       <groupId>com.fazecast</groupId>
       <artifactId>jSerialComm</artifactId>
     </dependency>

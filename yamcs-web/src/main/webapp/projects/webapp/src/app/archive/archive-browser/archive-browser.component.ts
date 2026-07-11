@@ -1,4 +1,4 @@
-import { Overlay } from '@angular/cdk/overlay';
+import { Overlay, OverlayRef } from '@angular/cdk/overlay';
 import { ComponentPortal } from '@angular/cdk/portal';
 import {
   AfterViewInit,
@@ -15,6 +15,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, Params, Router } from '@angular/router';
 import {
+  DefaultSidebar,
   MouseTracker,
   TimeLocator,
   TimeRuler,
@@ -30,13 +31,14 @@ import {
   ProcessorSubscription,
   Synchronizer,
   WebappSdkModule,
+  YaTooltip,
   YamcsService,
   utils,
 } from '@yamcs/webapp-sdk';
 import { BehaviorSubject, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { StartReplayDialogComponent } from '../../shared/start-replay-dialog/start-replay-dialog.component';
-import { HoveredDateAnnotation } from '../../timeline/timeline-chart/HoveredDateAnnotation';
+import { HoveredDateAnnotation } from '../../timeline/HoveredDateAnnotation';
 import { DownloadDumpDialogComponent } from '../download-dump-dialog/download-dump-dialog.component';
 import { JumpToDialogComponent } from '../jump-to-dialog/jump-to-dialog.component';
 import { ArchiveRecordGroup } from '../model/ArchiveRecordGroup';
@@ -45,7 +47,6 @@ import { RGB } from '../model/RGB';
 import { ReplayOverlay } from '../model/ReplayOverlay';
 import { TitleBand } from '../model/TitleBand';
 import { ModifyReplayDialogComponent } from '../modify-replay-dialog/modify-replay-dialog.component';
-import { TimelineTooltipComponent } from '../timeline-tooltip/timeline-tooltip.component';
 
 const PACKETS_BG = new RGB(141, 182, 194);
 const PACKETS_FG = new RGB(70, 70, 70);
@@ -126,7 +127,8 @@ export class ArchiveBrowserComponent implements AfterViewInit, OnDestroy {
   viewportRange$ = new BehaviorSubject<DateRange | null>(null);
   tool$ = new BehaviorSubject<Tool>('hand');
 
-  private tooltipInstance: TimelineTooltipComponent;
+  private tooltipInstance: YaTooltip;
+  private tooltipOverlayRef?: OverlayRef;
   private packetNames: string[] = [];
   private subscriptions: Subscription[] = [];
 
@@ -197,9 +199,10 @@ export class ArchiveBrowserComponent implements AfterViewInit, OnDestroy {
       ])
       .withPush(false);
 
-    const overlayRef = this.overlay.create({ positionStrategy });
-    const tooltipPortal = new ComponentPortal(TimelineTooltipComponent);
-    this.tooltipInstance = overlayRef.attach(tooltipPortal).instance;
+    this.tooltipOverlayRef = this.overlay.create({ positionStrategy });
+    const tooltipPortal = new ComponentPortal(YaTooltip);
+    this.tooltipInstance =
+      this.tooltipOverlayRef.attach(tooltipPortal).instance;
   }
 
   @HostListener('mouseleave')
@@ -220,6 +223,7 @@ export class ArchiveBrowserComponent implements AfterViewInit, OnDestroy {
 
   private initializeTimeline() {
     this.timeline = new Timeline(this.container.nativeElement);
+    this.timeline.leftSidebar = new DefaultSidebar(this.timeline);
 
     this.timeline.addViewportChangeListener((event) => {
       this.viewportRange$.next({
@@ -290,7 +294,7 @@ export class ArchiveBrowserComponent implements AfterViewInit, OnDestroy {
     axis.label = 'UTC';
     axis.timezone = 'UTC';
     axis.frozen = true;
-    axis.fullHeight = 'underlay';
+    axis.grid = 'underlay';
 
     this.timeline.addViewportSelectionListener((evt) => {
       if (evt.selection) {
@@ -690,6 +694,7 @@ export class ArchiveBrowserComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.tooltipOverlayRef?.dispose();
     this.processorSubscription?.cancel();
     this.subscriptions.forEach((subscription) => subscription.unsubscribe());
     this.timeline.disconnect();

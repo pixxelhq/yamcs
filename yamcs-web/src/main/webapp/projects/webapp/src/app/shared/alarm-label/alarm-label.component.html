@@ -1,10 +1,11 @@
 @if (context$ | async; as context) {
-  <ya-sidebar-nav-item
+  <ya-sidenav-item
     activeWhen="/alarms"
     routerLink="/alarms"
-    [queryParams]="{ c: yamcs.context }">
-    <mat-icon class="item-icon">notifications_none</mat-icon>
-    Alarms
+    [queryParams]="{ c: yamcs.context }"
+    icon="notifications_none"
+    label="Alarms"
+    [backgroundColor]="mini() ? (miniBackgroundColor$ | async) : undefined">
     @if (status$ | async; as status) {
       @if (status.unacknowledgedCount) {
         <div class="count unacked" [ngClass]="status.unacknowledgedSeverity | lowercase">
@@ -14,5 +15,5 @@
         <div class="count acked">{{ status.acknowledgedCount }} acked</div>
       }
     }
-  </ya-sidebar-nav-item>
+  </ya-sidenav-item>
 }

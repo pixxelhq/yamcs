@@ -22,6 +22,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.jcommander</groupId>
+      <artifactId>jcommander</artifactId>
+      <version>3.0</version>
+    </dependency>
+    <dependency>
       <groupId>org.yamcs</groupId>
       <artifactId>yamcs-client</artifactId>
       <version>${project.version}</version>
@@ -30,11 +35,6 @@
       <groupId>org.yamcs</groupId>
       <artifactId>yamcs-xtce</artifactId>
       <version>${project.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>com.beust</groupId>
-      <artifactId>jcommander</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>

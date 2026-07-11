@@ -12,6 +12,7 @@ export interface WebsiteConfig {
   commandClearanceEnabled: boolean;
   commandExports: boolean;
   twoStageCommanding: boolean;
+  showAliasColumns: boolean;
   preferredNamespace: string;
   collapseInitializedArguments: boolean;
   commandOptions: CommandOption[];
@@ -43,6 +44,7 @@ export interface OpiConfig {
   invalidColor: string;
   majorColor: string;
   minorColor: string;
+  legacyFontSizing: boolean;
 }
 
 export interface SiteLink {

@@ -21,8 +21,9 @@ import {
   Command,
   CommandHistoryEntry,
   ConfigService,
-  CreateTimelineItemRequest,
   MessageService,
+  SaveTimelineItemRequest,
+  utils,
   WebappSdkModule,
   WebsiteConfig,
   YamcsService,
@@ -30,10 +31,14 @@ import {
 } from '@yamcs/webapp-sdk';
 import { BehaviorSubject, Subscription } from 'rxjs';
 import { MarkdownComponent } from '../../../shared/markdown/markdown.component';
+import {
+  ScheduleActivityDialogComponent,
+  ScheduleActivityDialogData,
+  ScheduleActivityDialogResult,
+} from '../../../shared/schedule-activity-dialog/schedule-activity-dialog.component';
 import { SignificanceLevelComponent } from '../../../shared/significance-level/significance-level.component';
 import { CommandFormComponent } from '../command-form/command-form.component';
 import { TemplateProvider } from '../command-form/TemplateProvider';
-import { ScheduleCommandDialogComponent } from '../schedule-command-dialog/schedule-command-dialog.component';
 import { SendCommandWizardStepComponent } from '../send-command-wizard-step/send-command-wizard-step.component';
 import { CommandConstraintsComponent } from './command-constraints.component';
 import { CommandHistoryTemplateProvider } from './CommandHistoryTemplateProvider';
@@ -197,8 +202,16 @@ export class ConfigureCommandComponent
 
   openScheduleCommandDialog() {
     this.dialog
-      .open(ScheduleCommandDialogComponent, {
+      .open<
+        ScheduleActivityDialogComponent,
+        ScheduleActivityDialogData,
+        ScheduleActivityDialogResult
+      >(ScheduleActivityDialogComponent, {
         width: '600px',
+        data: {
+          type: 'command',
+          name: `Run ${utils.getFilename(this.qualifiedName())}`,
+        },
       })
       .afterClosed()
       .subscribe((scheduleOptions) => {
@@ -208,12 +221,9 @@ export class ConfigureCommandComponent
           const qname = this.qualifiedName();
           const commandConfig = this.commandForm.getResult(true);
 
-          const options: CreateTimelineItemRequest = {
+          const options: SaveTimelineItemRequest = {
             type: 'ACTIVITY',
-            duration: '0s',
-            name: qname,
-            start: scheduleOptions['executionTime'],
-            tags: scheduleOptions['tags'],
+            ...scheduleOptions,
             activityDefinition: {
               type: 'COMMAND',
               args: {

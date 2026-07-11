@@ -1,0 +1,12 @@
+:host {
+  display: flex;
+  align-items: center;
+}
+
+input[type="text"] {
+  margin-right: 16px;
+}
+
+:host.expanded:hover {
+  --mat-icon-button-state-layer-color: transparent;
+}

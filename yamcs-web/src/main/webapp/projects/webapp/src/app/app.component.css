@@ -6,9 +6,11 @@
 mat-toolbar-row {
   height: 48px;
   box-shadow: 0 0.125rem 0.3125rem rgba(0, 0, 0, 0.26);
-  z-index: 2;
+  z-index: 2000;
   padding-left: 6px;
   padding-right: calc(24px - 16px);
+  --mat-icon-button-icon-color: #fff;
+  --mat-icon-button-state-layer-color: #fff;
 }
 
 .mat-toolbar.focus {
@@ -80,23 +82,18 @@ mat-toolbar-row {
   overflow: hidden;
 }
 
-::ng-deep .top-tabs.mat-mdc-tab-nav-bar {
-  border-bottom: none;
+.user-button {
+  background-color: var(--y-accent);
+  border-radius: 25px;
+  margin-left: 8px;
 }
 
-.mat-mdc-button:hover,
-::ng-deep .top-tabs.mat-mdc-tab-nav-bar .mat-mdc-tab-link:hover,
-::ng-deep .top-tabs.mat-mdc-tab-nav-bar .mat-mdc-tab-link.active {
+.mat-mdc-button:hover:not(.user-button) {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-::ng-deep .top-tabs.mat-mdc-tab-nav-bar .mat-mdc-tab-link {
-  opacity: 1;
-  min-width: 0;
-  padding: 0 16px;
-}
-
-::ng-deep .top-tabs.mat-mdc-tab-nav-bar .mat-mdc-tab-link .mdc-tab__text-label {
-  color: #fff;
-  letter-spacing: 1.25px;
+.material-symbols.icon22 {
+  font-size: 22px !important;
+  height: 22px !important;
+  width: 22px !important;
 }

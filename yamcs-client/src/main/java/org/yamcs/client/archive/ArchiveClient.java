@@ -32,16 +32,13 @@ import org.yamcs.client.archive.ArchiveClient.StreamOptions.StreamOption;
 import org.yamcs.client.base.AbstractPage;
 import org.yamcs.client.base.ResponseObserver;
 import org.yamcs.protobuf.AlarmData;
-import org.yamcs.protobuf.Archive.GetParameterSamplesRequest;
-import org.yamcs.protobuf.Archive.ListParameterHistoryRequest;
-import org.yamcs.protobuf.Archive.ListParameterHistoryResponse;
-import org.yamcs.protobuf.Archive.StreamParameterValuesRequest;
 import org.yamcs.protobuf.Commanding.CommandHistoryEntry;
 import org.yamcs.protobuf.CommandsApiClient;
 import org.yamcs.protobuf.Event;
 import org.yamcs.protobuf.EventsApiClient;
 import org.yamcs.protobuf.GetCommandRequest;
 import org.yamcs.protobuf.GetParameterRangesRequest;
+import org.yamcs.protobuf.GetParameterSamplesRequest;
 import org.yamcs.protobuf.IndexGroup;
 import org.yamcs.protobuf.IndexResponse;
 import org.yamcs.protobuf.IndexesApiClient;
@@ -55,16 +52,17 @@ import org.yamcs.protobuf.ListEventSourcesResponse;
 import org.yamcs.protobuf.ListEventsRequest;
 import org.yamcs.protobuf.ListEventsResponse;
 import org.yamcs.protobuf.ListPacketIndexRequest;
+import org.yamcs.protobuf.ListParameterHistoryRequest;
+import org.yamcs.protobuf.ListParameterHistoryResponse;
 import org.yamcs.protobuf.ListParameterIndexRequest;
 import org.yamcs.protobuf.PacketsApiClient;
-import org.yamcs.protobuf.ParameterArchiveApiClient;
+import org.yamcs.protobuf.ParameterValuesApiClient;
 import org.yamcs.protobuf.Pvalue.ParameterData;
 import org.yamcs.protobuf.Pvalue.ParameterValue;
 import org.yamcs.protobuf.Pvalue.Ranges;
 import org.yamcs.protobuf.Pvalue.Ranges.Range;
 import org.yamcs.protobuf.Pvalue.TimeSeries;
 import org.yamcs.protobuf.Pvalue.TimeSeries.Sample;
-import org.yamcs.protobuf.StreamArchiveApiClient;
 import org.yamcs.protobuf.StreamCommandIndexRequest;
 import org.yamcs.protobuf.StreamCommandsRequest;
 import org.yamcs.protobuf.StreamCompletenessIndexRequest;
@@ -73,6 +71,7 @@ import org.yamcs.protobuf.StreamEventsRequest;
 import org.yamcs.protobuf.StreamPacketIndexRequest;
 import org.yamcs.protobuf.StreamPacketsRequest;
 import org.yamcs.protobuf.StreamParameterIndexRequest;
+import org.yamcs.protobuf.StreamParameterValuesRequest;
 import org.yamcs.protobuf.Table.GetTableDataRequest;
 import org.yamcs.protobuf.Table.ReadRowsRequest;
 import org.yamcs.protobuf.Table.Row;
@@ -94,8 +93,7 @@ public class ArchiveClient {
     private String instance;
     private IndexesApiClient indexService;
     private CommandsApiClient commandService;
-    private ParameterArchiveApiClient parameterArchiveService;
-    private StreamArchiveApiClient streamArchiveService;
+    private ParameterValuesApiClient parameterValuesService;
     private AlarmsApiClient alarmService;
     private TableApiClient tableService;
     private EventsApiClient eventService;
@@ -105,8 +103,7 @@ public class ArchiveClient {
         this.instance = instance;
         indexService = new IndexesApiClient(handler);
         commandService = new CommandsApiClient(handler);
-        parameterArchiveService = new ParameterArchiveApiClient(handler);
-        streamArchiveService = new StreamArchiveApiClient(handler);
+        parameterValuesService = new ParameterValuesApiClient(handler);
         alarmService = new AlarmsApiClient(handler);
         tableService = new TableApiClient(handler);
         eventService = new EventsApiClient(handler);
@@ -609,7 +606,7 @@ public class ArchiveClient {
         }
 
         CompletableFuture<Void> f = new CompletableFuture<>();
-        streamArchiveService.streamParameterValues(null, requestb.build(), new Observer<ParameterData>() {
+        parameterValuesService.streamParameterValues(null, requestb.build(), new Observer<ParameterData>() {
 
             @Override
             public void next(ParameterData message) {
@@ -718,7 +715,7 @@ public class ArchiveClient {
                 .setStart(Timestamp.newBuilder().setSeconds(start.getEpochSecond()).setNanos(start.getNano()))
                 .setStop(Timestamp.newBuilder().setSeconds(stop.getEpochSecond()).setNanos(stop.getNano()));
         CompletableFuture<TimeSeries> f = new CompletableFuture<>();
-        parameterArchiveService.getParameterSamples(null, requestb.build(), new ResponseObserver<>(f));
+        parameterValuesService.getParameterSamples(null, requestb.build(), new ResponseObserver<>(f));
         return f.thenApply(TimeSeries::getSampleList);
     }
 
@@ -739,7 +736,7 @@ public class ArchiveClient {
             }
         }
         CompletableFuture<Ranges> f = new CompletableFuture<>();
-        parameterArchiveService.getParameterRanges(null, requestb.build(), new ResponseObserver<>(f));
+        parameterValuesService.getParameterRanges(null, requestb.build(), new ResponseObserver<>(f));
         return f.thenApply(Ranges::getRangeList);
     }
 
@@ -891,7 +888,7 @@ public class ArchiveClient {
 
         @Override
         protected void fetch(ListParameterHistoryRequest request, Observer<ListParameterHistoryResponse> observer) {
-            parameterArchiveService.listParameterHistory(null, request, observer);
+            parameterValuesService.listParameterHistory(null, request, observer);
         }
     }
 

@@ -1,5 +1,10 @@
 import { LowerCasePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnDestroy } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  OnDestroy,
+} from '@angular/core';
 import {
   AuthService,
   FaviconService,
@@ -7,8 +12,9 @@ import {
   GlobalAlarmStatusSubscription,
   WebappSdkModule,
   YamcsService,
+  YaSidenav,
 } from '@yamcs/webapp-sdk';
-import { BehaviorSubject, Subscription } from 'rxjs';
+import { BehaviorSubject, map, Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-alarm-label',
@@ -22,6 +28,24 @@ export class AlarmLabelComponent implements OnDestroy {
 
   context$ = new BehaviorSubject<string | null>(null);
   status$ = new BehaviorSubject<GlobalAlarmStatus | null>(null);
+  miniBackgroundColor$ = this.status$.pipe(
+    map((status) => {
+      if (status?.unacknowledgedCount) {
+        switch (status.unacknowledgedSeverity) {
+          case 'WATCH':
+          case 'WARNING':
+            return '#ff983059';
+          case 'DISTRESS':
+          case 'CRITICAL':
+          case 'SEVERE':
+            return '#f2495c59';
+        }
+      }
+    }),
+  );
+
+  private sidenav = inject(YaSidenav);
+  mini = this.sidenav.collapseItem;
 
   private statusSubscription: GlobalAlarmStatusSubscription;
 

@@ -90,6 +90,10 @@ export interface SubscribeProcessorsRequest {
   processor?: string;
 }
 
+export interface SubscribeItemChangesRequest {
+  instance: string;
+}
+
 export interface SubscribeBackfillingRequest {
   instance: string;
 }
@@ -112,6 +116,7 @@ export interface Processor {
   hasAlarms: boolean;
   hasCommanding: boolean;
   checkCommandClearance: boolean;
+  overrideAlgorithmsEnabled: boolean;
   state: ServiceState;
   persistent: boolean;
   protected: boolean;
@@ -151,6 +156,8 @@ export interface DownloadCommandsOptions {
   stop?: string;
 
   delimiter?: 'COMMA' | 'SEMICOLON' | 'TAB';
+
+  includeAliases?: boolean;
 }
 
 export type TMStatisticsSubscription = WebSocketCall<

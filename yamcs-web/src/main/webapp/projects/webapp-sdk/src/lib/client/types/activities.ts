@@ -5,6 +5,7 @@ export type ActivityStatus = 'RUNNING' | 'SUCCESSFUL' | 'CANCELLED' | 'FAILED';
 export interface Activity {
   type: string;
   args: { [key: string]: any };
+  label?: string;
   detail: string;
   id: string;
   start: string;
@@ -41,6 +42,14 @@ export interface Executor {
   displayName: string;
   description?: string;
   icon?: string;
+}
+
+export interface ScriptRunnersPage {
+  runners?: ScriptRunner[];
+}
+
+export interface ScriptRunner {
+  name: string;
 }
 
 export interface ActivityScriptsPage {

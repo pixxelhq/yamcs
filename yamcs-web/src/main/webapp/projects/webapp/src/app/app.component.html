@@ -4,7 +4,7 @@
     class="app-bar"
     [class.replay]="(connectionInfo$ | async)?.processor?.replay"
     [class.nosidebar]="!(sidebar$ | async)">
-    @if (tag) {
+    @if (!smallWindow() && tag) {
       <div class="tag">
         {{ tag }}
       </div>
@@ -12,68 +12,113 @@
     <a class="logo-wrapper" routerLink="/">
       <img src="yamcs@2x.png" />
     </a>
-    @if (connectionInfo$ | async; as connectionInfo) {
-      <button mat-button (click)="openInstanceDialog()">
-        {{ connectionInfo.instance.name }} ▾
-      </button>
+
+    @if (section$ | async; as section) {
+      @if (section === "instance") {
+        @if (connectionInfo$ | async; as connectionInfo) {
+          <button mat-button (click)="openInstanceDialog()">
+            {{ connectionInfo.instance.name }} ▾
+          </button>
+        }
+      } @else if (section === "admin") {
+        <span style="color: white">Admin area</span>
+      }
     }
 
     <div style="flex: 1 1 auto"></div>
 
     @if (user$ | async; as user) {
-      <nav mat-tab-nav-bar class="top-tabs" [tabPanel]="tabPanel">
-        <!--a mat-tab-link matTooltip="Search (/)">
-        <mat-icon>search</mat-icon>
-      </a-->
-        <a mat-tab-link routerLink="storage" routerLinkActive="active">
-          <mat-icon>perm_media</mat-icon>
-          &nbsp;&nbsp;STORAGE
-        </a>
-        @if (user | mayAccessAdminArea) {
-          <a mat-tab-link routerLink="admin" routerLinkActive="active">
-            <mat-icon>security</mat-icon>
-            &nbsp;&nbsp;ADMIN AREA
-          </a>
-        }
-        @if (siteLinks.length) {
-          <a mat-tab-link [matMenuTriggerFor]="siteLinkMenu" style="padding: 0 8px">
-            <mat-icon>link</mat-icon>
-          </a>
-        }
-        <a mat-tab-link [matMenuTriggerFor]="userMenu">
-          <mat-icon>support_agent</mat-icon>
-          &nbsp;&nbsp;{{ user.getDisplayName() || user.getName() | uppercase }}
-        </a>
-      </nav>
-    }
+      @if ((section$ | async) === "instance") {
+        <app-search-input matTooltip="Search (/)" />
+      }
 
-    <mat-menu #siteLinkMenu="matMenu" overlapTrigger="false" xPosition="before">
-      @for (link of siteLinks; track link) {
-        <a mat-menu-item [href]="link.url" [target]="link.external ? '_blank' : '_self'">
-          Go to {{ link.label }}
-          @if (link.external) {
-            &nbsp;
-            <mat-icon class="icon16">open_in_new</mat-icon>
-          }
+      <a mat-icon-button routerLink="storage" matTooltip="Storage">
+        <mat-icon class="icon22">perm_media</mat-icon>
+      </a>
+
+      @if (user$ | async | mayAccessAdminArea) {
+        <a mat-icon-button routerLink="admin" matTooltip="Admin area">
+          <mat-icon class="icon22">security</mat-icon>
         </a>
       }
-    </mat-menu>
 
-    <mat-menu #userMenu="matMenu" overlapTrigger="false" xPosition="before">
-      <a mat-menu-item routerLink="profile" routerLinkActive="active">
-        <mat-icon>account_box</mat-icon>
-        &nbsp;Profile
-      </a>
+      @if (siteLinks.length) {
+        <a mat-icon-button matTooltip="Links" [matMenuTriggerFor]="linkMenu">
+          <mat-icon class="icon22">bookmarks</mat-icon>
+        </a>
+        <mat-menu #linkMenu="matMenu" overlapTrigger="false" xPosition="before" class="ya-menu">
+          @for (link of siteLinks; track link) {
+            <a mat-menu-item [href]="link.url" [target]="link.external ? '_blank' : '_self'">
+              <div style="display: flex; align-items: center; width: 100%">
+                <span>Go to {{ link.label }}</span>
+                <span style="flex: 1 1 auto; min-width: 10px"></span>
+                <mat-icon class="icon16">open_in_new</mat-icon>
+              </div>
+            </a>
+          }
+        </mat-menu>
+      }
+
+      <app-notification-widget />
+
+      <button
+        mat-button
+        [matMenuTriggerFor]="userMenu"
+        class="user-button"
+        matTooltip="Profile and settings">
+        <mat-icon class="icon22">support_agent</mat-icon>
+        {{ user.getDisplayName() || user.getName() }} ▾
+      </button>
+    }
+
+    <mat-menu #userMenu="matMenu" overlapTrigger="false" xPosition="before" class="ya-menu">
+      <a mat-menu-item routerLink="profile" routerLinkActive="active">Profile</a>
+      @if (enableAppearanceBeta) {
+        <button mat-menu-item [matMenuTriggerFor]="appearanceMenu">Appearance</button>
+      }
+      <button mat-menu-item [matMenuTriggerFor]="timezoneMenu">Timezone</button>
       @if (authInfo.requireAuthentication) {
         <a mat-menu-item (click)="logout()">
           <mat-icon>exit_to_app</mat-icon>
           Sign out
         </a>
       }
+      <mat-divider />
+      <a mat-menu-item href="https://docs.yamcs.org" target="_blank">
+        <div style="display: flex; align-items: center; width: 100%">
+          <span>Online documentation</span>
+          <span style="flex: 1 1 auto; min-width: 10px"></span>
+          <mat-icon class="icon16">open_in_new</mat-icon>
+        </div>
+      </a>
+    </mat-menu>
+
+    <mat-menu #appearanceMenu="matMenu" class="ya-menu">
+      <button mat-menu-item (click)="setTheme('light')">
+        <mat-icon>{{ themePreference() === "light" ? "check" : "" }}</mat-icon>
+        Light
+      </button>
+      <button mat-menu-item (click)="setTheme('dark')">
+        <mat-icon>{{ themePreference() === "dark" ? "check" : "" }}</mat-icon>
+        Dark
+      </button>
+      <button mat-menu-item (click)="setTheme('system')">
+        <mat-icon>{{ themePreference() === "system" ? "check" : "" }}</mat-icon>
+        System
+      </button>
+    </mat-menu>
+
+    <mat-menu #timezoneMenu="matMenu" class="ya-menu">
+      <button mat-menu-item (click)="setUTC(true)">
+        <mat-icon>{{ utc() ? "check" : "" }}</mat-icon>
+        UTC
+      </button>
+      <button mat-menu-item (click)="setUTC(false)">
+        <mat-icon>{{ utc() ? "" : "check" }}</mat-icon>
+        Local
+      </button>
     </mat-menu>
   </mat-toolbar-row>
 </mat-toolbar>
-<mat-tab-nav-panel #tabPanel>
-  <router-outlet />
-</mat-tab-nav-panel>
+<router-outlet />
 <ya-print-zone />

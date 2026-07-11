@@ -4,6 +4,7 @@ import {
   Component,
   ElementRef,
   OnDestroy,
+  Signal,
   ViewChild,
 } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
@@ -15,14 +16,18 @@ import {
   ConfigService,
   ConnectionInfo,
   ExtensionService,
-  PreferenceStore,
+  Formatter,
+  Preferences,
   SiteLink,
+  Theme,
   User,
   WebappSdkModule,
   YamcsService,
 } from '@yamcs/webapp-sdk';
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
-import { filter, map } from 'rxjs/operators';
+import { filter, map, shareReplay, tap } from 'rxjs/operators';
+import { NotificationWidgetComponent } from './appbase/notification-widget/notification-widget.component';
+import { SearchInputComponent } from './appbase/search-input/search-input.component';
 import { SelectInstanceDialogComponent } from './shared/select-instance-dialog/select-instance-dialog.component';
 
 @Component({
@@ -33,7 +38,7 @@ import { SelectInstanceDialogComponent } from './shared/select-instance-dialog/s
   host: {
     '[class]': 'componentCssClass',
   },
-  imports: [WebappSdkModule],
+  imports: [NotificationWidgetComponent, SearchInputComponent, WebappSdkModule],
 })
 export class AppComponent implements AfterViewInit, OnDestroy {
   componentCssClass: string;
@@ -52,20 +57,28 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
   showMdbItem$ = new BehaviorSubject<boolean>(false);
   sidebar$: Observable<boolean>;
+  section$: Observable<string | null>;
   focusMode$: Observable<boolean>;
+  utc: Signal<boolean>;
+  themePreference = this.appearanceService.themePreference;
+  smallWindow = this.appearanceService.smallWindow;
 
   userSubscription: Subscription;
+
+  // Incomplete: for dev use only
+  enableAppearanceBeta = false;
 
   constructor(
     private yamcs: YamcsService,
     router: Router,
-    route: ActivatedRoute,
+    private route: ActivatedRoute,
     private authService: AuthService,
-    private preferenceStore: PreferenceStore,
+    private prefs: Preferences,
     private dialog: MatDialog,
     private extensionService: ExtensionService,
-    appearanceService: AppearanceService,
+    private appearanceService: AppearanceService,
     private configService: ConfigService,
+    private formatter: Formatter,
   ) {
     this.focusMode$ = appearanceService.focusMode$;
     this.tag = configService.getTag();
@@ -74,6 +87,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     this.connected$ = yamcs.yamcsClient.connected$;
     this.connectionInfo$ = yamcs.connectionInfo$;
     this.user$ = authService.user$;
+    this.utc = formatter.utc;
 
     this.userSubscription = this.user$.subscribe((user) => {
       if (user) {
@@ -83,30 +97,33 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       }
     });
 
-    this.sidebar$ = router.events.pipe(
+    const route$ = router.events.pipe(
       filter((evt) => evt instanceof NavigationEnd),
-      map((evt) => {
+      tap(() => {
         // Emit ActivatedRoute updates for use in webcomponents
         window.dispatchEvent(
           new CustomEvent('YA_ACTIVATED_ROUTE', {
             detail: { route },
           }),
         );
-
+      }),
+      map(() => {
         let child = route;
         while (child.firstChild) {
           child = child.firstChild;
         }
 
-        if (
-          child.snapshot.data &&
-          child.snapshot.data['hasSidebar'] === false
-        ) {
-          return false;
-        } else {
-          return true;
-        }
+        return child.snapshot;
       }),
+      // Avoid multiple execution of our tap effect
+      shareReplay({ bufferSize: 1, refCount: true }),
+    );
+
+    this.sidebar$ = route$.pipe(
+      map((snapshot) => snapshot.data?.['hasSidebar'] !== false),
+    );
+    this.section$ = route$.pipe(
+      map((activatedRoute) => activatedRoute.data?.['section'] ?? null),
     );
   }
 
@@ -132,11 +149,15 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  toggleSidebar() {
-    this.preferenceStore.setValue(
-      'sidebar',
-      !this.preferenceStore.getValue('sidebar'),
-    );
+  setUTC(utc: boolean) {
+    if (this.formatter.utc() !== utc) {
+      this.prefs.setBoolean('utc', utc);
+      this.yamcs.switchContext(this.yamcs.instance, this.yamcs.processor);
+    }
+  }
+
+  setTheme(theme: Theme) {
+    this.appearanceService.setTheme(theme);
   }
 
   logout() {

@@ -64,7 +64,7 @@ export interface ParameterValue {
   expireMillis: number;
 }
 
-export interface Sample {
+export interface MeanSample {
   time: string;
   avg: number;
   min: number;
@@ -222,6 +222,7 @@ export interface DownloadParameterValuesOptions {
   stop?: string;
   norepeat?: boolean;
   delimiter?: 'TAB' | 'COMMA' | 'SEMICOLON';
+  extra?: Array<'raw' | 'monitoring'>;
   header?: 'QUALIFIED_NAME' | 'SHORT_NAME' | 'NONE';
   interval?: number;
   filename?: string;
@@ -234,20 +235,21 @@ export interface ExportParameterValuesOptions {
   list?: string;
   namespace?: string;
   delimiter?: 'TAB' | 'COMMA' | 'SEMICOLON';
+  extra?: 'raw' | 'monitoring';
   preserveLastValue?: boolean;
   interval?: number;
   limit?: number;
   order?: 'asc' | 'desc';
 }
 
-export interface GetParameterSamplesOptions {
+export interface DownsampleMeanOptions {
   start?: string;
   stop?: string;
   count?: number;
   gapTime?: number;
   source?: 'ParameterArchive' | 'replay';
-  order?: 'asc' | 'desc';
-  fields?: Array<keyof Sample>;
+  useRawValue?: boolean;
+  fields?: Array<keyof MeanSample>;
 }
 
 export interface GetParameterRangesOptions {

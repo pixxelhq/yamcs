@@ -1,0 +1,36 @@
+.legend {
+  position: absolute;
+  top: 0;
+  background-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.legend-box {
+  margin-top: 5px;
+  margin-right: 5px;
+  padding-left: 3px;
+  padding-right: 15px;
+  border-radius: 2px;
+  display: inline-block;
+  font-size: 10px;
+  line-height: 14px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.yvalue {
+  margin-left: 5px;
+  font-weight: bold;
+}
+
+.units {
+  margin-left: 2px;
+  font-weight: bold;
+}
+
+.error {
+  margin-left: 5px;
+  color: var(--y-error-color) !important;
+}
