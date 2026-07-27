@@ -676,21 +676,15 @@ repeat N:
 
 ## C. Gaps & Shortcomings
 
-### Gap 1 — TC[11,4]: Variable-length embedded TC packet (Critical)
+### Gap 1 — TC[11,4]: Variable-length embedded TC packet — RESOLVED, was not actually a gap
 
-**Problem**: PUS 11 INSERT_ACTIVITIES embeds a complete, variable-length CCSDS TC packet inside each scheduled activity. The embedded TC's length is determined by its **own CCSDS length field** (at byte offset +4 from the packet start), not by a preceding count field in the outer TC.
+**Problem** (as originally stated): PUS 11 INSERT_ACTIVITIES embeds a complete, variable-length CCSDS TC packet inside each scheduled activity, self-length-delimited via its own CCSDS length field, not a preceding count field.
 
-**What nested array support resolves**: YAMCS supports repeating a `{release_time, tc_packet}` pair N times as a single MetaCommand using `AggregateArgumentType` + `ArrayArgumentType` (confirmed by `array-in-array-arg.xml`). The N-activity repetition is NOT the barrier.
+**Correction**: this was assumed to require a `DynamicValue` referencing a sibling argument (impossible, since the length lives inside the binary blob, not a separate field). That's true for `BinaryDataEncoding.Type.DYNAMIC`, but there's a third option: **omit `SizeInBits` entirely**. `BinaryDataEncoding` then defaults to `FIXED_SIZE` with `sizeInBits = -1`, and the encoder (`DataEncodingEncoder.encodeRawBinary()`, `yamcs-core/.../mdb/DataEncodingEncoder.java:298-306`) writes out exactly the bytes the caller supplies — no framing, no fixed-size constraint, heterogeneous TC types fully supported. This is a documented YAMCS extension (see `DIFFERS_FROM_XTCE` note on `BinaryDataEncoding`), not a hack.
 
-**What it does NOT resolve**: The `tc_packet` field within each activity is variable-length. Its size cannot be declared as a static `FixedValue` and cannot be derived from a sibling argument (the CCSDS length is embedded inside the binary payload, not in a separate argument). XTCE `BinaryArgumentType` requires either a `FixedValue` or a `DynamicValue` that references an **argument in the same command** — not a field buried inside the binary blob.
+**Fix**: `ActivityEntryType` aggregate = `{release_time (PusTimeType), tc_packet (BinaryArgumentType, no SizeInBits)}`, wrapped in `ArrayArgumentType` sized by `N`. No uniform-size constraint, no manual hex pre-encoding required — operators can supply `tc_packet` from any other MDB command's already-built bytes. Full worked example (including the sub-command-CRC wrinkle, since an embedded TC is never independently transmitted/postprocessed) in `pus21.md` §b/§e — same technique, same codebase.
 
-**Impact**: TC[11,4] cannot be fully defined in XTCE for multi-activity scheduling with heterogeneous TC types. For single-activity scheduling with one known fixed-size TC, a workaround exists:
-
-- Define an `ActivityEntryType` aggregate: `{release_time (PusTimeType), tc_packet (BinaryArgumentType, FixedValue size)}`.
-- Use `ArrayArgumentType` over `ActivityEntryType` sized by `N`.
-- Operators supply the pre-encoded TC as a hex string; all TCs must be the same declared size.
-
-**Recommended approach**: Use `yamcs-client` with the `pus11ScheduleAt` extra for all production scheduling. The MDB definition of TC[11,4] is for documentation and manual testing only (N=1 or N>1 with uniform fixed-size TCs).
+**Still recommended**: `yamcs-client`'s `pus11ScheduleAt` extra remains the ergonomic path for production scheduling; the MDB definition above is now fully capable, not just a manual/documentation-only fallback.
 
 ---
 
@@ -754,7 +748,7 @@ repeat N:
 
 | Gap | Severity | Scope | XTCE-only fix? | Effort |
 |-----|----------|-------|----------------|--------|
-| #1 TC[11,4] embedded TC | High | MCS (operator interface) | ❌ No — N-activity array is expressible, but variable-length tc_packet binary is not | N/A (by design) |
+| #1 TC[11,4] embedded TC | High | MCS (operator interface) | ✅ Yes — resolved; unbounded `BinaryArgumentType` (no `SizeInBits`) inside the array element | Trivial (MDB only) |
 | #2 TC[11,7/8] missing offset | High | MCS (operator interface) | ✅ Yes | Trivial |
 | #3 TC[11,15] wrong args | High | MCS (operator interface) | ✅ Yes | Trivial |
 | #4 Groups TC[11,22–26]+TM[11,27] | Medium | MDB: MCS; Java: demo/test only | Partial — MDB ✅, Java (sim) ❌ | Low |
@@ -784,7 +778,7 @@ The one "Java" piece is `PusCommandPostprocessor.buildScheduledTc()` in `yamcs-c
 | TC[11,1] | Send | **Yes** | No | `ENABLE_SCHEDULER`, no args |
 | TC[11,2] | Send | **Yes** | No | `DISABLE_SCHEDULER`, no args |
 | TC[11,3] | Send | **Yes** | No | `RESET_SCHEDULER`, no args |
-| TC[11,4] | Send | **Partial** | No (already done) | Direct MDB limited to fixed-size TCs (Gap #1); production path uses `pus11ScheduleAt` extra handled by `PusCommandPostprocessor` |
+| TC[11,4] | Send | **Yes** | No | Direct MDB now fully expressible via unbounded `BinaryArgumentType` per entry (Gap #1, resolved); `pus11ScheduleAt` extra remains the ergonomic production path |
 | TC[11,5] | Send | **Yes** | No | Array of `{source_id, apid, seqcount}` |
 | TC[11,6] | Send | **Yes** | No | filter_type hardcoded to 0x01 (Gap #6) |
 | TC[11,7] | Send | **Yes** (with fix) | No | Missing `time_offset_ms` arg (Gap #2) |

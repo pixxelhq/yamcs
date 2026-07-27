@@ -155,12 +155,8 @@
 					</Dimension>
 				</DimensionList>
 			</ArrayArgumentType>
-			<!-- TC[11,4] INSERT_ACTIVITIES types — tc_packet size fixed at 128 bits (16 bytes); adjust for mission TC size -->
-			<BinaryArgumentType name="TcPacketType">
-				<BinaryDataEncoding>
-					<SizeInBits><FixedValue>128</FixedValue></SizeInBits>
-				</BinaryDataEncoding>
-			</BinaryArgumentType>
+			<!-- TC[11,4] INSERT_ACTIVITIES types — no SizeInBits: BinaryDataEncoding defaults to FIXED_SIZE with sizeInBits=-1, so the encoder writes out exactly the supplied bytes (unbounded, no uniform-size constraint across entries) -->
+			<BinaryArgumentType name="TcPacketType"/>
 			<AggregateArgumentType name="ActivityEntryType">
 				<MemberList>
 					<Member name="release_time" typeRef="/PUS/PusTimeType"/>

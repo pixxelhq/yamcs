@@ -519,12 +519,27 @@ YAMCS TC encoding → UDP uplink → simulator dispatch → UDP downlink → YAM
 
 ### Embedded TC Packet in TC/TM Payload (ST[19] reference)
 
-TC[19,1] and TM[19,11] carry a **raw TC packet** as a payload field. XTCE has no way to
-express "a variable-length TC packet embedded in another packet". Two workarounds:
+TC[19,1] and TM[19,11] carry a **raw TC packet** as a payload field, variable-length,
+heterogeneous type. **This is fully XTCE-expressible, no manual/Python parsing needed** — shipped
+in `examples/pus/src/main/yamcs/mdb/pus19.xml`:
 
-**Workaround A (recommended)**: Non-standard `request_tc_len:uint16` length prefix before the raw bytes. XTCE declares only the fixed fields; Python parses `request_tc_len` + `request_tc_bytes` manually after the last XTCE-declared argument.
+- **TC[19,1] (encode)**: `ea_add_entry_type` aggregate = `{app_process_id, event_def_id,
+  request_len:uint16, request}`, where `request` is a `BinaryArgumentType` whose `SizeInBits` is
+  a `DynamicValue` referencing the sibling `request_len` member (`pus19.xml:182-199`). Wrapped in
+  `ArrayArgumentType` sized by `N` (`pus19.xml:200-212`).
+- **TM[19,11] (decode)**: nested `SequenceContainer` (`ea_def_entry`) with a
+  `BinaryParameterType` sized the same way, referenced via `ContainerRefEntry`+`RepeatEntry`
+  (`pus19.xml:64-77, 134-142`) — see "Nested Dynamic Array Patterns" above for the general form.
 
-**Workaround B**: Fix the action request to a single known TC type (e.g., always TC[17,1] = 8 bytes). No length prefix needed; XTCE can declare 8 FixedValueEntry bytes as part of the aggregate. Only viable when the mission restricts EA requests to one TC type.
+This mission convention adds an explicit `request_len` sibling field (valid, but not literally
+spec-minimal). For services whose spec figures show **zero** framing bytes around the embedded
+packet (e.g. ST[21]'s TC[21,1]/TM[21,12] — see `pus21.md` §b), the same array-of-aggregate shape
+works with the raw-packet member's `SizeInBits` simply **omitted** — the encoder then writes
+exactly the caller-supplied bytes with no framing at all
+(`DataEncodingEncoder.encodeRawBinary()`, `FIXED_SIZE` + `sizeInBits<0`), and the decoder derives
+each entry's length from the packet's own internal CCSDS length field instead of a sibling
+argument. Prefer that variant when the spec forbids added fields; ST[19]'s `request_len` approach
+remains valid where it doesn't.
 
 ### Event-Action Function State Machine
 
@@ -842,28 +857,20 @@ SEQUENCE_STORE: dict[str, RequestSequence]   # key = seq_id string
 
 Execution status enum (Table 8-22): inactive=0, under_execution=1.
 
-### Embedded-TC-in-Sequence Workaround (extends ST[19] pattern)
+### Embedded-TC-in-Sequence — fully XTCE, no `tc_len` prefix (supersedes earlier draft)
 
-TC[21,1] and TM[21,12] carry `N × {TC_packet (variable-length), delay}` — the same structural
-gap as ST[19]. XTCE declares only `seq_id (16B fixed-string)` + `N (uint8)`; the entry block is
-raw binary parsed entirely in Python.
-
-**Mission wire format for each entry**:
-```
-tc_len : uint16  (big-endian, length of TC packet in bytes)
-TC_packet: raw bytes (tc_len bytes)
-delay_ms : uint32  (big-endian, milliseconds — mission relative-time convention)
-```
-
-**Parse snippet**:
-```python
-offset = 25   # after 16B seq_id + 1B N
-for _ in range(n):
-    tc_len = struct.unpack_from(">H", data, offset)[0]; offset += 2
-    raw_tc = data[offset:offset + tc_len];              offset += tc_len
-    delay_ms = struct.unpack_from(">I", data, offset)[0]; offset += 4
-    entries.append((raw_tc, delay_ms))
-```
+TC[21,1] and TM[21,12] carry `N × {TC_packet (variable-length, self-length-delimited via its own
+CCSDS header), delay}`. Earlier drafts of this doc assumed a non-standard `tc_len:uint16` prefix
+was required (like the ST[19] "Workaround A" above) and parsed entirely outside XTCE/MCS — this
+was replaced. The real wire format adds **no** framing field (spec figures show none), and the
+whole entry array — encode (TC[21,1]) and decode (TM[21,12]) — is declared directly in
+`pus21.xml` as an `ArrayArgumentType`/`ArrayParameterType` of an aggregate, same shape as the
+"Nested Dynamic Array Patterns" above, with the raw-packet member's `SizeInBits` omitted (encode)
+or `ContainerRefEntry`+`RepeatEntry`+`DynamicValue` off the packet's own length field (decode).
+See `pus21.md` §b for the worked XML and §e for the one remaining `yamcs-core` piece (CRC-
+finalizing an embedded sub-command before it's placed into the array — XTCE can't choose which
+MetaCommand an entry names). On-board (this simulator), the entry boundary is still found by
+reading each embedded packet's own CCSDS length field, unchanged from before.
 
 ### Sequence Execution Thread Pattern
 
