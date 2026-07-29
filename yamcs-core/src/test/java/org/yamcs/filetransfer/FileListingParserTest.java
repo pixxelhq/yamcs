@@ -132,6 +132,26 @@ class FileListingParserTest {
         ));
     }
 
+    @Test
+    void parseLsAlTest() throws ValidationException {
+        String data = "Contents of directory . generated with '['ls', '-al']':\n" +
+                "total 4\n" +
+                "drwx------  2 user user   80 Jul 29 12:42 .\n" +
+                "drwxrwxrwt 29 root root 1020 Jul 29 12:42 ..\n" +
+                "-rw-r--r--  1 user user   28 Jul 29 12:42 myfile.txt\n" +
+                "-rw-r--r--  1 user user    0 Jul 29 12:42 .hidden\n";
+
+        assertEquals(parse(new LsAlListingParser(), YConfiguration.wrap(Map.of("skipFirstLine", true)), "", data),
+                List.of(
+                        RemoteFile.newBuilder().setName(".hidden").setIsDirectory(false).setSize(0).build(),
+                        RemoteFile.newBuilder().setName("myfile.txt").setIsDirectory(false).setSize(28).build()));
+
+        // without skipFirstLine the bogus header line still doesn't match the ls -al pattern, so it's ignored anyway
+        assertEquals(parse(new LsAlListingParser(), "", data), List.of(
+                RemoteFile.newBuilder().setName(".hidden").setIsDirectory(false).setSize(0).build(),
+                RemoteFile.newBuilder().setName("myfile.txt").setIsDirectory(false).setSize(28).build()));
+    }
+
     List<RemoteFile> parse(FileListingParser parser, String remotePath, String data) throws ValidationException {
         return parse(parser, YConfiguration.emptyConfig(), remotePath, data);
     }
