@@ -866,8 +866,17 @@ public class V7Loader extends V7LoaderBase {
                 ptype.setReferenceTime(rt);
             } catch (IllegalArgumentException e) {
                 throw new SpreadsheetLoadException(ctx1,
-                        "Invalid epoch '" + epochs + "'for time calibration. Known epochs are "
+                        "Invalid epoch '" + epochs + "' for time calibration. Known epochs are "
                                 + Arrays.toString(TimeEpoch.CommonEpochs.values()));
+            }
+        } else if (ref.toLowerCase().startsWith("utc:")) {
+            String isostring = ref.substring(4);
+            try {
+                ReferenceTime rt = new ReferenceTime(new TimeEpoch(isostring));
+                ptype.setReferenceTime(rt);
+            } catch (IllegalArgumentException e) {
+                throw new SpreadsheetLoadException(ctx1,
+                        "Invalid UTC epoch '" + isostring + "' for time calibration.");
             }
         } else if (ref.toLowerCase().startsWith("parameter:")) {
             String paraRefName = ref.substring(10);
