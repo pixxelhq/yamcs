@@ -1,3 +1,11 @@
+Version 5.13.3 released 5-Aug-2026
+- Fix token refresh issue in case of cascaded commanding #1139
+- UI: Allow sublink nesting of arbitrary depth (previously only two levels)
+- Add filter option to subscribe-containers call
+- Added support for previously unimplemented OPI widgets
+- Excel: Allow specifying a custom epoch for an Absolute Time parameter (was already possible with XTCE)
+- CFDP: fix for zero size file transfers
+
 Version 5.13.2 released 14-Jul-2026
 - Improved privilege checks (CVE-2026-55521, CVE-2026-55547, CVE-2026-55548 and CVE-2026-55545)
 - Fix XSS in extension route (CVE-2026-55566)
