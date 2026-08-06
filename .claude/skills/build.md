@@ -18,3 +18,7 @@ Parse the args:
 Run from `/Users/nikhil/GSS Workspace/yamcs-Pixxel-fork`.
 
 Report: whether the build succeeded, any compilation errors, and how long it took.
+
+## Code Review Graph:
+- `source .venv/bin/activate` - Start venv for code review graph
+- `code-review-graph build` - runs code review graph

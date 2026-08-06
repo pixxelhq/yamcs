@@ -16,3 +16,5 @@ server.lock
 
 # Flattened pom.xmls
 .flattened-pom.xml
+# Added by code-review-graph
+.code-review-graph/

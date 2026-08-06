@@ -62,59 +62,64 @@ The primary ground-side workflow uses `yamcs-client` with the `pus11ScheduleAt` 
 ### Overall Status Table
 
 > **Java column** = simulator (`Pus11Service.java`) — **test/demo code only**. MDB column reflects the YAMCS operator interface, which is the production-relevant concern.
+>
+> All subtypes are now implemented in both MDB and the Java simulator. The one remaining item is Gap #1 below (`filter_type` hardcoded to `0x01` on the four filter-based commands).
 
 | Subtype | Type | Name | MDB | Java (sim) | Action Required |
 |---------|------|------|-----|------|-----------------|
 | 1 | TC | Enable Scheduler | ✅ | ✅ | None |
 | 2 | TC | Disable Scheduler | ✅ | ✅ | None |
 | 3 | TC | Reset Scheduler | ✅ | ✅ | None |
-| 4 | TC | Insert Activities | ❌ | ✅ | Add MDB definition |
+| 4 | TC | Insert Activities | ✅ | ✅ | None |
 | 5 | TC | Delete by Request ID | ✅ | ✅ | None |
-| 6 | TC | Delete by Filter | ✅ | ✅ | None |
-| 7 | TC | Time-shift by Request ID | ⚠️ | ✅ | Fix MDB: add `time_offset_ms` |
-| 8 | TC | Time-shift by Filter | ⚠️ | ✅ | Fix MDB: add `time_offset_ms` |
+| 6 | TC | Delete by Filter | ✅ | ✅ | `filter_type` hardcoded (Gap #1) |
+| 7 | TC | Time-shift by Request ID | ✅ | ✅ | None |
+| 8 | TC | Time-shift by Filter | ✅ | ✅ | `filter_type` hardcoded (Gap #1) |
+| 9 | TC | Detail Report by ID | ✅ | ✅ | None |
+| 10 | TM | Detail Report | ✅ | ✅ | None |
+| 11 | TC | Detail Report by Filter | ✅ | ✅ | `filter_type` hardcoded (Gap #1) |
 | 12 | TC | Summary Report by ID | ✅ | ✅ | None |
 | 13 | TM | Summary Report | ✅ | ✅ | None |
-| 14 | TC | Summary Report by Filter | ✅ | ✅ | None |
-| 15 | TC | Time-shift All | ⚠️ | ✅ | Fix MDB: wrong args |
+| 14 | TC | Summary Report by Filter | ✅ | ✅ | `filter_type` hardcoded (Gap #1) |
+| 15 | TC | Time-shift All | ✅ | ✅ | None |
 | 16 | TC | Detail Report All | ✅ | ✅ | None |
 | 17 | TC | Summary Report All | ✅ | ✅ | None |
 | 18 | TC | Report Subschedule Status | ✅ | ✅ | None |
 | 19 | TM | Subschedule Status Report | ✅ | ✅ | None |
 | 20 | TC | Enable Subschedules | ✅ | ✅ | None |
 | 21 | TC | Disable Subschedules | ✅ | ✅ | None |
-| 22 | TC | Create Scheduling Groups | ❌ | ❌ | MDB + Java |
-| 23 | TC | Delete Scheduling Groups | ❌ | ❌ | MDB + Java |
-| 24 | TC | Enable Scheduling Groups | ❌ | ❌ | MDB + Java |
-| 25 | TC | Disable Scheduling Groups | ❌ | ❌ | MDB + Java |
-| 26 | TC | Report Group Status | ❌ | ❌ | MDB + Java |
-| 27 | TM | Group Status Report | ❌ | ❌ | MDB + Java |
+| 22 | TC | Create Scheduling Groups | ✅ | ✅ | None |
+| 23 | TC | Delete Scheduling Groups | ✅ | ✅ | None |
+| 24 | TC | Enable Scheduling Groups | ✅ | ✅ | None |
+| 25 | TC | Disable Scheduling Groups | ✅ | ✅ | None |
+| 26 | TC | Report Group Status | ✅ | ✅ | None |
+| 27 | TM | Group Status Report | ✅ | ✅ | None |
 
 ---
 
 ### TC[11,1] — Enable the time-based schedule execution function
 
-**Spec**: No application data. Enables the scheduler so stored commands are released at their times.  
-**MDB**: ✅ `ENABLE_SCHEDULER` defined, no args.  
-**Java**: ✅ Sets `enabled = true`, sends ACK[1,3] + ACK[1,7].  
+**Spec**: No application data. Enables the scheduler so stored commands are released at their times.
+**MDB**: ✅ `ENABLE_SCHEDULER` defined, no args.
+**Java**: ✅ Sets `enabled = true`, sends ACK[1,3] + ACK[1,7].
 **Action**: None.
 
 ---
 
 ### TC[11,2] — Disable the time-based schedule execution function
 
-**Spec**: No application data. Disables the scheduler; queued commands are retained but not released.  
-**MDB**: ✅ `DISABLE_SCHEDULER`, no args.  
-**Java**: ✅ Sets `enabled = false`.  
+**Spec**: No application data. Disables the scheduler; queued commands are retained but not released.
+**MDB**: ✅ `DISABLE_SCHEDULER`, no args.
+**Java**: ✅ Sets `enabled = false`.
 **Action**: None.
 
 ---
 
 ### TC[11,3] — Reset the time-based schedule
 
-**Spec**: No application data. Clears all scheduled activities and disables the scheduler.  
-**MDB**: ✅ `RESET_SCHEDULER`, no args.  
-**Java**: ✅ Clears `commands` queue, sets `enabled = false`.  
+**Spec**: No application data. Clears all scheduled activities and disables the scheduler.
+**MDB**: ✅ `RESET_SCHEDULER`, no args.
+**Java**: ✅ Clears `commands` queue, sets `enabled = false`.
 **Action**: None.
 
 ---
@@ -130,71 +135,11 @@ repeat N times:
   tc_packet     (variable-length CCSDS TC, length = CCSDS_len_field + 7)
 ```
 
-**MDB**: ❌ No `INSERT_ACTIVITIES` MetaCommand defined.  
+**MDB**: ✅ `INSERT_ACTIVITIES` defined. `ActivityEntryType` aggregate = `{release_time (/PUS/PusTimeType), tc_packet (TcPacketType)}`, repeated via `ActivityArrayType` sized by argument `n`. `TcPacketType` is a `BinaryArgumentType` with no `SizeInBits` — `BinaryDataEncoding` defaults to `FIXED_SIZE` with `sizeInBits = -1`, so the encoder writes exactly the bytes supplied per entry, with no uniform-size constraint and no framing. Heterogeneous TC sizes are fully supported (see Gap history below and `pus21.md` §b/§e for the same technique).
 **Java**: ✅ `insertActivities()` reads subschedule + N, then for each: reads `PusTime`, reads CCSDS packet (using length field at offset +4), schedules into priority queue.
+**Action**: None.
 
-**Implementation plan** (MDB change):
-
-The N-activity repetition IS expressible using YAMCS's nested array support. Each activity is an aggregate of `{release_time, tc_packet}`. The tc_packet must be declared as fixed-size binary (all scheduled TCs must have the same encoded size — typically the smallest common TC size for the mission).
-
-```xml
-<!-- Add to ArgumentTypeSet: -->
-<!-- Fixed-size TC packet binary (adjust sizeInBits to match mission's common TC size) -->
-<BinaryArgumentType name="TcPacketType">
-    <BinaryDataEncoding>
-        <SizeInBits><FixedValue>128</FixedValue></SizeInBits>  <!-- 16 bytes example -->
-    </BinaryDataEncoding>
-</BinaryArgumentType>
-
-<!-- Activity entry: one {release_time, tc_packet} pair -->
-<AggregateArgumentType name="ActivityEntryType">
-    <MemberList>
-        <Member name="release_time" typeRef="/PUS/PusTimeType"/>
-        <Member name="tc_packet"    typeRef="TcPacketType"/>
-    </MemberList>
-</AggregateArgumentType>
-
-<!-- Array of N activity entries; N is a top-level argument -->
-<ArrayArgumentType arrayTypeRef="ActivityEntryType" name="ActivityArrayType">
-    <DimensionList>
-        <Dimension>
-            <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
-            <EndingIndex>
-                <DynamicValue>
-                    <ArgumentInstanceRef argumentRef="n"/>
-                    <LinearAdjustment intercept="-1"/>
-                </DynamicValue>
-            </EndingIndex>
-        </Dimension>
-    </DimensionList>
-</ArrayArgumentType>
-
-<!-- MetaCommand: -->
-<MetaCommand name="INSERT_ACTIVITIES" shortDescription="TC[11,4] insert activities into the time-based schedule">
-    <BaseMetaCommand metaCommandRef="pus11-tc">
-        <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="subtype" argumentValue="4" />
-        </ArgumentAssignmentList>
-    </BaseMetaCommand>
-    <ArgumentList>
-        <Argument argumentTypeRef="/dt/uint8" name="subschedule_id"/>
-        <Argument argumentTypeRef="/dt/uint8" name="n"/>
-        <Argument argumentTypeRef="ActivityArrayType" name="activities"/>
-    </ArgumentList>
-    <CommandContainer name="INSERT_ACTIVITIES">
-        <EntryList>
-            <ArgumentRefEntry argumentRef="subschedule_id"/>
-            <ArgumentRefEntry argumentRef="n"/>
-            <ArgumentRefEntry argumentRef="activities"/>
-        </EntryList>
-        <BaseContainer containerRef="pus11-tc"/>
-    </CommandContainer>
-</MetaCommand>
-```
-
-**Constraint**: All N TCs inside `activities` must have the same declared binary size (`TcPacketType` `FixedValue`). Operators supply each `tc_packet` as a hex string. For heterogeneous TC sizes, use `yamcs-client` `pus11ScheduleAt` instead.
-
-**Limitation**: YAMCS supports repeating a structured aggregate N times in a single command using nested `AggregateArgumentType` + `ArrayArgumentType` (confirmed by `array-in-array-arg.xml`). The `{release_time, tc_packet}` pair COULD be defined as a fixed-size aggregate array — BUT only if `tc_packet` has a known fixed size. Since `tc_packet` is a variable-length CCSDS TC packet (its length is determined by the CCSDS length field embedded within it, not by a preceding count in the outer command), this is the actual barrier. The practical workaround is: define the command for a single activity (n=1) with a fixed-size tc_packet, or use the `yamcs-client` `pus11ScheduleAt` extra which bypasses this entirely. See Section C — Gap #1.
+**Production note**: `yamcs-client`'s `pus11ScheduleAt` extra remains the ergonomic path for scheduling any existing TC (see Section D) — the `INSERT_ACTIVITIES` MetaCommand above is for operators who want to build a multi-activity TC[11,4] manually.
 
 ---
 
@@ -209,8 +154,8 @@ repeat N times:
   seqcount     (uint16)
 ```
 
-**MDB**: ✅ `DELETE_ACTIVITIES_BY_ID` with `num_requests (uint16)` + `requests[]` array.  
-**Java**: ✅ `deleteByRequestId()` → `filterById(bb, true)`.  
+**MDB**: ✅ `DELETE_ACTIVITIES_BY_ID` with `num_requests (uint16)` + `requests[]` array.
+**Java**: ✅ `deleteByRequestId()` → `filterById(bb, true)`.
 **Action**: None.
 
 ---
@@ -227,9 +172,9 @@ repeat N:
   subschedule_id (uint8)
 ```
 
-**MDB**: ✅ `DELETE_ACTIVITIES_BY_FILTER`. Note: MDB hardcodes `filter_type=0x01` as a `FixedValueEntry` — this locks it to "from-to" window only.  
-**Java**: ✅ `deleteByFilter()` → `filterByFilter(bb, true)` handles all 4 types.  
-**Action**: None for basic use. If all filter types are needed, the `filter_type` FixedValueEntry should be changed to an `ArgumentRefEntry`.
+**MDB**: ✅ `DELETE_ACTIVITIES_BY_FILTER`. Note: MDB hardcodes `filter_type=0x01` as a `FixedValueEntry` — this locks it to "from-to" window only.
+**Java**: ✅ `deleteByFilter()` → `filterByFilter(bb, true)` handles all 4 types.
+**Action**: None for basic use. If all filter types are needed, the `filter_type` FixedValueEntry should be changed to an `ArgumentRefEntry` (Gap #1).
 
 ---
 
@@ -243,25 +188,9 @@ repeat N:
   source_id / apid / seqcount
 ```
 
-**MDB**: ⚠️ `TIME_SHIFT_ACTIVITIES_BY_ID` is defined but **missing the `time_offset` argument**. The ArgList starts directly with `num_requests`.  
+**MDB**: ✅ `TIME_SHIFT_ACTIVITIES_BY_ID` — `time_offset_ms (/dt/uint32)` is the first argument, followed by `num_requests` + `requests[]`.
 **Java**: ✅ `timeShiftById()` reads `int timeShiftMillis = bb.getInt()` first, then calls `filterById`.
-
-**Fix required** in pus11.xml:
-```xml
-<ArgumentList>
-    <Argument argumentTypeRef="/dt/uint32" name="time_offset_ms"/>   <!-- ADD THIS -->
-    <Argument argumentTypeRef="NumRequestsType" name="num_requests"/>
-    <Argument argumentTypeRef="RequestArrayType" name="requests"/>
-</ArgumentList>
-<CommandContainer name="TIME_SHIFT_ACTIVITIES_BY_ID">
-    <EntryList>
-        <ArgumentRefEntry argumentRef="time_offset_ms"/>             <!-- ADD THIS -->
-        <ArgumentRefEntry argumentRef="num_requests"/>
-        <ArgumentRefEntry argumentRef="requests"/>
-    </EntryList>
-    ...
-</CommandContainer>
-```
+**Action**: None.
 
 ---
 
@@ -275,10 +204,50 @@ filter_type    (uint8)
 N subschedule_ids
 ```
 
-**MDB**: ⚠️ Same issue as TC[11,7] — `time_offset` missing.  
+**MDB**: ✅ `TIME_SHIFT_ACTIVITIES_BY_FILTER` — `time_offset_ms (/dt/uint32)` is the first argument, followed by the filter fields (`filter_type` still hardcoded to `0x01`, see Gap #1).
 **Java**: ✅ `timeShiftByFilter()` reads `int timeShiftMillis = bb.getInt()` first.
+**Action**: None for basic use; see Gap #1 for `filter_type`.
 
-**Fix required**: Same pattern as TC[11,7] — add `time_offset_ms (uint32)` as first argument.
+---
+
+### TC[11,9] — Detail-report activities by request identifier
+
+**Spec**:
+```
+N              (uint16)
+repeat N:
+  source_id / apid / seqcount
+```
+
+**MDB**: ✅ `GET_DETAIL_REPORT_BY_ID`.
+**Java**: ✅ `detailReportById()` → `filterById(bb, false)` → `sendDetailReport()`.
+**Action**: None.
+
+---
+
+### TM[11,10] — Time-based schedule detail report
+
+**Spec**:
+```
+N              (uint16)
+repeat N:
+  schedule_id  (uint8)
+  release_time (PusTime, 8 bytes)
+  tc_packet    (full embedded CCSDS TC, verbatim)
+```
+
+**MDB**: ✅ `DETAIL_REPORT` (in its own `DETAIL_REPORT` SpaceSystem for nicer parameter naming in YAMCS Web). `tc_data` is a `DetailReportTcPacketDataType` binary parameter sized dynamically from the embedded CCSDS `length` field (`LinearAdjustment slope="8" intercept="-48"`).
+**Java**: ✅ `sendDetailReport()` batches entries up to `MAX_DETAIL_REPORT_SIZE` (1400 bytes) per TM packet and writes the full TC bytes per entry.
+**Action**: None.
+
+---
+
+### TC[11,11] — Detail-report activities by filter
+
+**Spec**: Same filter structure as TC[11,6].
+**MDB**: ✅ `GET_DETAIL_REPORT_BY_FILTER`. Same `filter_type` hardcoded limitation as TC[11,6] (Gap #1).
+**Java**: ✅ `detailReportByFilter()`.
+**Action**: None for basic use.
 
 ---
 
@@ -291,8 +260,8 @@ repeat N:
   source_id / apid / seqcount
 ```
 
-**MDB**: ✅ `GET_SUMMARY_REPORT_BY_ID`.  
-**Java**: ✅ `summaryReportById()` → `filterById(bb, false)` → `sendSummaryReport()`.  
+**MDB**: ✅ `GET_SUMMARY_REPORT_BY_ID`.
+**Java**: ✅ `summaryReportById()` → `filterById(bb, false)` → `sendSummaryReport()`.
 **Action**: None.
 
 ---
@@ -310,17 +279,17 @@ repeat N:
   seqcount     (uint16)
 ```
 
-**MDB**: ✅ `SUMMARY_REPORT` in `SUMMARY_REPORT` SpaceSystem with `SUMMARY_REPORT_ELEMENT` container repeated N times.  
-**Java**: ✅ `sendSummaryReport()` encodes each entry as: subschedule(1) + releaseTime(8) + source(2) + apid(2) + seq(2) = 15 bytes/entry.  
+**MDB**: ✅ `SUMMARY_REPORT` in `SUMMARY_REPORT` SpaceSystem with `SUMMARY_REPORT_ELEMENT` container repeated N times.
+**Java**: ✅ `sendSummaryReport()` encodes each entry as: subschedule(1) + releaseTime(8) + source(2) + apid(2) + seq(2) = 15 bytes/entry.
 **Action**: None.
 
 ---
 
 ### TC[11,14] — Summary-report activities by filter
 
-**Spec**: Same filter structure as TC[11,6].  
-**MDB**: ✅ `GET_SUMMARY_REPORT_BY_FILTER`. Same filter_type hardcoded limitation as TC[11,6].  
-**Java**: ✅ `summaryReportByFilter()`.  
+**Spec**: Same filter structure as TC[11,6].
+**MDB**: ✅ `GET_SUMMARY_REPORT_BY_FILTER`. Same filter_type hardcoded limitation as TC[11,6] (Gap #1).
+**Java**: ✅ `summaryReportByFilter()`.
 **Action**: None for basic use.
 
 ---
@@ -333,54 +302,35 @@ time_offset    (relative time, int32 milliseconds)
 ```
 No other arguments — applies the offset to every scheduled activity.
 
-**MDB**: ⚠️ **WRONG**. `TIME_SHIFT_ACTIVITIES` currently has `num_requests (uint16)` + `requests[]` array — this is TC[11,7]'s signature, not TC[11,15].  
+**MDB**: ✅ `TIME_SHIFT_ACTIVITIES` has exactly one argument, `time_offset_ms (/dt/uint32)` — matches the spec.
 **Java**: ✅ `timeShiftAll()` correctly reads only `int timeShiftMillis = bb.getInt()` and iterates all commands.
-
-**Fix required** in pus11.xml — replace the entire ArgumentList and CommandContainer:
-```xml
-<MetaCommand name="TIME_SHIFT_ACTIVITIES" shortDescription="TC[11,15] time-shift all scheduled activities">
-    <BaseMetaCommand metaCommandRef="pus11-tc">
-        <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="subtype" argumentValue="15" />
-        </ArgumentAssignmentList>
-    </BaseMetaCommand>
-    <ArgumentList>
-        <Argument argumentTypeRef="/dt/uint32" name="time_offset_ms"/>
-    </ArgumentList>
-    <CommandContainer name="TIME_SHIFT_ACTIVITIES">
-        <EntryList>
-            <ArgumentRefEntry argumentRef="time_offset_ms"/>
-        </EntryList>
-        <BaseContainer containerRef="pus11-tc" />
-    </CommandContainer>
-</MetaCommand>
-```
+**Action**: None.
 
 ---
 
 ### TC[11,16] — Detail-report all scheduled activities
 
-**Spec**: No application data. Responds with TM[11,10] packet(s).  
-**MDB**: ✅ `GET_DETAIL_REPORT`, no args.  
-**Java**: ✅ `detailReportAll()` → `sendDetailReport(commands)`.  
+**Spec**: No application data. Responds with TM[11,10] packet(s).
+**MDB**: ✅ `GET_DETAIL_REPORT`, no args.
+**Java**: ✅ `detailReportAll()` → `sendDetailReport(commands)`.
 **Action**: None.
 
 ---
 
 ### TC[11,17] — Summary-report all scheduled activities
 
-**Spec**: No application data. Responds with TM[11,13].  
-**MDB**: ✅ `GET_SUMMARY_REPORT`, no args.  
-**Java**: ✅ `summaryReportAll()` → `sendSummaryReport(commands)`.  
+**Spec**: No application data. Responds with TM[11,13].
+**MDB**: ✅ `GET_SUMMARY_REPORT`, no args.
+**Java**: ✅ `summaryReportAll()` → `sendSummaryReport(commands)`.
 **Action**: None.
 
 ---
 
 ### TC[11,18] — Report the status of each time-based sub-schedule
 
-**Spec**: No application data. Responds with TM[11,19].  
-**MDB**: ✅ `GET_SCHEDULE_STATUS`, no args.  
-**Java**: ✅ `scheduleStatusReport()` emits TM[11,19] with count + {id, status} entries.  
+**Spec**: No application data. Responds with TM[11,19].
+**MDB**: ✅ `GET_SCHEDULE_STATUS`, no args.
+**Java**: ✅ `scheduleStatusReport()` emits TM[11,19] with count + {id, status} entries.
 **Action**: None.
 
 ---
@@ -395,8 +345,8 @@ repeat N:
   status       (uint8, 0=disabled 1=enabled)
 ```
 
-**MDB**: ✅ `SUBSCHEDULE_STATUS_REPORT` with `StatusReportType` array.  
-**Java**: ✅ Written by `scheduleStatusReport()`.  
+**MDB**: ✅ `SUBSCHEDULE_STATUS_REPORT` with `StatusReportType` array.
+**Java**: ✅ Written by `scheduleStatusReport()`.
 **Action**: None.
 
 ---
@@ -410,18 +360,18 @@ repeat N:
   subschedule_id (uint8)
 ```
 
-**MDB**: ✅ `ENABLE_SCHEDULE` with `num_schedules (uint8)` + `schedules[]`.  
-**Java**: ✅ `enableSubschedule()` — note: current Java reads only a single subschedule ID (`bb.get()`), ignoring `num_schedules`. Handles N=1 only.  
-**Action**: Java should loop N times. Minor fix.
+**MDB**: ✅ `ENABLE_SCHEDULE` with `num_schedules (uint8)` + `schedules[]`.
+**Java**: ✅ `enableSubschedule()` reads `n` then loops `n` times over `subschStatus.put(subschedule, true)`.
+**Action**: None.
 
 ---
 
 ### TC[11,21] — Disable time-based sub-schedules
 
-**Spec**: Same structure as TC[11,20].  
-**MDB**: ✅ `DISABLE_SCHEDULE`.  
-**Java**: ✅ Same single-read limitation as TC[11,20].  
-**Action**: Same minor Java fix as TC[11,20].
+**Spec**: Same structure as TC[11,20].
+**MDB**: ✅ `DISABLE_SCHEDULE`.
+**Java**: ✅ `disableSubschedule()` — same loop pattern as TC[11,20].
+**Action**: None.
 
 ---
 
@@ -435,88 +385,9 @@ repeat N:
   group_status (uint8, 0=disabled 1=enabled)
 ```
 
-**MDB**: ❌ Not defined.  
-**Java**: ❌ Returns `NACK(START_ERR_NOT_IMPLEMENTED)`.
-
-**Implementation plan**:
-
-*MDB additions* (pus11.xml):
-```xml
-<!-- Parameter types (TelemetryMetaData): -->
-<IntegerParameterType name="GroupIdType" signed="false">
-    <IntegerDataEncoding sizeInBits="8"/>
-</IntegerParameterType>
-<EnumeratedParameterType name="GroupStatusType">
-    <IntegerDataEncoding sizeInBits="8"/>
-    <EnumerationList>
-        <Enumeration value="0" label="disabled"/>
-        <Enumeration value="1" label="enabled"/>
-    </EnumerationList>
-</EnumeratedParameterType>
-
-<!-- Argument types (CommandMetaData): -->
-<IntegerArgumentType name="GroupIdType" baseType="/dt/uint8"/>
-<IntegerArgumentType name="NumGroupsType" baseType="/dt/uint8"/>
-<AggregateArgumentType name="GroupElementType">
-    <MemberList>
-        <Member typeRef="GroupIdType" name="group_id"/>
-        <Member typeRef="/dt/uint8" name="group_status"/>
-    </MemberList>
-</AggregateArgumentType>
-<ArrayArgumentType arrayTypeRef="GroupElementType" name="GroupArrayType">
-    <DimensionList>
-        <Dimension>
-            <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
-            <EndingIndex>
-                <DynamicValue>
-                    <ArgumentInstanceRef argumentRef="num_groups"/>
-                    <LinearAdjustment intercept="-1"/>
-                </DynamicValue>
-            </EndingIndex>
-        </Dimension>
-    </DimensionList>
-</ArrayArgumentType>
-
-<!-- MetaCommand: -->
-<MetaCommand name="CREATE_SCHEDULING_GROUPS"
-             shortDescription="TC[11,22] create time-based scheduling groups">
-    <BaseMetaCommand metaCommandRef="pus11-tc">
-        <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="subtype" argumentValue="22"/>
-        </ArgumentAssignmentList>
-    </BaseMetaCommand>
-    <ArgumentList>
-        <Argument argumentTypeRef="NumGroupsType" name="num_groups"/>
-        <Argument argumentTypeRef="GroupArrayType" name="groups"/>
-    </ArgumentList>
-    <CommandContainer name="CREATE_SCHEDULING_GROUPS">
-        <EntryList>
-            <ArgumentRefEntry argumentRef="num_groups"/>
-            <ArgumentRefEntry argumentRef="groups"/>
-        </EntryList>
-        <BaseContainer containerRef="pus11-tc"/>
-    </CommandContainer>
-</MetaCommand>
-```
-
-*Java addition* (Pus11Service.java):
-```java
-Map<Integer, Boolean> groupStatus = new HashMap<>();
-
-case 22 -> createGroups(tc);
-
-private void createGroups(PusTcPacket tc) {
-    ack_start(tc);
-    ByteBuffer bb = tc.getUserDataBuffer();
-    int n = bb.get() & 0xFF;
-    for (int i = 0; i < n; i++) {
-        int groupId = bb.get() & 0xFF;
-        boolean enabled = (bb.get() & 0xFF) == 1;
-        groupStatus.put(groupId, enabled);
-    }
-    ack_completion(tc);
-}
-```
+**MDB**: ✅ `CREATE_SCHEDULING_GROUPS` — `num_groups (uint8)` + `groups[]` array of `{group_id, group_status}`.
+**Java**: ✅ `createGroups()` reads N, then for each `{groupId, enabled}` pair populates `groupStatus`.
+**Action**: None.
 
 ---
 
@@ -529,94 +400,36 @@ repeat N:
   group_id     (uint8)
 ```
 
-**MDB**: ❌ Not defined. **Java**: ❌ NACK.
-
-**Implementation plan**:
-
-*MDB*: `DELETE_SCHEDULING_GROUPS` — args: `num_groups (uint8)` + `GroupIdArrayType` (array of uint8 group IDs).  
-*Java*: `case 23 -> deleteGroups(tc)` — reads N group IDs, calls `groupStatus.remove(groupId)` for each.
-
-```xml
-<ArrayArgumentType arrayTypeRef="GroupIdType" name="GroupIdArrayType">
-    <DimensionList><Dimension>
-        <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
-        <EndingIndex><DynamicValue><ArgumentInstanceRef argumentRef="num_groups"/>
-            <LinearAdjustment intercept="-1"/></DynamicValue></EndingIndex>
-    </Dimension></DimensionList>
-</ArrayArgumentType>
-
-<MetaCommand name="DELETE_SCHEDULING_GROUPS"
-             shortDescription="TC[11,23] delete time-based scheduling groups">
-    <BaseMetaCommand metaCommandRef="pus11-tc">
-        <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="subtype" argumentValue="23"/>
-        </ArgumentAssignmentList>
-    </BaseMetaCommand>
-    <ArgumentList>
-        <Argument argumentTypeRef="NumGroupsType" name="num_groups"/>
-        <Argument argumentTypeRef="GroupIdArrayType" name="group_ids"/>
-    </ArgumentList>
-    <CommandContainer name="DELETE_SCHEDULING_GROUPS">
-        <EntryList>
-            <ArgumentRefEntry argumentRef="num_groups"/>
-            <ArgumentRefEntry argumentRef="group_ids"/>
-        </EntryList>
-        <BaseContainer containerRef="pus11-tc"/>
-    </CommandContainer>
-</MetaCommand>
-```
+**MDB**: ✅ `DELETE_SCHEDULING_GROUPS` — `num_groups (uint8)` + `GroupIdArrayType` array of uint8 group IDs.
+**Java**: ✅ `deleteGroups()` reads N group IDs, calls `groupStatus.remove(groupId)` for each.
+**Action**: None.
 
 ---
 
 ### TC[11,24] — Enable time-based scheduling groups
 
-**Spec**:
-```
-N              (uint8)
-repeat N:
-  group_id     (uint8)
-```
-
-**MDB**: ❌. **Java**: ❌ NACK.  
-
-**Implementation plan**: Same structure as TC[11,23]. MetaCommand `ENABLE_SCHEDULING_GROUPS`, subtype=24. Java sets `groupStatus.put(groupId, true)`.
+**Spec**: Same structure as TC[11,23].
+**MDB**: ✅ `ENABLE_SCHEDULING_GROUPS`.
+**Java**: ✅ `enableGroups()` sets `groupStatus.put(groupId, true)` for each ID.
+**Action**: None.
 
 ---
 
 ### TC[11,25] — Disable time-based scheduling groups
 
-**Spec**: Same as TC[11,24].  
-**MDB**: ❌. **Java**: ❌ NACK.  
-
-**Implementation plan**: MetaCommand `DISABLE_SCHEDULING_GROUPS`, subtype=25. Java sets `groupStatus.put(groupId, false)`.
+**Spec**: Same structure as TC[11,23].
+**MDB**: ✅ `DISABLE_SCHEDULING_GROUPS`.
+**Java**: ✅ `disableGroups()` sets `groupStatus.put(groupId, false)` for each ID.
+**Action**: None.
 
 ---
 
 ### TC[11,26] — Report the status of each time-based scheduling group
 
-**Spec**: No application data. Responds with TM[11,27].  
-**MDB**: ❌. **Java**: ❌ NACK.
-
-**Implementation plan**:
-
-*MDB*: `REPORT_GROUP_STATUS`, no args, subtype=26.  
-*Java*:
-```java
-case 26 -> groupStatusReport(tc);
-
-private void groupStatusReport(PusTcPacket tc) {
-    ack_start(tc);
-    var pkt = newPacket(27, 4 + groupStatus.size() * 2);
-    var bb = pkt.getUserDataBuffer();
-    bb.putInt(groupStatus.size());
-    for (var me : groupStatus.entrySet()) {
-        bb.put(me.getKey().byteValue());
-        bb.put((byte)(me.getValue() ? 1 : 0));
-    }
-    pusSimulator.transmitRealtimeTM(pkt);
-    ack_completion(tc);
-}
-```
+**Spec**: No application data. Responds with TM[11,27].
+**MDB**: ✅ `REPORT_GROUP_STATUS`, no args.
+**Java**: ✅ `groupStatusReport()` emits TM[11,27] with count + `{group_id, group_status}` entries.
+**Action**: None.
 
 ---
 
@@ -630,117 +443,27 @@ repeat N:
   group_status (uint8, 0=disabled 1=enabled)
 ```
 
-**MDB**: ❌ Not defined. **Java**: ❌ Not emitted.
-
-**Implementation plan**:
-
-*MDB additions* (pus11.xml TelemetryMetaData):
-```xml
-<!-- ParameterTypeSet: -->
-<AggregateParameterType name="GroupStatusElementType">
-    <MemberList>
-        <Member typeRef="GroupIdType" name="group_id"/>
-        <Member typeRef="GroupStatusType" name="group_status"/>
-    </MemberList>
-</AggregateParameterType>
-<ArrayParameterType arrayTypeRef="GroupStatusElementType" name="GroupStatusReportType">
-    <DimensionList><Dimension>
-        <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
-        <EndingIndex><DynamicValue>
-            <ParameterInstanceRef parameterRef="group_report_n"/>
-            <LinearAdjustment intercept="-1"/>
-        </DynamicValue></EndingIndex>
-    </Dimension></DimensionList>
-</ArrayParameterType>
-
-<!-- ParameterSet: -->
-<Parameter parameterTypeRef="/dt/uint32" name="group_report_n"/>
-<Parameter parameterTypeRef="GroupStatusReportType" name="group_report"/>
-
-<!-- ContainerSet: -->
-<SequenceContainer name="GROUP_STATUS_REPORT"
-                   shortDescription="TM[11,27] time-based scheduling group status report">
-    <EntryList>
-        <ParameterRefEntry parameterRef="group_report_n"/>
-        <ArrayParameterRefEntry parameterRef="group_report"/>
-    </EntryList>
-    <BaseContainer containerRef="pus11-tm">
-        <RestrictionCriteria>
-            <Comparison parameterRef="/PUS/subtype" comparisonOperator="==" value="27"/>
-        </RestrictionCriteria>
-    </BaseContainer>
-</SequenceContainer>
-```
+**MDB**: ✅ `GROUP_STATUS_REPORT` with `GroupStatusReportType` array, mirroring `SUBSCHEDULE_STATUS_REPORT`'s pattern.
+**Java**: ✅ Written by `groupStatusReport()`.
+**Action**: None.
 
 ---
 
 ## C. Gaps & Shortcomings
 
-### Gap 1 — TC[11,4]: Variable-length embedded TC packet — RESOLVED, was not actually a gap
+> Previous revisions of this doc tracked five other gaps (missing `INSERT_ACTIVITIES` MDB definition, missing `time_offset_ms` on TC[11,7]/[11,8], wrong argument list on TC[11,15], unimplemented scheduling groups TC[11,22–26]/TM[11,27], and a single-ID-only bug in the simulator's TC[11,20]/[11,21] handlers). All five are now resolved in both the MDB (`pus11.xml`) and the Java simulator (`Pus11Service.java`) — see the per-subtype sections in Part B for details. Only one gap remains open.
 
-**Problem** (as originally stated): PUS 11 INSERT_ACTIVITIES embeds a complete, variable-length CCSDS TC packet inside each scheduled activity, self-length-delimited via its own CCSDS length field, not a preceding count field.
+### Gap 1 — TC[11,6/8/11/14]: `filter_type` hardcoded to `0x01`
 
-**Correction**: this was assumed to require a `DynamicValue` referencing a sibling argument (impossible, since the length lives inside the binary blob, not a separate field). That's true for `BinaryDataEncoding.Type.DYNAMIC`, but there's a third option: **omit `SizeInBits` entirely**. `BinaryDataEncoding` then defaults to `FIXED_SIZE` with `sizeInBits = -1`, and the encoder (`DataEncodingEncoder.encodeRawBinary()`, `yamcs-core/.../mdb/DataEncodingEncoder.java:298-306`) writes out exactly the bytes the caller supplies — no framing, no fixed-size constraint, heterogeneous TC types fully supported. This is a documented YAMCS extension (see `DIFFERS_FROM_XTCE` note on `BinaryDataEncoding`), not a hack.
-
-**Fix**: `ActivityEntryType` aggregate = `{release_time (PusTimeType), tc_packet (BinaryArgumentType, no SizeInBits)}`, wrapped in `ArrayArgumentType` sized by `N`. No uniform-size constraint, no manual hex pre-encoding required — operators can supply `tc_packet` from any other MDB command's already-built bytes. Full worked example (including the sub-command-CRC wrinkle, since an embedded TC is never independently transmitted/postprocessed) in `pus21.md` §b/§e — same technique, same codebase.
-
-**Still recommended**: `yamcs-client`'s `pus11ScheduleAt` extra remains the ergonomic path for production scheduling; the MDB definition above is now fully capable, not just a manual/documentation-only fallback.
-
----
-
-### Gap 2 — TC[11,7] and TC[11,8]: Missing `time_offset_ms` in MDB
-
-**Problem**: Both `TIME_SHIFT_ACTIVITIES_BY_ID` and `TIME_SHIFT_ACTIVITIES_BY_FILTER` in pus11.xml are missing the first argument `time_offset_ms`. The Java simulator reads this field first (`bb.getInt()`), so any TC sent via YAMCS using the current MDB will be mis-parsed — the first 4 bytes of `num_requests` will be interpreted as the time offset.
-
-**Impact**: Both subtypes are silently broken when used via YAMCS Web. The TC appears to succeed (ACK returned) but the shift value and target commands are wrong.
-
-**Fix**: Add `<Argument argumentTypeRef="/dt/uint32" name="time_offset_ms"/>` as the first arg in both commands.
-
----
-
-### Gap 3 — TC[11,15]: Wrong argument signature in MDB
-
-**Problem**: `TIME_SHIFT_ACTIVITIES` (subtype 15) currently has `num_requests + requests[]` — the same signature as TC[11,7]. The PUS spec defines subtype 15 as "shift ALL activities by a single time offset" with no selection arguments. The Java `timeShiftAll()` correctly reads only `bb.getInt()`.
-
-**Impact**: Sending TC[11,15] via YAMCS will send spurious `num_requests` + request-ID data that the Java simulator ignores (after reading the first 4 bytes as the time offset, remaining data is discarded). However the operator interface is misleading and extra bytes are transmitted.
-
-**Fix**: Replace the ArgumentList and CommandContainer with just `time_offset_ms (uint32)`.
-
----
-
-### Gap 4 — Group management (TC[11,22–26] + TM[11,27]): Not implemented
-
-**Problem**: All group management subtypes return `NACK(NOT_IMPLEMENTED)` and have no MDB definitions. Groups are an optional PUS 11 feature, but they are listed as required in the task spec.
-
-**Impact**: TC[11,22–26] cannot be sent via the operator interface (no MDB). TM[11,27] is never emitted by the simulator.
-
-**Scope**: MDB additions are the **production-relevant** concern (they define what operators can send from the MCS). The Java simulator additions are **test/demo only** — needed only to validate the MDB against an on-board behaviour stub.
-
-**Effort**: Low-to-medium. MDB needs new parameter types and 6 new definitions. Java simulator (demo) needs a new `Map<Integer, Boolean> groupStatus`, 5 new case handlers, and 1 new TM emitter (~80 lines). No architectural change required — mirrors the existing subschedule pattern exactly.
-
-**XTCE feasibility**: ✅ Fully implementable in XTCE. Group management uses the same patterns as subschedule management (TC[11,20/21] + TM[11,19]) which already work.
-
----
-
-### Gap 5 — TC[11,20/21]: Java simulator only handles N=1
-
-**Problem**: `enableSubschedule()` and `disableSubschedule()` each read only a single `bb.get()` — they ignore `num_schedules` and only process the first subschedule ID. The MDB correctly encodes an array.
-
-**Scope**: **Simulator (test/demo) only.** The MCS ground interface is correct; this is a gap in the demo simulator's TC handler.
-
-**Impact**: When testing against the simulator, sending ENABLE_SCHEDULE or DISABLE_SCHEDULE with N > 1 will only enable/disable the first subschedule. No error is reported. Does not affect production MCS TC encoding.
-
-**Fix** (minor, simulator Java only): Loop `num_schedules` times.
-
----
-
-### Gap 6 — TC[11,6/8/14]: `filter_type` hardcoded to `0x01`
-
-**Problem**: The MDB for filter-based commands uses `<FixedValueEntry binaryValue="01" sizeInBits="8" name="filter_type"/>` which always sends `type=1` (from-to time window). Operators cannot select other filter types (select-all, from-time, to-time) from YAMCS Web.
+**Problem**: The MDB for all four filter-based commands uses `<FixedValueEntry binaryValue="01" sizeInBits="8" name="filter_type"/>` which always sends `type=1` (from-to time window). Operators cannot select other filter types (select-all, from-time, to-time) from YAMCS Web.
 
 **Impact**: Only time-range based filtering is accessible via UI. Select-all (type=0) is most common and is not reachable.
 
-**Fix**: Change `FixedValueEntry` to `ArgumentRefEntry` with an enumerated `FilterTypeType` argument.
+**Fix**: Change `FixedValueEntry` to `ArgumentRefEntry` with an enumerated `FilterTypeType` argument, on `DELETE_ACTIVITIES_BY_FILTER` (TC[11,6]), `TIME_SHIFT_ACTIVITIES_BY_FILTER` (TC[11,8]), `GET_DETAIL_REPORT_BY_FILTER` (TC[11,11]), and `GET_SUMMARY_REPORT_BY_FILTER` (TC[11,14]).
+
+**Scope**: MCS (operator interface). The Java simulator already handles all 4 filter types correctly (`filterByFilter()`); only the MDB restricts what an operator can send.
+
+**Effort**: Minor — one new enumerated argument type, four `EntryList` edits.
 
 ---
 
@@ -748,12 +471,7 @@ repeat N:
 
 | Gap | Severity | Scope | XTCE-only fix? | Effort |
 |-----|----------|-------|----------------|--------|
-| #1 TC[11,4] embedded TC | High | MCS (operator interface) | ✅ Yes — resolved; unbounded `BinaryArgumentType` (no `SizeInBits`) inside the array element | Trivial (MDB only) |
-| #2 TC[11,7/8] missing offset | High | MCS (operator interface) | ✅ Yes | Trivial |
-| #3 TC[11,15] wrong args | High | MCS (operator interface) | ✅ Yes | Trivial |
-| #4 Groups TC[11,22–26]+TM[11,27] | Medium | MDB: MCS; Java: demo/test only | Partial — MDB ✅, Java (sim) ❌ | Low |
-| #5 TC[11,20/21] N>1 | Low | Demo/test simulator only | ❌ Java sim only | Trivial |
-| #6 TC[11,6/8/14] filter_type | Low | MCS (operator interface) | ✅ Yes | Minor |
+| #1 TC[11,6/8/11/14] filter_type hardcoded | Low | MCS (operator interface) | ✅ Yes | Minor |
 
 ---
 
@@ -765,7 +483,7 @@ ST[11] is **XTCE-only on the ground side**. No `Pus11Service.java` exists in `ya
 
 For ST[11]:
 - All **TC sends** are encoded as XTCE MetaCommands + `PusCommandPostprocessor`
-- All **TM receives** (TM[11,13], TM[11,19], TM[11,27]) are ordinary XTCE parameter containers — no native event emission needed
+- All **TM receives** (TM[11,10], TM[11,13], TM[11,19], TM[11,27]) are ordinary XTCE parameter containers — no native event emission needed
 
 The one "Java" piece is `PusCommandPostprocessor.buildScheduledTc()` in `yamcs-core/src/main/java/org/yamcs/pus/PusCommandPostprocessor.java` (lines 128–190), but that code already exists and requires no new implementation. It handles the `pus11ScheduleAt` command extra transparently.
 
@@ -778,24 +496,27 @@ The one "Java" piece is `PusCommandPostprocessor.buildScheduledTc()` in `yamcs-c
 | TC[11,1] | Send | **Yes** | No | `ENABLE_SCHEDULER`, no args |
 | TC[11,2] | Send | **Yes** | No | `DISABLE_SCHEDULER`, no args |
 | TC[11,3] | Send | **Yes** | No | `RESET_SCHEDULER`, no args |
-| TC[11,4] | Send | **Yes** | No | Direct MDB now fully expressible via unbounded `BinaryArgumentType` per entry (Gap #1, resolved); `pus11ScheduleAt` extra remains the ergonomic production path |
+| TC[11,4] | Send | **Yes** | No | `INSERT_ACTIVITIES` fully expressible via unbounded `BinaryArgumentType` per entry; `pus11ScheduleAt` extra remains the ergonomic production path |
 | TC[11,5] | Send | **Yes** | No | Array of `{source_id, apid, seqcount}` |
-| TC[11,6] | Send | **Yes** | No | filter_type hardcoded to 0x01 (Gap #6) |
-| TC[11,7] | Send | **Yes** (with fix) | No | Missing `time_offset_ms` arg (Gap #2) |
-| TC[11,8] | Send | **Yes** (with fix) | No | Same as TC[11,7] (Gap #2) |
+| TC[11,6] | Send | **Yes** | No | filter_type hardcoded to 0x01 (Gap #1) |
+| TC[11,7] | Send | **Yes** | No | `time_offset_ms` present |
+| TC[11,8] | Send | **Yes** | No | `time_offset_ms` present; filter_type hardcoded (Gap #1) |
+| TC[11,9] | Send | **Yes** | No | Array of request IDs |
+| TC[11,11] | Send | **Yes** | No | filter_type hardcoded to 0x01 (Gap #1) |
 | TC[11,12] | Send | **Yes** | No | Array of request IDs |
 | TC[11,14] | Send | **Yes** | No | Same as TC[11,6] |
-| TC[11,15] | Send | **Yes** (with fix) | No | Wrong args currently (Gap #3) |
+| TC[11,15] | Send | **Yes** | No | Single `time_offset_ms` arg, matches spec |
 | TC[11,16] | Send | **Yes** | No | No args |
 | TC[11,17] | Send | **Yes** | No | No args |
 | TC[11,18] | Send | **Yes** | No | No args |
 | TC[11,20] | Send | **Yes** | No | Array of subschedule IDs |
 | TC[11,21] | Send | **Yes** | No | Same as TC[11,20] |
-| TC[11,22–25] | Send | **Yes** | No | Not in MDB yet (Gap #4), but fully expressible in XTCE |
-| TC[11,26] | Send | **Yes** | No | Not in MDB yet (Gap #4) |
+| TC[11,22–25] | Send | **Yes** | No | Array of group IDs / `{group_id, group_status}` |
+| TC[11,26] | Send | **Yes** | No | No args |
+| TM[11,10] | Receive | **Yes** | No | XTCE container with dynamically-sized embedded TC binary |
 | TM[11,13] | Receive | **Yes** | No | XTCE container with dynamic array of summary entries |
 | TM[11,19] | Receive | **Yes** | No | XTCE container with `{id, status}` array |
-| TM[11,27] | Receive | **Yes** | No | Not in MDB yet (Gap #4), but fully expressible in XTCE |
+| TM[11,27] | Receive | **Yes** | No | XTCE container with `{group_id, group_status}` array |
 
 ---
 
@@ -837,7 +558,7 @@ commandPostprocessorArgs:
 | | ST[05] | ST[11] |
 |--|--------|--------|
 | Native Java needed? | **Yes** — `PusEventDecoder` | **No** |
-| Why Java for TM? | TM[5,1–4] must be promoted to YAMCS native events (events stream) — no XTCE mechanism exists for this | TM[11,13/19/27] are parameter containers — decoded by XTCE directly |
+| Why Java for TM? | TM[5,1–4] must be promoted to YAMCS native events (events stream) — no XTCE mechanism exists for this | TM[11,10/13/19/27] are parameter containers — decoded by XTCE directly |
 | Existing Java in yamcs-core | `Pus5Service`, `PusEventDecoder` | `PusCommandPostprocessor.buildScheduledTc()` (already present) |
 | XTCE for TC? | Yes (TC[5,5/6/7]) | Yes (all subtypes) |
 | XTCE for TM? | Partial — XTCE decodes params, but Java needed for event emission | Full — XTCE decodes all TM packets |
@@ -850,8 +571,198 @@ Only if you run the on-board scheduler **inside the YAMCS process** (HITL or a Y
 
 1. Create `yamcs-core/src/main/java/org/yamcs/pus/Pus11Service.java` extending `PusTcHandler`
 2. Register under `PusCommandReleaser` with `serviceType: 11`
-3. Implement `handleTc(PreparedCommand)` dispatching to subtypes 1–21 (groups 22–26 optional)
+3. Implement `handleTc(PreparedCommand)` dispatching to subtypes 1–26
 
 This mirrors `Pus11Service.java` in `simulator/` exactly, but uses `emitTm(serviceType, subtype, appData)` from `PusCommandReleaser` instead of `pusSimulator.transmitRealtimeTM(pkt)`.
 
 For a ground-only MCS, no such service is needed.
+
+---
+
+## E. Manual Testing
+
+Reflects the actual implementation: `Pus11Service.java` and `examples/pus/src/main/yamcs/mdb/pus11.xml`.
+Command paths, argument names, and byte layouts below are taken directly from those files.
+
+### E.1 Start the instance
+
+```bash
+mvn -pl simulator,examples/pus -am clean install -DskipTests   # first build only
+mvn -pl examples/pus yamcs:run
+```
+Web UI: `http://localhost:8090`, instance `pus`. Commands live under `/PUS11/...`. TM containers
+are also under `/PUS11/...`, except TM[11,10] and TM[11,13] which live one level deeper — see E.3.
+
+### E.2 Command reference — valid inputs
+
+All commands are under `/PUS11/`. The `n`/`num_requests`/`num_schedules`/`num_groups` count fields
+must be supplied explicitly alongside their corresponding arrays — YAMCS does not infer them from
+array length (same convention as PUS12/PUS14's `N` fields).
+
+| Command | Subtype | Valid example args |
+|---|---|---|
+| `ENABLE_SCHEDULER` | TC[11,1] | `{}` (no arguments) |
+| `DISABLE_SCHEDULER` | TC[11,2] | `{}` (no arguments) |
+| `RESET_SCHEDULER` | TC[11,3] | `{}` (no arguments) — clears the queue and disables the scheduler |
+| `INSERT_ACTIVITIES` | TC[11,4] | `{"subschedule_id": 1, "n": 1, "activities": [{"release_time": "<a few seconds in the future>", "tc_packet": "<hex bytes of an already-encoded TC — see E.2.1>"}]}` |
+| `DELETE_ACTIVITIES_BY_ID` | TC[11,5] | `{"num_requests": 1, "requests": [{"source_id": 0, "apid": 1, "seqcount": <seq of the embedded TC>}]}` |
+| `DELETE_ACTIVITIES_BY_FILTER` | TC[11,6] | `{"start_time": "<past>", "end_time": "<far future>", "num_schedules": 0, "schedules": []}` — `filter_type` is fixed at `0x01` (from–to) in the MDB (Gap #1), so this always matches by time window only; `num_schedules=0` means "any subschedule" |
+| `TIME_SHIFT_ACTIVITIES_BY_ID` | TC[11,7] | `{"time_offset_ms": 5000, "num_requests": 1, "requests": [{"source_id": 0, "apid": 1, "seqcount": <seq>}]}` — positive shift only, see E.5 |
+| `TIME_SHIFT_ACTIVITIES_BY_FILTER` | TC[11,8] | `{"time_offset_ms": 5000, "start_time": "<past>", "end_time": "<far future>", "num_schedules": 0, "schedules": []}` |
+| `GET_DETAIL_REPORT_BY_ID` | TC[11,9] | `{"num_requests": 1, "requests": [{"source_id": 0, "apid": 1, "seqcount": <seq>}]}` |
+| `GET_DETAIL_REPORT_BY_FILTER` | TC[11,11] | `{"start_time": "<past>", "end_time": "<far future>", "num_schedules": 0, "schedules": []}` |
+| `GET_SUMMARY_REPORT_BY_ID` | TC[11,12] | `{"num_requests": 1, "requests": [{"source_id": 0, "apid": 1, "seqcount": <seq>}]}` |
+| `GET_SUMMARY_REPORT_BY_FILTER` | TC[11,14] | `{"start_time": "<past>", "end_time": "<far future>", "num_schedules": 0, "schedules": []}` |
+| `TIME_SHIFT_ACTIVITIES` | TC[11,15] | `{"time_offset_ms": 5000}` — shifts every queued activity |
+| `GET_DETAIL_REPORT` | TC[11,16] | `{}` (no arguments) — reports all queued activities |
+| `GET_SUMMARY_REPORT` | TC[11,17] | `{}` (no arguments) |
+| `GET_SCHEDULE_STATUS` | TC[11,18] | `{}` (no arguments) |
+| `ENABLE_SCHEDULE` | TC[11,20] | `{"num_schedules": 1, "schedules": [1]}` |
+| `DISABLE_SCHEDULE` | TC[11,21] | `{"num_schedules": 1, "schedules": [1]}` |
+| `CREATE_SCHEDULING_GROUPS` | TC[11,22] | `{"num_groups": 1, "groups": [{"group_id": 1, "group_status": 1}]}` |
+| `DELETE_SCHEDULING_GROUPS` | TC[11,23] | `{"num_groups": 1, "group_ids": [1]}` |
+| `ENABLE_SCHEDULING_GROUPS` | TC[11,24] | `{"num_groups": 1, "group_ids": [1]}` |
+| `DISABLE_SCHEDULING_GROUPS` | TC[11,25] | `{"num_groups": 1, "group_ids": [1]}` |
+| `REPORT_GROUP_STATUS` | TC[11,26] | `{}` (no arguments) |
+
+Rejection conditions to exercise: `INSERT_ACTIVITIES` with a `release_time` in the past responds
+with **NACK completion**, code `COMPL_ERR_SCHEDULE_TIME_IN_THE_PAST` (`insertActivities` rejects the
+whole batch as soon as one entry fails the check — see E.4 step 8). An unrecognized subtype (e.g.
+hand-crafting TC[11,10] or TC[11,13], which are TM-only) gets **NACK start**
+(`START_ERR_INVALID_PUS_SUBTYPE`) since `Pus11Service.executeTc`'s `switch` has no case for it.
+Every other command in the table above unconditionally ACKs — the simulator does no further
+validation (no "unknown request ID" or "unknown subschedule/group ID" rejection anywhere in ST[11]).
+
+#### E.2.1 Building the embedded `tc_packet` bytes for TC[11,4]
+
+`tc_packet` must be a complete, already-encoded CCSDS/PUS TC packet (same convention as ST[19]'s
+embedded `request` — see `pus19.md`). The simplest command to embed is `/PUS17/ARE_YOU_ALIVE`
+(`TC[17,1]`, zero arguments, responds with `TM[17,2]`) since its effect is trivially observable.
+Preferred way to get real, correctly-encoded bytes — a dry-run command issue via `yamcs-client`:
+
+```python
+from yamcs.client import YamcsClient
+
+client = YamcsClient("localhost:8090")
+processor = client.get_processor("pus", "realtime")
+issued = processor.issue_command("/PUS17/ARE_YOU_ALIVE", args={}, dry_run=True)
+tc_packet_bytes = issued.binary   # complete, CRC'd raw TC packet, ready to embed
+print(len(tc_packet_bytes), issued.hex, issued.generation_time)
+```
+
+`dry_run=True` prepares and encodes the command without transmitting it, so `issued.binary` is safe
+to reuse as `tc_packet` in `INSERT_ACTIVITIES`. Note the `seqcount` YAMCS assigns it (visible on the
+`PreparedCommand`/via `StringConverter.arrayToHexString` in the simulator log when it's released) —
+that value is what you'll need for `DELETE_ACTIVITIES_BY_ID`/`TIME_SHIFT_ACTIVITIES_BY_ID`/
+`GET_*_REPORT_BY_ID`'s `seqcount` argument, since request IDs are `(source_id, apid, seqcount)` of
+the *embedded* TC, not of the outer `INSERT_ACTIVITIES` command.
+
+For a purely manual/offline reference, an `ARE_YOU_ALIVE` packet targeting `MAIN_APID=1` with the
+default `ackflags=7` looks like this (13 bytes; CRC zeroed since `pusSimulator.processTc` re-dispatches
+it exactly like an externally-uplinked TC when released, so the CRC **is** checked at release time —
+unlike ST[19]'s bypass, see `pus19.md`):
+
+```
+1801 C000 0006 27 11 01 0000 0000
+```
+Use a real dry-run instead of hand-computing the CRC for anything beyond a smoke test.
+
+### E.3 TMs to check
+
+| Container | Subtype | Triggered by | Layout |
+|---|---|---|---|
+| `/PUS11/SUBSCHEDULE_STATUS_REPORT` | TM[11,19] | `GET_SCHEDULE_STATUS` | `status_report_n:u32`, then `status_report_n` × `{schedule_id:u8, schedule_status:u8}` (0=disabled/1=enabled) |
+| `/PUS11/GROUP_STATUS_REPORT` | TM[11,27] | `REPORT_GROUP_STATUS` | `group_report_n:u32`, then `group_report_n` × `{group_id:u8, group_status:u8}` |
+| `/PUS11/DETAIL_REPORT/DETAIL_REPORT` | TM[11,10] | `GET_DETAIL_REPORT`, `GET_DETAIL_REPORT_BY_ID`, `GET_DETAIL_REPORT_BY_FILTER` | `n:u16`, then `n` × `{schedule_id:u8, release_time:PusTime(8B), <embedded TC packet verbatim>}` — nested one `SpaceSystem` level down for a cleaner display name in YAMCS Web (see the XML comment) |
+| `/PUS11/SUMMARY_REPORT/SUMMARY_REPORT` | TM[11,13] | `GET_SUMMARY_REPORT`, `GET_SUMMARY_REPORT_BY_ID`, `GET_SUMMARY_REPORT_BY_FILTER` | `n:u16`, then `n` × `{schedule_id:u8, release_time:PusTime(8B), source:u16, apid:u16, seq:u16}` — also nested one level down |
+
+Large detail reports are split across multiple TM[11,10] packets if the encoded size would exceed
+`MAX_DETAIL_REPORT_SIZE` (1400 bytes) — `sendDetailReport()` batches entries and emits one packet per
+batch, so expect >1 `/PUS11/DETAIL_REPORT/DETAIL_REPORT` packet if you've queued many activities.
+
+Also watch the standard PUS-1 verification containers (`/PUS/pus-tc-ack-*`) for ACK/NACK
+start/completion of every TC[11,x] you send, **and** for the embedded command's own ACK/NACK when it
+is autonomously released at its `release_time` — that second ACK/completion pair, with no
+corresponding TC[11,x] in the command history at that timestamp, is the tell that the release
+actually happened on-board rather than being sent from ground (same pattern as ST[19], see
+`pus19.md`).
+
+### E.4 Suggested manual test walkthrough
+
+1. **Baseline**: `ENABLE_SCHEDULER`, confirm ACK completion, then `GET_SCHEDULE_STATUS` →
+   `/PUS11/SUBSCHEDULE_STATUS_REPORT` reports `status_report_n=0` (no subschedules exist until an
+   activity is inserted into one).
+2. **Build and insert an activity**: dry-run `/PUS17/ARE_YOU_ALIVE` per E.2.1 to get `tc_packet` and
+   note its `seqcount`. Send `INSERT_ACTIVITIES` with `subschedule_id=1`, `release_time` ~10s in the
+   future. Confirm ACK completion. `GET_SCHEDULE_STATUS` now shows subschedule `1` with
+   `schedule_status=1` (`insertActivities` auto-creates the subschedule as enabled — §6.19's
+   equivalent behaviour for ST[11]).
+3. **Verify the summary and detail reports**: `GET_SUMMARY_REPORT` → `/PUS11/SUMMARY_REPORT/SUMMARY_REPORT`
+   shows one entry with `schedule_id=1` and the request-ID fields matching the embedded TC.
+   `GET_DETAIL_REPORT` → `/PUS11/DETAIL_REPORT/DETAIL_REPORT` shows the same entry, but with the full
+   embedded TC bytes instead of just the request ID — byte-for-byte compare against `tc_packet_bytes`
+   from E.2.1.
+4. **Confirm autonomous release**: wait for `release_time` to pass. Confirm a second ACK
+   start/completion pair appears for `TC[17,1]` (the embedded `ARE_YOU_ALIVE`) with no matching
+   TC[17,1] ground command, and `TM[17,2]` is emitted — the core insert→release chain working
+   end to end. `GET_SUMMARY_REPORT` now returns `n=0` (the released activity is removed from the
+   queue).
+5. **Subschedule gate**: insert a second activity (repeat step 2, new dry-run so you get a fresh
+   `seqcount`), then `DISABLE_SCHEDULE` with `{"num_schedules": 1, "schedules": [1]}`. Wait past its
+   `release_time` and confirm the command is **not** released and produces no ACK — `runSchedule()`
+   silently drops it because `subschStatus.get(1) == false` (check the simulator log for "Dropping
+   command ... subschedule ... is disabled"). `GET_SUMMARY_REPORT` confirms it's gone from the queue.
+6. **Re-enable and time-shift by ID**: insert a third activity ~30s out, `ENABLE_SCHEDULE` for
+   subschedule 1, then immediately `TIME_SHIFT_ACTIVITIES_BY_ID` targeting its `(source_id=0, apid=1,
+   seqcount=<its seq>)` with `time_offset_ms=60000`. Confirm ACK completion, then `GET_SUMMARY_REPORT`
+   shows the `release_time` moved 60s later.
+7. **Time-shift by filter and time-shift all**: insert two more activities into subschedule 1 at
+   different times. `TIME_SHIFT_ACTIVITIES_BY_FILTER` with a `start_time`/`end_time` window covering
+   only one of them and confirm only that one's `release_time` moves (`GET_SUMMARY_REPORT` before/after
+   compare). Then `TIME_SHIFT_ACTIVITIES` (subtype 15, all-activities) and confirm every remaining
+   queued entry's `release_time` shifts.
+8. **Reject a past release time**: `INSERT_ACTIVITIES` with `release_time` set to a timestamp already
+   in the past. Confirm **NACK completion** with code matching `COMPL_ERR_SCHEDULE_TIME_IN_THE_PAST`,
+   and that nothing was added to the queue (`GET_SUMMARY_REPORT` count unchanged).
+9. **Delete by ID and by filter**: insert two activities, `DELETE_ACTIVITIES_BY_ID` for one specific
+   request ID (confirm `GET_SUMMARY_REPORT` count drops by exactly one), then `DELETE_ACTIVITIES_BY_FILTER`
+   with `num_schedules=0` (any subschedule) and a wide time window (confirm the rest are removed too).
+10. **Scheduling groups lifecycle**: `CREATE_SCHEDULING_GROUPS` with `{"group_id": 1, "group_status": 1}`,
+    then `REPORT_GROUP_STATUS` → `/PUS11/GROUP_STATUS_REPORT` shows `group_id=1, group_status=1`.
+    `DISABLE_SCHEDULING_GROUPS` for group 1, re-check the report shows `group_status=0`, then
+    `ENABLE_SCHEDULING_GROUPS` to flip it back, then `DELETE_SCHEDULING_GROUPS` and confirm the entry
+    is gone from the next `REPORT_GROUP_STATUS`. Note groups are bookkeeping-only in this simulator —
+    `runSchedule()` never consults `groupStatus`, only `subschStatus` (step 5), so releasing an
+    activity while its group is disabled will **not** block it; only the subschedule gate does.
+11. **Reset**: `RESET_SCHEDULER` and confirm `GET_SUMMARY_REPORT`/`GET_DETAIL_REPORT` both return
+    `n=0`, and a subsequent `ENABLE_SCHEDULER` is required before newly inserted activities will
+    actually release (`enabled=false` after reset).
+
+### E.5 Caveats specific to this simulator
+
+- **Single fixed APID**: every TC and TM in this simulator uses `MAIN_APID = 1`
+  (`PusSimulator.newPacket`), so request-ID `apid` fields in test data should always be `1` — there is
+  no second process to exercise an APID mismatch against (same caveat noted for ST[14]/ST[19]).
+- **`release_time` must be a genuine future timestamp**: unlike ST[19] where the stored `request`
+  bytes are never re-validated, `insertActivities()` actively checks `releaseTime.isBefore(now)`
+  against `pusSimulator.timeEncoding.now()` and NACKs the whole batch if any entry fails — pick a
+  `release_time` comfortably ahead of the instance's current time (visible in YAMCS Web), not a fixed
+  hardcoded timestamp, since real elapsed wall-clock time between building the command and sending it
+  varies.
+- **`time_offset_ms` cannot go negative through this MDB**: the argument type is `/dt/uint32`
+  (unsigned), even though PUS-C allows a negative offset (shift earlier) and `Pus11Service` happily
+  applies a negative `int` via `bb.getInt()` if one arrived. Negative shifts are exercisable only by
+  hand-crafting the TC bytes outside YAMCS Web/`yamcs-client`'s argument validation — not a blocker
+  for forward-shift testing, but worth knowing before assuming a "negative shift" test case is
+  reachable from the MDB as-is.
+- **`filter_type` is fixed at `0x01`**: every `*_BY_FILTER` command in the table above can only be
+  tested as a from–to time window (Gap #1) — select-all (`type=0`), from-only (`type=2`), and to-only
+  (`type=3`) are exercisable in the simulator (`filterByFilter()` handles all four) but not reachable
+  through the current MDB without hand-crafting bytes.
+- **Nested `SpaceSystem` paths for TM[11,10]/TM[11,13]**: both containers live one level below
+  `/PUS11` (`/PUS11/DETAIL_REPORT/DETAIL_REPORT` and `/PUS11/SUMMARY_REPORT/SUMMARY_REPORT`) — easy to
+  miss if you're tab-completing container names expecting a flat `/PUS11/...` layout like the other
+  TM containers in this service.
+- **Groups are bookkeeping-only**: `groupStatus` is maintained faithfully by TC[11,22–26]/TM[11,27]
+  but never consulted by `runSchedule()` — see walkthrough step 10. Don't expect a disabled group to
+  suppress a release; only `DISABLE_SCHEDULE` (subschedule-level) does that.
