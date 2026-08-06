@@ -411,6 +411,15 @@ For injected TM: raw bytes must match XTCE `SequenceContainer` definitions
 TC binary from XTCE definitions. `PusCommandPostprocessor` fills sequence count and CRC
 when the command reaches the data link.
 
+**Embedded/repeated raw sub-packets (ST[19], ST[21], ST[11] patterns)**: don't assume these need
+custom Java. XTCE natively supports a repeating array of raw sub-packets via `ArrayArgumentType`/
+`ArrayParameterType` of an aggregate, with the raw-packet member left with no `SizeInBits`
+(encode — writes exactly the supplied bytes, no framing) or sized via `ContainerRefEntry`+
+`RepeatEntry`+`DynamicValue` off the sub-packet's own CCSDS length field (decode). Already shipped
+for ST[19] (`pus19.xml`); see `pus_analysis/pus21.md` §b/§e for the fully-worked example and the
+one remaining gap (choosing *which* MetaCommand an entry names, and CRC-finalizing a
+never-independently-transmitted sub-command).
+
 ---
 
 ## 10. Command Verification

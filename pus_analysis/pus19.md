@@ -80,7 +80,7 @@ YAMCS (MCS) is involved only at the TC uplink and TM downlink boundaries. All ru
 | State maintained | Global function status + per-definition status |
 | Background tasks | Event listener; action trigger thread |
 | New pus_dt.xml types needed | None (use existing uint8/uint16/uint32) |
-| Major XTCE limitation | Embedded TC packet in TC[19,1]/TM[19,11] not XTCE-expressible |
+| Major XTCE limitation | None — embedded TC packet in TC[19,1]/TM[19,11] turned out to be fully XTCE-expressible (dynamic-sized `BinaryArgumentType`/`ContainerRefEntry`+`RepeatEntry`); see "Testing Methodology — Actual Implementation" below |
 
 ### Spec-defined message types (§8.19.2)
 
@@ -533,7 +533,7 @@ def build_tm_19_11(definitions_to_report: list) -> bytes:
 
 | # | Gap | Severity | Impact | Fix / Workaround |
 |---|-----|----------|--------|-----------------|
-| 1 | **Embedded TC packet in TC[19,1] and TM[19,11]** | **High** | Not XTCE-expressible; YAMCS cannot encode/decode the request field automatically | Add non-standard `request_tc_len:uint16` length prefix; handle in Python manually. YAMCS TC editor cannot build TC[19,1] without custom scripting. |
+| 1 | **Embedded TC packet in TC[19,1] and TM[19,11]** — *superseded, see "Testing Methodology — Actual Implementation" below* | ~~High~~ Resolved | Originally assumed not XTCE-expressible | Actually fully XTCE-expressible via dynamic-sized `BinaryArgumentType` (TC) / `ContainerRefEntry`+`RepeatEntry` (TM), same mechanism confirmed in `pus21.md`. `pus19.xml` builds/decodes both directly, no Python/manual parsing. |
 | 2 | **N=0 "all definitions" in TC[19,4]/TC[19,5]** | Medium | XTCE does not model conditional semantics (N=0 = all vs N>0 = specific) | Use two MetaCommands per subtype: `_specific` (with args) and `_all` (zero payload). Python disambiguates at runtime. |
 | 3 | **Enumerated types for app_process_id and event_def_id** | Minor | Spec says "enumerated"; mission-specific values not known at design time | Use `uint16` as raw integer; add YAMCS enumeration mappings post-hoc if needed. |
 | 4 | **No PUS-1 ACK/NACK in test_yamcs** | Minor | Simplified PUS limitation; not ST[19]-specific | Inherent to test_yamcs architecture. |
