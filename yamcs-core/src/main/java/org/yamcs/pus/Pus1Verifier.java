@@ -12,6 +12,8 @@ import org.yamcs.commanding.VerificationResult;
 import org.yamcs.mdb.ProcessingContext;
 import org.yamcs.parameter.AggregateValue;
 import org.yamcs.parameter.RawEngValue;
+import org.yamcs.parameter.Value;
+import org.yamcs.protobuf.Yamcs.Value.Type;
 import org.yamcs.pus.MessageTemplate.ParameterValueResolver;
 import org.yamcs.xtce.Algorithm;
 import org.yamcs.xtce.Parameter;
@@ -71,9 +73,7 @@ public class Pus1Verifier extends AbstractAlgorithmExecutor {
 
         if (yc.containsKey("ackFlags")){
             Map<Integer, String> ackFlags = yc.getMap("ackFlags");
-            for (Map.Entry<Integer, String> entry: ackFlags.entrySet()) {
-                verificationStageToFlagMapping.put(entry.getKey(), entry.getValue());
-            }
+            verificationStageToFlagMapping.putAll(ackFlags);
         } else {
             verificationStageToFlagMapping.put(1, "pus_acceptance_flag");
             verificationStageToFlagMapping.put(3, "pus_start_exec_flag");
@@ -96,30 +96,33 @@ public class Pus1Verifier extends AbstractAlgorithmExecutor {
                 return NO_RESULT;
             }
         }
-        String sentApid = inputValues.get(0).getEngValue().getStringValue();
+        long sentApid = apidValue(inputValues.get(0).getEngValue());
 
         // the sequence count set by the post-processor has no raw value
         int sentSeq = inputValues.get(1).getEngValue().getSint32Value();
-        String rcvdApid = inputValues.get(2).getEngValue().getStringValue();
+        long rcvdApid = apidValue(inputValues.get(2).getEngValue());
         int rcvdSeq = inputValues.get(3).getRawValue().getUint32Value();
         int reportSubType = inputValues.get(4).getRawValue().getUint32Value();
 
-        // FIXME:
-        // This assumes for now that the ack flags (which is obtained from the cmd args), are an aggregate value
-        // Hence, as a workaround, I am obtaining the ackFlag by relying the the flag member name.
-
-        // If the flags were not an aggregate, there this needs to be changed
-
-        // FIXME:
-        // Reinvestigate this behaviour for ArgumentParameter (maybe its called ArgumentValue, idk), because this problem does
-        // not exist for rcvdApid or rcvdSeq
-        AggregateValue ackFlags = (AggregateValue)  inputValues.get(5).getEngValue();
-        boolean ackFlag = ackFlags.getMemberValue(verificationStageToFlagMapping.get(verificationStage)).getBooleanValue();
+        // Optional 6th input: an "ackflags" aggregate value, used to skip this stage's verification
+        // when the command's ackflags argument didn't request it (per-bit, keyed by
+        // verificationStageToFlagMapping). Not every MDB wires this - e.g. when ackflags is a plain
+        // integer argument rather than an aggregate (as in this mission's pus-tc), or when the 6th
+        // input slot is used for something else entirely (e.g. an error code, only present on
+        // failure). In that case there is no bit to check, so this stage is always verified.
+        boolean ackFlag = true;
+        if (inputValues.size() > 5 && inputValues.get(5) != null
+                && inputValues.get(5).getEngValue() instanceof AggregateValue ackFlags) {
+            var flagValue = ackFlags.getMemberValue(verificationStageToFlagMapping.get(verificationStage));
+            if (flagValue != null) {
+                ackFlag = flagValue.getBooleanValue();
+            }
+        }
 
         if (!ackFlag) {
             return NO_RESULT;
         }
-        if (!sentApid.equalsIgnoreCase(rcvdApid) || sentSeq != rcvdSeq) {
+        if (sentApid != rcvdApid || sentSeq != rcvdSeq) {
             return NO_RESULT;
         }
 
@@ -153,5 +156,15 @@ public class Pus1Verifier extends AbstractAlgorithmExecutor {
         } else {
             return NO_RESULT;
         }
+    }
+
+    /**
+     * Extracts the numeric APID from an engineering value, regardless of whether the argument/parameter
+     * type is a plain integer (e.g. {@code UINT32}, the common case) or an {@code ENUMERATED} type with a
+     * string label (the case this algorithm originally assumed). Enumerated values carry their own numeric
+     * code alongside the label, so both are compared by that code rather than by string.
+     */
+    private static long apidValue(Value v) {
+        return v.getType() == Type.ENUMERATED ? v.getSint64Value() : v.toLong();
     }
 }
