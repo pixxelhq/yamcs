@@ -1,3 +1,6 @@
+Version 5.13.4 released 7-Aug-2026
+- Fix OPI sizing issues on Firefox
+
 Version 5.13.3 released 5-Aug-2026
 - Fix token refresh issue in case of cascaded commanding #1139
 - UI: Allow sublink nesting of arbitrary depth (previously only two levels)
