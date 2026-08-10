@@ -8,7 +8,7 @@ import {
   YamcsService,
   YaSelectOption,
 } from '@yamcs/webapp-sdk';
-import { AdvanceAckHelpComponent } from '../../../automation/run-stack/advance-ack-help/advance-ack-help.component';
+import { AdvanceAckHelpComponent } from '../../../stacks/advance-ack-help/advance-ack-help.component';
 import { TemplateProvider } from './TemplateProvider';
 
 @Component({

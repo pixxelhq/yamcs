@@ -11,6 +11,8 @@
 
 <span style="flex: 1 1 auto"></span>
 
+<ng-content select="ya-instance-toolbar-right" />
+
 @if (processor$ | async; as processor) {
   @if (connected$ | async) {
     @if (connectionInfo$ | async; as connectionInfo) {

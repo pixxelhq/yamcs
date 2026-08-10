@@ -104,22 +104,14 @@
         label="File transfer" />
     }
 
-    @if (automationItems.length) {
-      <ya-sidenav-group
-        label="Automation"
-        icon="playlist_play"
-        [active]="automationActive"
-        [expanded]="automationExpanded"
-        (toggle)="toggleAutomationGroup()">
-        @for (item of automationItems; track item) {
-          <ya-sidenav-item
-            [activeWhen]="'/automation/' + (item.activeWhen ?? item.path)"
-            [routerLink]="'/automation/' + item.path"
-            [queryParams]="{ c: yamcs.context }"
-            [exact]="item.path === ''"
-            [label]="item.label" />
-        }
-      </ya-sidenav-group>
+    @for (item of automationItems; track item) {
+      <ya-sidenav-item
+        [activeWhen]="'/' + (item.activeWhen ?? item.path)"
+        [icon]="item.icon || 'checklist'"
+        [routerLink]="'/' + item.path"
+        [queryParams]="{ c: yamcs.context }"
+        [exact]="item.path === ''"
+        [label]="item.label" />
     }
 
     @if ((connectionInfo$ | async)?.instance?.capabilities | arrayContains: "timeline") {

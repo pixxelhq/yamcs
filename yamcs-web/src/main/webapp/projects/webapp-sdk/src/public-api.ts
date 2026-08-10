@@ -52,6 +52,7 @@ export * from './lib/components/icon-button/icon-button.component';
 export * from './lib/components/inline-select/inline-select.component';
 export * from './lib/components/instance-page/instance-page.component';
 export * from './lib/components/instance-toolbar/instance-toolbar-label.directive';
+export * from './lib/components/instance-toolbar/instance-toolbar-right.component';
 export * from './lib/components/instance-toolbar/instance-toolbar.component';
 export * from './lib/components/interval/interval.component';
 export * from './lib/components/label/label.component';

@@ -52,8 +52,6 @@ export class InstanceLayoutComponent implements OnDestroy {
   telemetryExpanded = false;
   commandingActive = false;
   commandingExpanded = false;
-  automationActive = false;
-  automationExpanded = false;
   timelineActive = false;
   timelineExpanded = false;
   mdbActive = false;
@@ -154,7 +152,11 @@ export class InstanceLayoutComponent implements OnDestroy {
       this.user.hasObjectPrivilege('ManageBucket', stackBucket) ||
       this.user.hasSystemPrivilege('ManageAnyBucket');
     if (this.config.tc && mayReadStackBucket) {
-      this.automationItems.push({ path: 'stacks', label: 'Stacks' });
+      this.automationItems.push({
+        path: 'stacks',
+        label: 'Stacks',
+        icon: 'playlist_play',
+      });
     }
     if (
       this.user.hasSystemPrivilege('ControlActivities') &&
@@ -162,7 +164,11 @@ export class InstanceLayoutComponent implements OnDestroy {
         'activities',
       ) !== -1
     ) {
-      this.automationItems.push({ path: 'script', label: 'Run a script' });
+      this.automationItems.push({
+        path: 'scripts',
+        label: 'Scripts',
+        icon: 'integration_instructions',
+      });
     }
     for (const item of extensionService.getNavItems('automation')) {
       if (item.condition && item.condition(this.user)) {
@@ -205,7 +211,6 @@ export class InstanceLayoutComponent implements OnDestroy {
         const url = evt.url as string;
         this.mdbActive = false;
         this.commandingActive = false;
-        this.automationActive = false;
         this.telemetryActive = false;
         this.timelineActive = false;
         this.collapseAllGroups();
@@ -215,9 +220,6 @@ export class InstanceLayoutComponent implements OnDestroy {
         } else if (url.match(/\/commanding.*/)) {
           this.commandingActive = true;
           this.commandingExpanded = true;
-        } else if (url.match(/\/automation.*/)) {
-          this.automationActive = true;
-          this.automationExpanded = true;
         } else if (url.match(/\/telemetry.*/)) {
           this.telemetryActive = true;
           this.telemetryExpanded = true;
@@ -228,7 +230,6 @@ export class InstanceLayoutComponent implements OnDestroy {
   private collapseAllGroups() {
     this.telemetryExpanded = false;
     this.commandingExpanded = false;
-    this.automationExpanded = false;
     this.timelineExpanded = false;
     this.mdbExpanded = false;
   }
@@ -243,12 +244,6 @@ export class InstanceLayoutComponent implements OnDestroy {
     const expanded = this.commandingExpanded;
     this.collapseAllGroups();
     this.commandingExpanded = !expanded;
-  }
-
-  toggleAutomationGroup() {
-    const expanded = this.automationExpanded;
-    this.collapseAllGroups();
-    this.automationExpanded = !expanded;
   }
 
   toggleMdbGroup() {

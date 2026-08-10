@@ -53,7 +53,7 @@ export class YaSidenavItem extends BaseComponent implements OnInit, OnDestroy {
     this.routerSubscription = this.router.events
       .pipe(filter((evt) => evt instanceof NavigationEnd))
       .subscribe((evt) => {
-        this.checkLinkActive(evt.url);
+        this.checkLinkActive(evt.urlAfterRedirects);
       });
   }
 

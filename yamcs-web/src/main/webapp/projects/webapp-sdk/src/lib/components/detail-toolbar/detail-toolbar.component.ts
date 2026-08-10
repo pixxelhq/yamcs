@@ -4,7 +4,6 @@ import {
   Component,
   input,
 } from '@angular/core';
-import { MatToolbar } from '@angular/material/toolbar';
 import { MatTooltip } from '@angular/material/tooltip';
 import { BaseComponent } from '../../abc/BaseComponent';
 import { YaIconAction } from '../icon-action/icon-action.component';
@@ -17,7 +16,7 @@ import { YaIconAction } from '../icon-action/icon-action.component';
     class: 'ya-detail-toolbar',
   },
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [MatToolbar, MatTooltip, YaIconAction],
+  imports: [MatTooltip, YaIconAction],
 })
 export class YaDetailToolbar extends BaseComponent {
   alwaysOpen = input(false, { transform: booleanAttribute });
