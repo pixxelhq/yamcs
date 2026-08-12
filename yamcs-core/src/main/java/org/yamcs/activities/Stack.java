@@ -182,7 +182,16 @@ public class Stack {
                 if (argValue.isJsonNull()) {
                     command.addAssignment(argInfo, null);
                 } else if (argValue.isJsonPrimitive()) {
-                    command.addAssignment(argInfo, argValue.getAsString());
+                    var primitive = argValue.getAsJsonPrimitive();
+                    if (primitive.isBoolean()) {
+                        command.addAssignment(argInfo, primitive.getAsBoolean());
+                    } else if (primitive.isNumber()) {
+                        command.addAssignment(argInfo, primitive.getAsNumber());
+                    } else if (primitive.isString()) {
+                        command.addAssignment(argInfo, primitive.getAsString());
+                    } else {
+                        throw new StackParseException("Unexpected value type for " + argValue);
+                    }
                 } else if (argValue.isJsonArray()) {
                     command.addAssignment(argInfo, argValue.getAsJsonArray().toString());
                 } else if (argValue.isJsonObject()) {
