@@ -259,6 +259,12 @@ public class StackExecution extends ActivityExecution {
         var ackStatus = pendingCommand.acknowledgedFuture.get();
         logActivityInfo(acknowledgment + ": " + ackStatus);
 
+        if (ackStatus != AckStatus.OK && ackStatus != AckStatus.DISABLED && ackStatus != AckStatus.NA) {
+            var message = acknowledgment + " acknowledgment failed: " + ackStatus;
+            logActivityError(message);
+            throw new YamcsException(message);
+        }
+
         int waitTime = stackedCommand.getWaitTime();
         if (waitTime == -1) {
             waitTime = stack.getWaitTime();
@@ -292,7 +298,9 @@ public class StackExecution extends ActivityExecution {
             for (var attr : attrs) {
                 if (attr.getName().equals(ackStatusKey)) {
                     var ackStatus = AckStatus.valueOf(attr.getValue().getStringValue());
-                    acknowledgedFuture.complete(ackStatus);
+                    if (isTerminal(ackStatus)) {
+                        acknowledgedFuture.complete(ackStatus);
+                    }
                 }
             }
         }
@@ -305,9 +313,18 @@ public class StackExecution extends ActivityExecution {
             for (var attr : attrs) {
                 if (attr.getKey().equals(ackStatusKey)) {
                     var ackStatus = AckStatus.valueOf(attr.getValue().getStringValue());
-                    acknowledgedFuture.complete(ackStatus);
+                    if (isTerminal(ackStatus)) {
+                        acknowledgedFuture.complete(ackStatus);
+                    }
                 }
             }
+        }
+
+        private static boolean isTerminal(AckStatus ackStatus) {
+            return switch (ackStatus) {
+            case OK, NOK, TIMEOUT, CANCELLED, DISABLED, NA -> true;
+            case SCHEDULED, PENDING -> false;
+            };
         }
     }
 }
