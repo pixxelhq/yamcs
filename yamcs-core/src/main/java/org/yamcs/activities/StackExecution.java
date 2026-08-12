@@ -5,7 +5,9 @@ import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -24,10 +26,11 @@ import org.yamcs.cmdhistory.CommandHistoryPublisher.AckStatus;
 import org.yamcs.commanding.PreparedCommand;
 import org.yamcs.mdb.MdbFactory;
 import org.yamcs.parameter.ParameterConsumer;
-import org.yamcs.parameter.ParameterRequestManager;
+import org.yamcs.parameter.ParameterValue;
 import org.yamcs.protobuf.Commanding.CommandHistoryAttribute;
 import org.yamcs.protobuf.Commanding.CommandId;
 import org.yamcs.security.User;
+import org.yamcs.xtce.Parameter;
 import org.yamcs.yarch.YarchDatabase;
 
 public class StackExecution extends ActivityExecution {
@@ -39,6 +42,9 @@ public class StackExecution extends ActivityExecution {
 
     private int seq = 0;
     private AtomicReference<PendingCommand> pendingCommandRef = new AtomicReference<>();
+
+    private final Map<Parameter, ParameterValue> verifyValues = new ConcurrentHashMap<>();
+    private AtomicReference<PendingVerify> pendingVerifyRef = new AtomicReference<>();
 
     public StackExecution(
             ActivityService activityService,
@@ -83,6 +89,33 @@ public class StackExecution extends ActivityExecution {
                     }
                 });
 
+        var prm = processor.getParameterRequestManager();
+        var verifyParameters = stack.getSteps().stream()
+                .filter(StackedVerify.class::isInstance)
+                .map(StackedVerify.class::cast)
+                .flatMap(v -> v.getCondition().stream())
+                .map(comparison -> comparison.parameter())
+                .collect(Collectors.toSet());
+
+        Integer verifySubscriptionId = null;
+        if (!verifyParameters.isEmpty()) {
+            verifySubscriptionId = prm.addRequest(verifyParameters, (ParameterConsumer) (subId, items) -> {
+                for (var pv : items) {
+                    verifyValues.put(pv.getParameter(), pv);
+                }
+                var pending = pendingVerifyRef.get();
+                if (pending != null && testCondition(pending.stackedVerify(), verifyValues)) {
+                    pending.future().complete(true);
+                }
+            });
+            // Seed with whatever is already known. Subscribing first means any update delivered
+            // concurrently with this read already landed in verifyValues via the callback above;
+            // putIfAbsent here only fills gaps, never clobbers a value the callback already set.
+            for (var pv : prm.getValuesFromCache(verifyParameters)) {
+                verifyValues.putIfAbsent(pv.getParameter(), pv);
+            }
+        }
+
         try {
             for (var step : stack.getSteps()) {
                 if (step instanceof StackedCommand stackedCommand) {
@@ -93,6 +126,9 @@ public class StackExecution extends ActivityExecution {
             }
         } finally {
             histManager.unsubscribeCommandHistory(histSubscription.subscriptionId);
+            if (verifySubscriptionId != null) {
+                prm.removeRequest(verifySubscriptionId);
+            }
         }
 
         return null;
@@ -108,42 +144,33 @@ public class StackExecution extends ActivityExecution {
             Thread.sleep(delayTime);
         }
 
-        var parameters = stackedVerify.getCondition().stream()
-                .map(comparison -> comparison.parameter())
-                .collect(Collectors.toSet());
-
-        var prm = processor.getParameterRequestManager();
-
-        var success = testCondition(stackedVerify, prm);
-        if (success) {
+        if (testCondition(stackedVerify, verifyValues)) {
             return;
-        } else {
-            var successFuture = new CompletableFuture<Boolean>();
-            var subscriptionId = prm.addRequest(parameters, (ParameterConsumer) (subId, items) -> {
-                var success1 = testCondition(stackedVerify, prm);
-                if (success1) {
-                    successFuture.complete(true);
-                }
-            });
+        }
 
-            try {
-                if (stackedVerify.getTimeout() > 0) {
-                    successFuture.get(stackedVerify.getTimeout(), TimeUnit.MILLISECONDS);
-                } else {
-                    successFuture.get();
-                }
-            } catch (TimeoutException e) {
-                logActivityError("Timeout while verifying");
-                throw e;
-            } finally {
-                prm.removeRequest(subscriptionId);
+        var successFuture = new CompletableFuture<Boolean>();
+        pendingVerifyRef.set(new PendingVerify(stackedVerify, successFuture));
+        try {
+            // May have become true between the check above and wiring up pendingVerifyRef.
+            if (testCondition(stackedVerify, verifyValues)) {
+                return;
             }
+            if (stackedVerify.getTimeout() > 0) {
+                successFuture.get(stackedVerify.getTimeout(), TimeUnit.MILLISECONDS);
+            } else {
+                successFuture.get();
+            }
+        } catch (TimeoutException e) {
+            logActivityError("Timeout while verifying");
+            throw e;
+        } finally {
+            pendingVerifyRef.set(null);
         }
     }
 
-    private boolean testCondition(StackedVerify stackedVerify, ParameterRequestManager prm) {
+    private boolean testCondition(StackedVerify stackedVerify, Map<Parameter, ParameterValue> values) {
         for (var comparison : stackedVerify.getCondition()) {
-            var pval = prm.getLastValueFromCache(comparison.parameter());
+            var pval = values.get(comparison.parameter());
             if (pval == null || pval.getEngValue() == null) {
                 return false;
             }
@@ -166,7 +193,7 @@ public class StackExecution extends ActivityExecution {
                 if (!isNumeric(stringValue) || !isNumeric(comparand)) {
                     return false;
                 }
-                if (Double.parseDouble(stringValue) >= Double.parseDouble(stringValue)) {
+                if (Double.parseDouble(stringValue) >= Double.parseDouble(comparand)) {
                     return false;
                 }
                 break;
@@ -174,7 +201,7 @@ public class StackExecution extends ActivityExecution {
                 if (!isNumeric(stringValue) || !isNumeric(comparand)) {
                     return false;
                 }
-                if (Double.parseDouble(stringValue) > Double.parseDouble(stringValue)) {
+                if (Double.parseDouble(stringValue) > Double.parseDouble(comparand)) {
                     return false;
                 }
                 break;
@@ -182,7 +209,7 @@ public class StackExecution extends ActivityExecution {
                 if (!isNumeric(stringValue) || !isNumeric(comparand)) {
                     return false;
                 }
-                if (Double.parseDouble(stringValue) < Double.parseDouble(stringValue)) {
+                if (Double.parseDouble(stringValue) <= Double.parseDouble(comparand)) {
                     return false;
                 }
                 break;
@@ -190,7 +217,7 @@ public class StackExecution extends ActivityExecution {
                 if (!isNumeric(stringValue) || !isNumeric(comparand)) {
                     return false;
                 }
-                if (Double.parseDouble(stringValue) <= Double.parseDouble(stringValue)) {
+                if (Double.parseDouble(stringValue) < Double.parseDouble(comparand)) {
                     return false;
                 }
                 break;
@@ -326,5 +353,8 @@ public class StackExecution extends ActivityExecution {
             case SCHEDULED, PENDING -> false;
             };
         }
+    }
+
+    private record PendingVerify(StackedVerify stackedVerify, CompletableFuture<Boolean> future) {
     }
 }
