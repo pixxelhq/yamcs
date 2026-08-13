@@ -196,9 +196,12 @@ public class YamcsClient {
 
     /**
      * Polls the server, to see if it is ready.
+     * <p>
+     * A negative {@code connectionAttempts} means retry indefinitely.
      */
     public void pollServer() throws ClientException {
-        for (int i = 0; i < connectionAttempts; i++) {
+        boolean unlimited = connectionAttempts < 0;
+        for (int i = 0; unlimited || i < connectionAttempts; i++) {
             synchronized (this) {
                 try {
                     // Use an endpoint that does not require auth
@@ -228,14 +231,16 @@ public class YamcsClient {
                     for (ConnectionListener cl : connectionListeners) {
                         cl.connectionFailed(new ClientException("Thread interrupted", e));
                     }
+                    throw new ClientException("Thread interrupted while polling server", e);
                 }
             }
 
-            if (i + 1 < connectionAttempts) {
+            if (unlimited || i + 1 < connectionAttempts) {
                 try {
                     Thread.sleep(retryDelay);
                 } catch (InterruptedException e1) {
                     Thread.currentThread().interrupt();
+                    throw new ClientException("Thread interrupted while polling server", e1);
                 }
             }
         }
@@ -691,6 +696,10 @@ public class YamcsClient {
             return this;
         }
 
+        /**
+         * @param connectionAttempts how many times {@link YamcsClient#pollServer()} should retry before giving up. A
+         *                           negative value means retry indefinitely.
+         */
         public Builder withConnectionAttempts(int connectionAttempts) {
             this.connectionAttempts = connectionAttempts;
             return this;

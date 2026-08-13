@@ -2,6 +2,7 @@ package org.yamcs.cascading;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -11,6 +12,7 @@ import org.yamcs.Spec.OptionType;
 import org.yamcs.YConfiguration;
 import org.yamcs.client.ClientException;
 import org.yamcs.client.ConnectionListener;
+import org.yamcs.client.UnauthorizedException;
 import org.yamcs.client.YamcsClient;
 import org.yamcs.client.base.WebSocketClient;
 import org.yamcs.client.mdb.MissionDatabaseClient;
@@ -37,6 +39,9 @@ public class YamcsLink extends AbstractLink implements AggregatedDataLink, Conne
             new ThreadFactoryBuilder().setNameFormat("YamcsLink").build());
 
     long reconnectionDelay;
+    int connectionAttempts;
+    int connectAttemptCount = 0;
+    ScheduledFuture<?> pendingReconnect;
 
     private String username;
     private char[] password;
@@ -47,9 +52,10 @@ public class YamcsLink extends AbstractLink implements AggregatedDataLink, Conne
     public void init(String instance, String name, YConfiguration config) {
         super.init(instance, name, config);
         this.reconnectionDelay = config.getLong("reconnectionDelay", 5000);
+        this.connectionAttempts = config.getInt("connectionAttempts", -1);
 
         yclient = YamcsClient.newBuilder(config.getString("yamcsUrl"))
-                .withConnectionAttempts(config.getInt("connectionAttempts", 20))
+                .withConnectionAttempts(connectionAttempts)
                 .withRetryDelay(reconnectionDelay)
                 .withVerifyTls(config.getBoolean("verifyTls", true))
                 .build();
@@ -135,11 +141,12 @@ public class YamcsLink extends AbstractLink implements AggregatedDataLink, Conne
                 .withDescription("If the connection fails or breaks, "
                         + "the time (in milliseconds) to wait before reconnection.");
 
-        spec.addOption("connectionAttempts", OptionType.INTEGER).withDefault(20)
+        spec.addOption("connectionAttempts", OptionType.INTEGER).withDefault(-1)
                 .withDescription(
-                        "How many times to attempt reconnection if the connection fails. "
-                                + "Reconnection will not be reatempted if the authentication fails. "
-                                + "Link disable/enable is required to reattempt the connection");
+                        "How many times to attempt to (re)connect if the connection fails or is lost, "
+                                + "spaced by reconnectionDelay. A value of -1 (the default) means retry "
+                                + "indefinitely. Reconnection will not be reattempted if the authentication "
+                                + "fails. Link disable/enable is required to reattempt the connection");
 
         /*
          * TM
@@ -241,6 +248,10 @@ public class YamcsLink extends AbstractLink implements AggregatedDataLink, Conne
 
     @Override
     public void doDisable() {
+        if (pendingReconnect != null) {
+            pendingReconnect.cancel(false);
+            pendingReconnect = null;
+        }
         WebSocketClient wsclient = yclient.getWebSocketClient();
         if (wsclient != null && wsclient.isConnected()) {
             wsclient.disconnect();
@@ -249,10 +260,12 @@ public class YamcsLink extends AbstractLink implements AggregatedDataLink, Conne
 
     @Override
     public void doEnable() {
+        connectAttemptCount = 0;
         timer.execute(() -> connectToUpstream());
     }
 
     private void connectToUpstream() {
+        pendingReconnect = null;
         WebSocketClient wsclient = yclient.getWebSocketClient();
         if (wsclient != null && wsclient.isConnected()) {
             // we have to protect against double connection because there might be a timer and a user action that causes
@@ -265,11 +278,29 @@ public class YamcsLink extends AbstractLink implements AggregatedDataLink, Conne
                 yclient.login(username, password);
             }
             yclient.connectWebSocket();
+        } catch (UnauthorizedException cause) {
+            log.warn("Authentication with upstream Yamcs server failed, giving up", cause);
+            eventProducer.sendWarning("Authentication with upstream Yamcs failed: " + cause);
+            return;
         } catch (ClientException cause) {
-            log.warn("Connection to upstream Yamcs server failed", cause);
+            connectAttemptCount++;
+            if (connectionAttempts >= 0 && connectAttemptCount >= connectionAttempts) {
+                log.warn("Connection to upstream Yamcs server failed, giving up after {} attempts", connectAttemptCount,
+                        cause);
+                eventProducer.sendWarning("Connection to upstream Yamcs failed after " + connectAttemptCount
+                        + " attempts: " + cause);
+                return;
+            }
+            log.warn("Connection to upstream Yamcs server failed (attempt {}), retrying in {} ms", connectAttemptCount,
+                    reconnectionDelay, cause);
             eventProducer.sendWarning("Connection to upstream Yamcs failed: " + cause);
+            if (isRunningAndEnabled()) {
+                pendingReconnect = timer.schedule(() -> connectToUpstream(), reconnectionDelay, TimeUnit.MILLISECONDS);
+            }
             return;
         }
+
+        connectAttemptCount = 0;
 
         if (tmLink != null || tmArchiveLink != null) {
             retrieveContainers();
@@ -346,7 +377,8 @@ public class YamcsLink extends AbstractLink implements AggregatedDataLink, Conne
         connected = false;
         if (isRunningAndEnabled()) {
             log.warn("Disconnected from upstream Yamcs server");
-            timer.schedule(() -> connectToUpstream(), reconnectionDelay, TimeUnit.MILLISECONDS);
+            connectAttemptCount = 0;
+            pendingReconnect = timer.schedule(() -> connectToUpstream(), reconnectionDelay, TimeUnit.MILLISECONDS);
         } else {
             log.debug("Disconnected from upstream Yamcs server");
         }

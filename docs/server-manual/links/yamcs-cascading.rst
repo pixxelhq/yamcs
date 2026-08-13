@@ -104,9 +104,13 @@ eventRealtimeStream (string)
   Stream to which the events will be sent. Default: ``events_realtime``.
 
 connectionAttempts (integer)
-  How many times to attempt reconnection if the connection fails. Reconnection will only be attempted once if the authentication fails.
+  How many times to attempt to (re)connect if the connection fails or is lost, spaced by ``reconnectionDelay``. By default, reconnection is retried indefinitely; set a positive number to give up after that many attempts.
 
-  Link disable/enable is required to reattempt the connection once this number has passed.
+  Reconnection is never reattempted if the authentication fails (e.g. wrong credentials), regardless of this setting.
+
+  Link disable/enable is required to reattempt the connection once this number has passed, or after an authentication failure.
+
+  Default: -1 (unlimited)
 
 reconnectionDelay (integer)
    If the connection fails or breaks, the time (in milliseconds) to wait before reconnection.
