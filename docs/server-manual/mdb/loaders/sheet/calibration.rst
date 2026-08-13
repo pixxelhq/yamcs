@@ -96,7 +96,7 @@ The type ``java-expression`` serves as a catch-all. They can be used for float o
 Time
 ^^^^
 
-If the type is ``time``, this calibrator allows to convert a raw integer or float value into a timestamp value by using the raw value as an offset from a well known epoch or from another parameter. Optionally allow to use an (offset:scale) which can be used to scale the raw value from other units (e.g. millseconds) to seconds.
+If the type is ``time``, this calibrator allows to convert a raw integer or float value into a timestamp value by using the raw value as an offset from a well known epoch, or from a specified ISO 8601 UTC string, or from another parameter. Optionally allow to use an (offset:scale) which can be used to scale the raw value from other units (e.g. millseconds) to seconds.
 
 Known epochs are ``GPS``, ``TAI``, ``UNIX`` and ``J2000``.
 
@@ -107,7 +107,7 @@ The conversion is performed as follows:
 
 
 ``calib1`` (required)
-    Something of the shape ``epoch:<epoch>`` or ``parameter:<parameter reference>``. The reference has to be to a parameter of type ``time``.
+    Something of the shape ``epoch:<epoch>``, ``utc:<isostring>`` or ``parameter:<parameter reference>``. The reference has to be to a parameter of type ``time``.
 
 ``calib2``
     Optionally something of the shape ``offset:scale`` where both offset and scale are numbers.

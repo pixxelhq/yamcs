@@ -142,6 +142,13 @@ public class DataFileTest {
         verify(df);
     }
 
+    @Test
+    public void testZeroSizeFileIsComplete() {
+        DataFile df = new DataFile(0);
+        assertTrue(df.isComplete());
+        assertEquals(0, df.getMissingChunks().size());
+    }
+
     private FileDataPacket getSegment(int offset, int length) {
         return new FileDataPacket(Arrays.copyOfRange(data, offset, offset + length), offset, null);
     }

@@ -179,6 +179,10 @@ public class DataFile {
         if (size < 0) {
             return false;
         }
+        if (dataFileSegments.isEmpty()) {
+            // a 0 byte file is complete even though no data segment has ever been received
+            return size == 0;
+        }
         if (dataFileSegments.size() != 1) {
             return false;
         }

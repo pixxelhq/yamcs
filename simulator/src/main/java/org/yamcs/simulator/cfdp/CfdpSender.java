@@ -147,8 +147,12 @@ public class CfdpSender {
 
     private void sendData() {
         long end = Math.min(dataOffset + PDU_SIZE, fileSize);
-        sendFileData(dataOffset, end, true);
-        dataOffset = end;
+        // don't send a File Data PDU when there is no data to send (e.g. a 0 byte file);
+        // per CFDP 4.6.1.1.9(C) the sender goes straight to EOF in that case
+        if (end > dataOffset) {
+            sendFileData(dataOffset, end, true);
+            dataOffset = end;
+        }
         if (dataOffset == fileSize) {
             eofSenderFuture = executor.scheduleAtFixedRate(() -> sendEof(), 0, 2000, TimeUnit.MILLISECONDS);
             dataFinished = true;
