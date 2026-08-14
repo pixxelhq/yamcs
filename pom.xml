@@ -46,7 +46,7 @@
 	</developers>
 
 	<properties>
-		<revision>5.13.5-0.3.0.Pixxel-SNAPSHOT</revision>
+		<revision>5.13.5-0.3.1.Pixxel-SNAPSHOT</revision>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<protobufVersion>4.35.0</protobufVersion>
 		<rocksdbVersion>9.4.0.11</rocksdbVersion>
@@ -232,7 +232,7 @@
 					<artifactId>maven-compiler-plugin</artifactId>
 					<version>3.15.0</version>
 					<configuration>
-						<release>17</release>
+						<release>25</release>
 					</configuration>
 				</plugin>
 				<plugin>
@@ -285,7 +285,7 @@
 					<artifactId>maven-javadoc-plugin</artifactId>
 					<version>3.6.3</version>
 					<configuration>
-						<release>17</release>
+						<release>25</release>
 						<author>false</author>
 						<breakiterator>true</breakiterator>
 						<additionalOptions>
