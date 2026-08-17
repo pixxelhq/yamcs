@@ -63,14 +63,14 @@ The primary ground-side workflow uses `yamcs-client` with the `pus11ScheduleAt` 
 
 > **Java column** = simulator (`Pus11Service.java`) — **test/demo code only**. MDB column reflects the YAMCS operator interface, which is the production-relevant concern.
 >
-> All subtypes are now implemented in both MDB and the Java simulator. The one remaining item is Gap #1 below (`filter_type` hardcoded to `0x01` on the four filter-based commands).
+> All subtypes are now implemented in both MDB and the Java simulator. Two items remain: Gap #1 (`filter_type` hardcoded to `0x01` on the four filter-based commands) and Gap #2 (scheduling groups are bookkeeping-only — activities cannot be assigned to a group, so group enable/disable has no effect on release).
 
 | Subtype | Type | Name | MDB | Java (sim) | Action Required |
 |---------|------|------|-----|------|-----------------|
 | 1 | TC | Enable Scheduler | ✅ | ✅ | None |
 | 2 | TC | Disable Scheduler | ✅ | ✅ | None |
 | 3 | TC | Reset Scheduler | ✅ | ✅ | None |
-| 4 | TC | Insert Activities | ✅ | ✅ | None |
+| 4 | TC | Insert Activities | ✅ | ✅ | No `group_id` per activity (Gap #2) |
 | 5 | TC | Delete by Request ID | ✅ | ✅ | None |
 | 6 | TC | Delete by Filter | ✅ | ✅ | `filter_type` hardcoded (Gap #1) |
 | 7 | TC | Time-shift by Request ID | ✅ | ✅ | None |
@@ -88,12 +88,12 @@ The primary ground-side workflow uses `yamcs-client` with the `pus11ScheduleAt` 
 | 19 | TM | Subschedule Status Report | ✅ | ✅ | None |
 | 20 | TC | Enable Subschedules | ✅ | ✅ | None |
 | 21 | TC | Disable Subschedules | ✅ | ✅ | None |
-| 22 | TC | Create Scheduling Groups | ✅ | ✅ | None |
-| 23 | TC | Delete Scheduling Groups | ✅ | ✅ | None |
-| 24 | TC | Enable Scheduling Groups | ✅ | ✅ | None |
-| 25 | TC | Disable Scheduling Groups | ✅ | ✅ | None |
-| 26 | TC | Report Group Status | ✅ | ✅ | None |
-| 27 | TM | Group Status Report | ✅ | ✅ | None |
+| 22 | TC | Create Scheduling Groups | ✅ | ✅ | Bookkeeping only (Gap #2) |
+| 23 | TC | Delete Scheduling Groups | ✅ | ✅ | Bookkeeping only (Gap #2) |
+| 24 | TC | Enable Scheduling Groups | ✅ | ✅ | Bookkeeping only (Gap #2) |
+| 25 | TC | Disable Scheduling Groups | ✅ | ✅ | Bookkeeping only (Gap #2) |
+| 26 | TC | Report Group Status | ✅ | ✅ | Bookkeeping only (Gap #2) |
+| 27 | TM | Group Status Report | ✅ | ✅ | Bookkeeping only (Gap #2) |
 
 ---
 
@@ -136,8 +136,8 @@ repeat N times:
 ```
 
 **MDB**: ✅ `INSERT_ACTIVITIES` defined. `ActivityEntryType` aggregate = `{release_time (/PUS/PusTimeType), tc_packet (TcPacketType)}`, repeated via `ActivityArrayType` sized by argument `n`. `TcPacketType` is a `BinaryArgumentType` with no `SizeInBits` — `BinaryDataEncoding` defaults to `FIXED_SIZE` with `sizeInBits = -1`, so the encoder writes exactly the bytes supplied per entry, with no uniform-size constraint and no framing. Heterogeneous TC sizes are fully supported (see Gap history below and `pus21.md` §b/§e for the same technique).
-**Java**: ✅ `insertActivities()` reads subschedule + N, then for each: reads `PusTime`, reads CCSDS packet (using length field at offset +4), schedules into priority queue.
-**Action**: None.
+**Java**: ✅ `insertActivities()` reads subschedule + N, then for each: reads `PusTime`, reads CCSDS packet (using length field at offset +4), schedules into priority queue. The subschedule is auto-created as enabled if unknown (`Pus11Service.java:126`).
+**Action**: None for subschedule-level scheduling. **No `group_id` field** exists on the activity entry in either the MDB aggregate or `insertActivities()`, so an activity can never be a member of a scheduling group — see Gap #2.
 
 **Production note**: `yamcs-client`'s `pus11ScheduleAt` extra remains the ergonomic path for scheduling any existing TC (see Section D) — the `INSERT_ACTIVITIES` MetaCommand above is for operators who want to build a multi-activity TC[11,4] manually.
 
@@ -387,7 +387,7 @@ repeat N:
 
 **MDB**: ✅ `CREATE_SCHEDULING_GROUPS` — `num_groups (uint8)` + `groups[]` array of `{group_id, group_status}`.
 **Java**: ✅ `createGroups()` reads N, then for each `{groupId, enabled}` pair populates `groupStatus`.
-**Action**: None.
+**Action**: None for the command itself. `groupStatus` is never consulted when releasing — see Gap #2.
 
 ---
 
@@ -411,7 +411,7 @@ repeat N:
 **Spec**: Same structure as TC[11,23].
 **MDB**: ✅ `ENABLE_SCHEDULING_GROUPS`.
 **Java**: ✅ `enableGroups()` sets `groupStatus.put(groupId, true)` for each ID.
-**Action**: None.
+**Action**: None for the command itself; enabling has no effect on release (Gap #2).
 
 ---
 
@@ -420,7 +420,7 @@ repeat N:
 **Spec**: Same structure as TC[11,23].
 **MDB**: ✅ `DISABLE_SCHEDULING_GROUPS`.
 **Java**: ✅ `disableGroups()` sets `groupStatus.put(groupId, false)` for each ID.
-**Action**: None.
+**Action**: None for the command itself; **disabling does not suppress any release** (Gap #2) — unlike `DISABLE_SCHEDULE` (TC[11,21]), which does.
 
 ---
 
@@ -451,7 +451,9 @@ repeat N:
 
 ## C. Gaps & Shortcomings
 
-> Previous revisions of this doc tracked five other gaps (missing `INSERT_ACTIVITIES` MDB definition, missing `time_offset_ms` on TC[11,7]/[11,8], wrong argument list on TC[11,15], unimplemented scheduling groups TC[11,22–26]/TM[11,27], and a single-ID-only bug in the simulator's TC[11,20]/[11,21] handlers). All five are now resolved in both the MDB (`pus11.xml`) and the Java simulator (`Pus11Service.java`) — see the per-subtype sections in Part B for details. Only one gap remains open.
+> Previous revisions of this doc tracked five other gaps (missing `INSERT_ACTIVITIES` MDB definition, missing `time_offset_ms` on TC[11,7]/[11,8], wrong argument list on TC[11,15], unimplemented scheduling groups TC[11,22–26]/TM[11,27], and a single-ID-only bug in the simulator's TC[11,20]/[11,21] handlers). All five are now resolved in both the MDB (`pus11.xml`) and the Java simulator (`Pus11Service.java`) — see the per-subtype sections in Part B for details. Two gaps remain open.
+>
+> **Scheduling capability summary**: sub-scheduling works end to end (assign → gate at release → report). Group scheduling does **not** — the group commands maintain state that nothing acts on (Gap #2).
 
 ### Gap 1 — TC[11,6/8/11/14]: `filter_type` hardcoded to `0x01`
 
@@ -467,11 +469,36 @@ repeat N:
 
 ---
 
+### Gap 2 — Scheduling groups are bookkeeping-only; activities cannot join a group
+
+**Problem**: Three things are missing for group scheduling to actually function:
+
+1. **No membership.** `INSERT_ACTIVITIES` (TC[11,4]) carries only `subschedule_id`. The `ActivityEntryType` aggregate in `pus11.xml` is `{release_time, tc_packet}` — no `group_id` member — and `Pus11Service.insertActivities()` never reads one. `ScheduledCommand` (`Pus11Service.java:573–583`) has fields `releaseTime`, `subschedule`, `tc` and no group field. Every scheduled activity is therefore group-less.
+2. **No gate at release.** `runSchedule()` (`Pus11Service.java:531–559`) checks `subschStatus` only. `groupStatus` is never read there, so `DISABLE_SCHEDULING_GROUPS` (TC[11,25]) suppresses nothing.
+3. **No group in filters.** `filterByFilter()` (`Pus11Service.java:478–495`) matches on a `BitSet` of subschedule IDs only; there is no group-based selection for the `*_BY_FILTER` commands.
+
+Net effect: TC[11,22–26] and TM[11,27] faithfully maintain a `Map<Integer, Boolean> groupStatus` that no other code path consumes. Group commands ACK and the status report is accurate, but toggling a group has zero observable effect on scheduling.
+
+**Impact**: Medium for a full PUS-C ST[11] implementation, low for the current test/demo scope. An operator can create/enable/disable/report groups and see consistent TM[11,27], which reads as working — the behaviour is silently inert. Sub-scheduling (the primary grouping mechanism) is unaffected and works correctly.
+
+**Fix**:
+1. Add a `group_id (uint8)` member to `ActivityEntryType` in `pus11.xml` (ahead of `release_time`, per PUS-C's activity-entry layout).
+2. Read it in `insertActivities()`; add a `group` field to `ScheduledCommand` and populate it. Auto-create the group as enabled if unknown, mirroring the subschedule behaviour at `Pus11Service.java:126`.
+3. Add a `groupStatus.getOrDefault(cmd.group, true)` check alongside the existing `subschStatus` check in `runSchedule()`.
+4. Optional, for full spec coverage: extend `filterByFilter()` with group-based selection.
+
+**Scope**: Both — MDB (new `group_id` argument, operator-visible) **and** Java simulator (membership + release gate). Not XTCE-only.
+
+**Effort**: Moderate — ~2–3 hours across `pus11.xml` and `Pus11Service.java`, plus a walkthrough step to verify a disabled group blocks a release.
+
+---
+
 ### Summary
 
 | Gap | Severity | Scope | XTCE-only fix? | Effort |
 |-----|----------|-------|----------------|--------|
 | #1 TC[11,6/8/11/14] filter_type hardcoded | Low | MCS (operator interface) | ✅ Yes | Minor |
+| #2 Scheduling groups bookkeeping-only (no `group_id` on activities, no release gate) | Medium | MDB + Java simulator | ❌ No | Moderate |
 
 ---
 
@@ -511,7 +538,7 @@ The one "Java" piece is `PusCommandPostprocessor.buildScheduledTc()` in `yamcs-c
 | TC[11,18] | Send | **Yes** | No | No args |
 | TC[11,20] | Send | **Yes** | No | Array of subschedule IDs |
 | TC[11,21] | Send | **Yes** | No | Same as TC[11,20] |
-| TC[11,22–25] | Send | **Yes** | No | Array of group IDs / `{group_id, group_status}` |
+| TC[11,22–25] | Send | **Yes** | No | Array of group IDs / `{group_id, group_status}`. XTCE is sufficient to *send* these, but group membership + release gating need simulator/on-board changes (Gap #2) |
 | TC[11,26] | Send | **Yes** | No | No args |
 | TM[11,10] | Receive | **Yes** | No | XTCE container with dynamically-sized embedded TC binary |
 | TM[11,13] | Receive | **Yes** | No | XTCE container with dynamic array of summary entries |
@@ -763,6 +790,8 @@ actually happened on-board rather than being sent from ground (same pattern as S
   `/PUS11` (`/PUS11/DETAIL_REPORT/DETAIL_REPORT` and `/PUS11/SUMMARY_REPORT/SUMMARY_REPORT`) — easy to
   miss if you're tab-completing container names expecting a flat `/PUS11/...` layout like the other
   TM containers in this service.
-- **Groups are bookkeeping-only**: `groupStatus` is maintained faithfully by TC[11,22–26]/TM[11,27]
-  but never consulted by `runSchedule()` — see walkthrough step 10. Don't expect a disabled group to
+- **Groups are bookkeeping-only** (Gap #2): `groupStatus` is maintained faithfully by
+  TC[11,22–26]/TM[11,27] but never consulted by `runSchedule()`, and there is no `group_id` on an
+  activity in the first place — `INSERT_ACTIVITIES` takes only `subschedule_id` — so no scheduled
+  command is a member of any group. See walkthrough step 10. Don't expect a disabled group to
   suppress a release; only `DISABLE_SCHEDULE` (subschedule-level) does that.

@@ -123,6 +123,8 @@ mdb:
   - type: "xtce"
     spec: "mdb/pus20.xml"
   - type: "xtce"
+    spec: "mdb/pus21.xml"
+  - type: "xtce"
     spec: "mdb/landing.xml"
 
 #Configuration for streams created at server startup
