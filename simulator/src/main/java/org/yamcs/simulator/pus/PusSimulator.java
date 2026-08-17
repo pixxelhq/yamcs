@@ -42,6 +42,7 @@ import org.yamcs.simulator.UdpTmFrameLink;
  * <li>ST[17] - test</li>
  * <li>ST[19] - event-action</li>
  * <li>ST[20] - on-board parameter management</li>
+ * <li>ST[21] - request sequencing</li>
  * <li>ST[23] - file management - TODO</li>
  * 
  * <li>
@@ -91,6 +92,7 @@ public class PusSimulator extends AbstractSimulator {
     Pus17Service pus17Service;
     Pus19Service pus19Service;
     Pus20Service pus20Service;
+    Pus21Service pus21Service;
 
     protected BlockingQueue<PusTcPacket> pendingCommands = new ArrayBlockingQueue<>(100);
 
@@ -119,6 +121,7 @@ public class PusSimulator extends AbstractSimulator {
         pus17Service = new Pus17Service(this);
         pus19Service = new Pus19Service(this);
         pus20Service = new Pus20Service(this);
+        pus21Service = new Pus21Service(this);
     }
 
     @Override
@@ -255,6 +258,7 @@ public class PusSimulator extends AbstractSimulator {
                 case 17 -> pus17Service.executeTc(commandPacket);
                 case 19 -> pus19Service.executeTc(commandPacket);
                 case 20 -> pus20Service.executeTc(commandPacket);
+                case 21 -> pus21Service.executeTc(commandPacket);
                 case 25 -> {
                     switch (commandPacket.getSubtype()) {
                     case 1 -> switchBatteryOn(commandPacket);

@@ -485,3 +485,85 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 ```
+
+---
+
+## Testing Methodology — Actual Implementation
+
+The `pus17_simulator.py` reference code above assumed a standalone "test_yamcs" style simulator
+(8-byte packet, no PUS secondary header). **That is not what was built.** The actual implementation
+reuses the same Java `PusSimulator`/`AbstractPusService` framework as every other PUS service in
+this repo (ST[05], ST[13], ST[15], ST[19], ...):
+
+| Artifact | Path |
+|---|---|
+| Simulator service | `simulator/src/main/java/org/yamcs/simulator/pus/Pus17Service.java` |
+| MDB | `examples/pus/src/main/yamcs/mdb/pus17.xml` |
+| Registration | `PusSimulator.java` (`pus17Service` field/constructor/dispatch, `case 17 -> pus17Service.executeTc(...)`) |
+
+Key differences from the reference pseudocode above:
+
+- **TC header is 11 bytes, not 8**: `PusTcPacket.DATA_OFFSET = 11` (6B CCSDS + 5B PUS secondary
+  header), so the raw byte offsets in section b) do not apply to the real wire format.
+- **Command name is `ARE_YOU_ALIVE`, not `TC_17_1`**: `pus17.xml` defines an abstract `pus17-tc`
+  base command (fixes `apid`/`type`) and a concrete `ARE_YOU_ALIVE` MetaCommand (fixes
+  `subtype=1`), reached from the UI/API as `/PUS17/ARE_YOU_ALIVE`.
+- **Built-in execution verifier**: `ARE_YOU_ALIVE` carries a `VerifierSet`/`ExecutionVerifier`
+  bound to the `are-you-alive-report` container (TM[17,2]) with a 15s check window — YAMCS marks
+  the command "completed" on its own once TM[17,2] arrives, in addition to the PUS-1 ACK/NACK
+  containers.
+- **Invalid subtype is rejected, not ignored**: `Pus17Service.executeTc` sends NACK start with
+  `START_ERR_INVALID_PUS_SUBTYPE` for any subtype other than `1` (the doc's simulator pseudocode
+  silently drops unknown packets instead).
+- **Single application process**: every TC/TM uses `PusSimulator.MAIN_APID = 1`; there is no
+  second process to exercise the APID field's real purpose.
+
+### Start the instance
+
+```bash
+mvn -pl simulator,examples/pus -am clean install -DskipTests   # first build only
+mvn -pl examples/pus yamcs:run
+```
+Web UI: `http://localhost:8090`, instance `pus`. Command lives under `/PUS17/ARE_YOU_ALIVE`.
+
+### Command reference — valid input
+
+| Command | Subtype | Valid example args |
+|---|---|---|
+| `/PUS17/ARE_YOU_ALIVE` | TC[17,1] | `{}` — no arguments |
+
+Any other subtype value cannot be reached through this MetaCommand (only `subtype=1` is wired up),
+so there is no in-UI way to exercise the NACK-start rejection path — that would require crafting a
+raw packet (e.g. via a Python client) with a bad subtype byte.
+
+### TMs to check
+
+| Container | Subtype | Triggered by | Layout |
+|---|---|---|---|
+| `/PUS17/are-you-alive-report` | TM[17,2] | `ARE_YOU_ALIVE` | Empty — PUS-1 header fields only |
+
+Also watch the standard PUS-1 verification containers (`/PUS/pus-tc-ack-*`) for ACK start and ACK
+completion, and the command's own "completed" status in the Commanding view once the built-in
+`ExecutionVerifier` observes TM[17,2].
+
+### Suggested manual test walkthrough
+
+1. **Send the command**: from the YAMCS web UI, Commanding → issue `/PUS17/ARE_YOU_ALIVE` with no
+   arguments.
+2. **Confirm ACK start**: `/PUS/pus-tc-ack-start` shows success for the command almost immediately.
+3. **Confirm TM[17,2] arrives**: `/PUS17/are-you-alive-report` shows a new packet within a second —
+   no payload, just the PUS header fields.
+4. **Confirm ACK completion + verifier**: `/PUS/pus-tc-ack-completed` shows success, and the command
+   row in the Commanding view flips to "completed" (driven by the `ExecutionVerifier`, not just the
+   PUS-1 completion ACK).
+5. **Repeat under load** (optional): issue `ARE_YOU_ALIVE` several times back-to-back and confirm
+   each gets its own independent ACK/TM/verifier triple with no cross-talk — useful as the baseline
+   smoke test before debugging any other PUS service in this simulator.
+
+### Caveats specific to this simulator
+
+- **No round-trip timing/latency simulated**: `executeTc` sends ACK start, TM[17,2], and ACK
+  completion synchronously in one call — there is no artificial delay, so this cannot be used to
+  test ground-side timeout/retry behavior.
+- **No way to trigger the NACK-start path from the UI**: see "Command reference" above; only a raw
+  packet with a corrupted subtype byte would exercise `Pus17Service`'s rejection branch.

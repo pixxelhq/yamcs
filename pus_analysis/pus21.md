@@ -5,6 +5,51 @@
 
 ---
 
+## Contents
+
+- [Ground vs. On-board Responsibility](#ground-vs-on-board-responsibility)
+- [a) General Context](#a-general-context)
+  - [Key characteristics](#key-characteristics)
+  - Spec-defined message types (§8.21.2)
+  - Request sequence model (§6.21.4)
+  - [Sequence lifecycle](#sequence-lifecycle)
+- [b) Per-Subtype Context and Implementation Plan](#b-per-subtype-context-and-implementation-plan)
+  - [TC\[21,1\] — Direct-load a request sequence](#tc211--direct-load-a-request-sequence)
+  - [TC\[21,2\] — Load a request sequence by reference](#tc212--load-a-request-sequence-by-reference)
+  - [TC\[21,3\] — Unload a request sequence](#tc213--unload-a-request-sequence)
+  - [TC\[21,4\] — Activate a request sequence](#tc214--activate-a-request-sequence)
+  - [TC\[21,5\] — Abort a request sequence](#tc215--abort-a-request-sequence)
+  - [TC\[21,6\] — Report execution status of each request sequence](#tc216--report-execution-status-of-each-request-sequence)
+  - [TM\[21,7\] — Request sequence execution status report](#tm217--request-sequence-execution-status-report)
+  - [TC\[21,8\] — Load by reference and activate a request sequence](#tc218--load-by-reference-and-activate-a-request-sequence)
+  - [TC\[21,9\] — Checksum a request sequence](#tc219--checksum-a-request-sequence)
+  - [TM\[21,10\] — Request sequence checksum report](#tm2110--request-sequence-checksum-report)
+  - [TC\[21,11\] — Report the content of a request sequence](#tc2111--report-the-content-of-a-request-sequence)
+  - [TM\[21,12\] — Request sequence content report](#tm2112--request-sequence-content-report)
+  - [TC\[21,13\] — Abort all request sequences and report](#tc2113--abort-all-request-sequences-and-report)
+  - [TM\[21,14\] — Aborted request sequence report](#tm2114--aborted-request-sequence-report)
+- [c) Gaps / Shortcomings](#c-gaps--shortcomings)
+  - §6.21.9 subservice observables — out of scope
+  - [Overall feasibility verdict](#overall-feasibility-verdict)
+- [d) Simulator On-board Emulation (Java)](#d-simulator-on-board-emulation-java)
+  - [New file: `Pus21Service.java`](#new-file-pus21servicejava)
+  - [Modified file: `PusSimulator.java`](#modified-file-pussimulatorjava)
+  - [Optional: `yamcs.pus.yaml` MDB entry](#optional-yamcspusyaml-mdb-entry)
+  - [Gap summary for simulator implementation](#gap-summary-for-simulator-on-board-emulation-java-implementation)
+- [e) MCS-side (`yamcs-core`) support: embedded-entry builder](#e-mcs-side-yamcs-core-support-one-embedded-entry-builder)
+  - [Why this is still needed (recap)](#why-this-is-still-needed-recap)
+  - [`Pus21EmbeddedEntryBuilder`](#pus21embeddedentrybuilder)
+  - [Open questions for this section](#open-questions-for-this-section)
+- [f) Testing Methodology — Actual Implementation](#f-testing-methodology--actual-implementation)
+  - [Start the instance](#start-the-instance)
+  - [Two ways to get a sequence loaded](#two-ways-to-get-a-sequence-loaded)
+  - [Command reference — valid inputs](#command-reference--valid-inputs)
+  - [TMs to check](#tms-to-check)
+  - [Suggested manual test walkthrough](#suggested-manual-test-walkthrough)
+  - [Caveats specific to this simulator](#caveats-specific-to-this-simulator)
+
+---
+
 ## Ground vs. On-board Responsibility
 
 | Concern | YAMCS / MCS (ground) | Satellite / On-board software |
@@ -1269,3 +1314,120 @@ for the outer command — it's a standard MetaCommand.
 - Whether the local sequence counter needs to persist across restarts (leaning "no" — see above).
 - Whether entry `args` should mirror the full `IssueCommandRequest` proto value types or a
   simplified subset.
+
+---
+
+## f) Testing Methodology — Actual Implementation
+
+All 14 in-scope subtypes are implemented and wired up. This section supersedes any pseudocode
+shown in §b/§d — it describes what to actually run.
+
+| Artifact | Path |
+|---|---|
+| MDB | `examples/pus/src/main/yamcs/mdb/pus21.xml` |
+| Simulator service | `simulator/src/main/java/org/yamcs/simulator/pus/Pus21Service.java` |
+| Registration | `PusSimulator.java` (`pus21Service` field/constructor/`case 21 ->` dispatch), `yamcs.pus.yaml` (`mdb:` list) |
+| Embedded-entry builder (ground) | `yamcs-core/src/main/java/org/yamcs/pus/Pus21EmbeddedEntryBuilder.java` — Java-only, no REST endpoint yet (see §e open questions) |
+| Sequence store | `Pus21Service.sequenceStore` — `LinkedHashMap<String, RequestSequence>`, empty at startup |
+| File repository stub | `Pus21Service.fileRepo` — pre-seeded with `/seq/demo-seq-1.bin` = two TC[17,1] ping entries, 500ms apart |
+
+### Start the instance
+
+```bash
+mvn -pl simulator,examples/pus -am clean install -DskipTests   # first build only
+mvn -pl examples/pus yamcs:run
+```
+Web UI: `http://localhost:8090`, instance `pus`. Commands live under `/PUS21/...`.
+
+### Two ways to get a sequence loaded
+
+TC[21,1] (`TC_21_1`) needs `entries[i].tc_packet` to already be complete, CRC'd, wire-ready bytes
+of a sub-command — the command UI cannot construct that by hand, and there is no REST convenience
+endpoint yet (§e). Two ways to actually exercise a loaded sequence without hand-crafting bytes:
+
+1. **Preferred for most tests — TC[21,2]/TC[21,8] against the seeded file repo.** No embedded-byte
+   construction needed: `TC_21_2_NO_PATH` with `seq_id="demo-seq-1"` loads the pre-seeded
+   `/seq/demo-seq-1.bin` entries directly (`loadFromRepo()` defaults to `<seq_id>.bin` in `/seq`
+   when no path is given).
+2. **For exercising TC[21,1] itself** — call `Pus21EmbeddedEntryBuilder.build()` from a Java test
+   (e.g. `buildCommand` a `TC_17_1` ping, get back finalized bytes), then paste those bytes
+   (hex/base64, per the web UI's binary argument input) into `entries[i].tc_packet` alongside a
+   `delay` value. Confirms the ground-side array-of-aggregate encoder path end-to-end.
+
+### Command reference — valid inputs
+
+| Command | Subtype | Valid example args |
+|---|---|---|
+| `TC_21_2_NO_PATH` | TC[21,2] | `{"seq_id": "demo-seq-1"}` — loads the seeded file |
+| `TC_21_4` | TC[21,4] | `{"seq_id": "demo-seq-1"}` — activates a loaded, inactive sequence |
+| `TC_21_5` | TC[21,5] | `{"seq_id": "demo-seq-1"}` — aborts a sequence currently under execution |
+| `TC_21_3` | TC[21,3] | `{"seq_id": "demo-seq-1"}` — unloads an inactive sequence |
+| `TC_21_6` | TC[21,6] | *(no args)* — triggers `TM_21_7` |
+| `TC_21_9` | TC[21,9] | `{"seq_id": "demo-seq-1"}` — triggers `TM_21_10` |
+| `TC_21_11` | TC[21,11] | `{"seq_id": "demo-seq-1"}` — triggers `TM_21_12` |
+| `TC_21_13` | TC[21,13] | *(no args)* — aborts every under-execution sequence, triggers `TM_21_14` |
+| `TC_21_8_NO_PATH` | TC[21,8] | `{"seq_id": "demo-seq-1"}` — load-and-activate in one TC (only works once per `seq_id`, since the file repo entry can be loaded only while not already in `sequenceStore`) |
+
+### TMs to check
+
+| Container | Subtype | Triggered by | Layout |
+|---|---|---|---|
+| `/PUS21/TM_21_7` | TM[21,7] | `TC_21_6` | `num_entries:u8`, then N × `{seq_id:16B, exec_status:u8}` |
+| `/PUS21/TM_21_10` | TM[21,10] | `TC_21_9` | `seq_id:16B`, `checksum_value:u16` (CRC-16/CCITT) |
+| `/PUS21/TM_21_12` | TM[21,12] | `TC_21_11` | `seq_id:16B`, `num_entries:u8`, then N × `{embedded TC packet (self-length-delimited), delay:u32}` |
+| `/PUS21/TM_21_14` | TM[21,14] | `TC_21_13` | `num_entries:u8`, then N × `seq_id:16B` |
+
+Also watch the standard PUS-1 verification containers (`/PUS/pus-tc-ack-*`) for ACK start/completion
+on every command, and note that activation additionally triggers *relayed* TC[17,1] pings — each
+appears as its own independent ACK-start/ACK-completion chain in command history, one per entry,
+staggered by the configured delay.
+
+### Suggested manual test walkthrough
+
+1. **Load the seeded sequence**: `TC_21_2_NO_PATH` with `{"seq_id": "demo-seq-1"}`. Confirm ACK
+   completion (not `COMPL_ERR_FILE_NOT_FOUND`).
+2. **Reject a duplicate load**: repeat step 1. Confirm NACK completion,
+   `COMPL_ERR_SEQ_ALREADY_LOADED` (3).
+3. **Check status before activation**: `TC_21_6` (no args). `TM_21_7` should list `demo-seq-1` with
+   `exec_status=0` (inactive).
+4. **Check content**: `TC_21_11` with `{"seq_id": "demo-seq-1"}`. `TM_21_12` should show 2 entries,
+   each a full TC[17,1] ping packet + `delay=500`.
+5. **Checksum**: `TC_21_9` with `{"seq_id": "demo-seq-1"}`. `TM_21_10` returns a CRC-16/CCITT value
+   — note it down, it should be stable across repeated calls on the same unmodified sequence.
+6. **Activate and watch relay**: `TC_21_4` with `{"seq_id": "demo-seq-1"}`. Confirm ACK completion,
+   then watch command history for two independent TC[17,1] ACK-start/completion chains roughly
+   500ms apart. After the second entry's delay elapses, `TC_21_6` again should show `demo-seq-1`
+   back to `exec_status=0` (execution completed and reset itself).
+7. **Abort responsiveness**: reload (`TC_21_2_NO_PATH`), activate (`TC_21_4`), then immediately
+   send `TC_21_5` with `{"seq_id": "demo-seq-1"}` (well inside the 500ms inter-entry delay).
+   Confirm ACK completion and that **no second** relayed ping appears in command history — the
+   cancellable `ScheduledFuture` chain means abort takes effect before the next entry's delay
+   elapses, not after.
+8. **Reject an abort on an inactive sequence**: repeat step 7's `TC_21_5` immediately after it
+   already succeeded. Confirm NACK completion, `COMPL_ERR_SEQ_NOT_ABORTABLE` (7).
+9. **Unload**: `TC_21_3` with `{"seq_id": "demo-seq-1"}`. Confirm ACK completion, then `TC_21_6`
+   shows an empty `TM_21_7` (0 entries).
+10. **Reject operations on an unknown seq_id**: `TC_21_9` with `{"seq_id": "does-not-exist"}`.
+    Confirm NACK completion, `COMPL_ERR_SEQ_NOT_FOUND` (4).
+11. **Reject a load from an unknown file**: `TC_21_2_NO_PATH` with `{"seq_id": "nope"}` (no file
+    `/seq/nope.bin` in the repo). Confirm NACK completion, `COMPL_ERR_FILE_NOT_FOUND` (8).
+12. **`TC_21_13` abort-all**: load and activate `demo-seq-1` again, then send `TC_21_13` (no args)
+    mid-execution. Confirm `TM_21_14` lists `demo-seq-1` as aborted, and no further pings relay.
+
+### Caveats specific to this simulator
+
+- **Only one seeded file**: `/seq/demo-seq-1.bin`. Testing `TC_21_2_WITH_PATH`/`TC_21_8_WITH_PATH`
+  against a *different* repo path requires editing `Pus21Service.seedFileRepo()` — there's no TC
+  that can write into `fileRepo` at runtime (no ST[23] File Management service, see Gap 6 in §c).
+- **Checksum algorithm not independently verified**: CRC-16/CCITT was chosen by analogy with
+  ST[6]'s independent reading of the same spec clause (5.4.4), not by reading that clause directly
+  (Gap 10 in §c). If a mission ICD later specifies otherwise, only `Pus21Service.computeChecksum()`
+  and the matching ground-side expectation need to change.
+- **`request_sequence_ID` is silently truncated/padded to 16 bytes**: `writeSeqId()` truncates
+  longer ids and null-pads shorter ones with no rejection — a `seq_id` longer than 16 ASCII
+  characters will not round-trip as typed.
+- **No persistence across restarts**: `sequenceStore` and `fileRepo` are both plain in-memory maps,
+  reset on every simulator process start (`fileRepo` reseeds itself; `sequenceStore` starts empty).
+- **`Pus21EmbeddedEntryBuilder` has no REST endpoint**: it's a Java-only helper today (open question
+  in §e). Building a real TC[21,1] test currently means writing a small Java caller, not something
+  reachable purely from the web UI.

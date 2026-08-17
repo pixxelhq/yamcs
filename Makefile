@@ -22,3 +22,12 @@ rebuild: clean all
 .PHONY: test
 test:
 	@mvn test javadoc:javadoc
+
+.PHONY: build-sim
+build-sim:
+	@mvn -pl simulator,examples/pus -am clean install -DskipTests
+
+.PHONY: run-sim
+run-sim:
+	@mvn -pl examples/pus yamcs:run
+# Web UI once running: http://localhost:8090, instance "pus"
