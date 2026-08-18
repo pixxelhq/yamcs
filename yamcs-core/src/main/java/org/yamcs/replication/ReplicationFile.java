@@ -260,6 +260,7 @@ public class ReplicationFile implements Closeable {
             this.readOnly = false;
             this.lastMetadataTxStart = Header2.HDR_IDX_OFFSET - METADATA_POS_OFFSET - 4;
             buf.position(hdr2.endOffset());
+            fc.force(true);
             log.info("Created new replication file {} pageSize: {}, maxPages:{}, maxFileSize: {}", path, hdr1.pageSize,
                     hdr1.maxPages, maxFileSize);
         } catch (IOException e) {
