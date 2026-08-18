@@ -140,7 +140,7 @@ public class ServerStreamingObserver implements Observer<Message> {
 
         Channel ch = ctx.nettyContext.channel();
         if (ch.isOpen()) {
-            log.warn("Closing channel because transfer failed");
+            log.warn("Closing channel because transfer failed", t);
             ch.close();
         }
     }
