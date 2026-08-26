@@ -84,6 +84,10 @@ service PacketsApi {
   rpc ExportPackets(ExportPacketsRequest) returns (stream yamcs.api.HttpBody) {
     option (yamcs.api.route) = {
       get: "/api/archive/{instance}:exportPackets"
+      additional_bindings {
+        post: "/api/archive/{instance}:exportPackets"
+        body: "*"
+      };
     };
   }
   
@@ -287,6 +291,22 @@ message ExportPacketsRequest {
   
   // The archived name of the packets. Names must match exactly.
   repeated string name = 4;
+
+  // Filter by the link where the packet was received from.
+  optional string link = 5;
+
+  // Filter query. See {doc}`../filtering` for how to write a filter query.
+  //
+  // Literal text search matches against the `name` and `link` fields.
+  // Field comparisons can use any of the following fields:
+  //
+  // | Field       | Type        | Description                        |
+  // | ----------- | ----------- | ---------------------------------- |
+  // | `name`      | string      | Filter by archived name            |
+  // | `link`      | string      | Filter by receiving link           |
+  // | `seqNumber` | number      | Filter by archived sequence number |
+  // | `size`      | number      | Filter by packet size in bytes     |
+  optional string filter = 6;
 }
 
 message SubscribePacketsRequest {

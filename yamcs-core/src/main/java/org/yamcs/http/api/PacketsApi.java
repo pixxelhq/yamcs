@@ -456,7 +456,16 @@ public class PacketsApi extends AbstractPacketsApi<Context> {
         if (request.getNameCount() > 0) {
             sqlb.whereColIn("pname", nameSet);
         }
+        if (request.hasLink()) {
+            sqlb.where("link = ?", request.getLink());
+        }
         String sql = sqlb.toString();
+
+        // Parse the filter before streaming anything, so that a syntax error
+        // results in a clean error response rather than a truncated download.
+        var filter = request.hasFilter()
+                ? PacketFilterFactory.create(request.getFilter())
+                : null;
 
         HttpBody metadata = HttpBody.newBuilder()
                 .setContentType(MediaType.OCTET_STREAM.toString())
@@ -470,6 +479,10 @@ public class PacketsApi extends AbstractPacketsApi<Context> {
             public void onTuple(Stream stream, Tuple tuple) {
                 if (observer.isCancelled()) {
                     stream.close();
+                    return;
+                }
+
+                if (filter != null && !filter.matches(tuple)) {
                     return;
                 }
 
