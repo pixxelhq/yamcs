@@ -33,3 +33,19 @@ Filter(Text, Minus, Text)
 ==>
 
 Filter(String, Minus, String)
+
+# Qualified name
+
+/YSS/SIMULATOR/FlightData
+
+==>
+
+Filter(Text)
+
+# Negate qualified name
+
+-/YSS/SIMULATOR/FlightData
+
+==>
+
+Filter(Minus, Text)

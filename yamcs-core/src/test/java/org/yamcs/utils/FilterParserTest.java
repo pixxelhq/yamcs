@@ -323,6 +323,39 @@ public class FilterParserTest {
     }
 
     @Test
+    public void testQualifiedName() throws ParseException {
+        var flightData = new Item("/YSS/SIMULATOR/FlightData", EventSeverity.INFO, false, 1, null, List.of());
+        var power = new Item("/YSS/SIMULATOR/Power", EventSeverity.INFO, false, 2, null, List.of());
+        var items = asList(flightData, power);
+
+        // Slashes are allowed in unquoted terms, so that qualified names
+        // do not need to be enclosed in double quotes.
+        var filter = new ItemFilter("name = /YSS/SIMULATOR/FlightData");
+        assertEquals(asList(flightData), items.stream().filter(filter::matches).toList());
+
+        filter = new ItemFilter("name = \"/YSS/SIMULATOR/FlightData\"");
+        assertEquals(asList(flightData), items.stream().filter(filter::matches).toList(), "Quoting remains valid");
+
+        filter = new ItemFilter("name != /YSS/SIMULATOR/Power");
+        assertEquals(asList(flightData), items.stream().filter(filter::matches).toList());
+
+        filter = new ItemFilter("name:/YSS/SIMULATOR/");
+        assertEquals(items, items.stream().filter(filter::matches).toList(), "Not confused with the has-operator");
+
+        filter = new ItemFilter("/YSS/SIMULATOR/FlightData");
+        assertEquals(asList(flightData), items.stream().filter(filter::matches).toList(), "Text search");
+
+        filter = new ItemFilter("-/YSS/SIMULATOR/Power");
+        assertEquals(asList(flightData), items.stream().filter(filter::matches).toList(), "Negated text search");
+
+        // Colons are not allowed in unquoted terms, they remain reserved
+        // for the has-operator.
+        var opsName = new Item("MDB:OPS Name", EventSeverity.INFO, false, 3, null, List.of());
+        filter = new ItemFilter("name = \"MDB:OPS Name\"");
+        assertEquals(asList(opsName), asList(opsName).stream().filter(filter::matches).toList());
+    }
+
+    @Test
     public void testPrefix() throws ParseException {
         var filter = new ItemFilter("label.name=\"icy wombat\"");
         assertEquals(asList(c), filterItems(filter));
