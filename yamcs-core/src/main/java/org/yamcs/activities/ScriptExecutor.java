@@ -169,7 +169,7 @@ public class ScriptExecutor implements ActivityExecutor {
 
         List<String> scriptArgs = new ArrayList<>();
         if (args.containsKey("args")) {
-            scriptArgs = YConfiguration.<String> getList(args, "args");
+            scriptArgs = parseScriptArgs(activity.getArgs().get("args"));
         }
 
         var becomeUser = caller;
@@ -184,5 +184,31 @@ public class ScriptExecutor implements ActivityExecutor {
         }
 
         return new ScriptExecution(activityService, this, activity, runner, processor, script, scriptArgs, becomeUser);
+    }
+
+    /**
+     * Normalizes the user-supplied {@code args} option into the list of arguments passed to the script.
+     * <p>
+     * Two input shapes are supported:
+     * <ul>
+     * <li>A single string is interpreted as a command line and tokenized on whitespace.
+     * <li>A list is taken as-is: each element becomes exactly one argument and is never split further, even if it
+     * contains whitespace.
+     * </ul>
+     */
+    static List<String> parseScriptArgs(Object rawArgs) {
+        var result = new ArrayList<String>();
+        if (rawArgs instanceof String cmdline) {
+            if (!cmdline.isBlank()) {
+                Collections.addAll(result, cmdline.trim().split("\\s+"));
+            }
+        } else if (rawArgs instanceof List<?> list) {
+            for (var element : list) {
+                result.add(String.valueOf(element));
+            }
+        } else if (rawArgs != null) {
+            result.add(String.valueOf(rawArgs));
+        }
+        return result;
     }
 }

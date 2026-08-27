@@ -3,6 +3,7 @@ package org.yamcs.activities;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -13,22 +14,35 @@ import com.google.common.base.CharMatcher;
 
 public class LocalScriptRun implements ScriptRun {
 
-    private String program;
+    private List<String> command;
     private List<String> scriptArgs;
 
     private Process process;
 
-    public LocalScriptRun(String program, List<String> scriptArgs) {
-        this.program = program;
+    /**
+     * @param command
+     *            the program to execute, already split into individual argv tokens (e.g. an interpreter and its options
+     *            followed by the script path). Taken as-is; not re-parsed.
+     * @param scriptArgs
+     *            user-supplied arguments, each element passed to the process as exactly one argv token.
+     */
+    public LocalScriptRun(List<String> command, List<String> scriptArgs) {
+        this.command = command;
         this.scriptArgs = scriptArgs;
+    }
+
+    List<String> getCommand() {
+        return command;
+    }
+
+    List<String> getScriptArgs() {
+        return scriptArgs;
     }
 
     @Override
     public void run(ScriptExecution scriptExecution) throws Exception {
-        var cmdline = program;
-        for (var arg : scriptArgs) {
-            cmdline += " " + arg;
-        }
+        var cmdline = new ArrayList<String>(command);
+        cmdline.addAll(scriptArgs);
 
         var yamcs = YamcsServer.getServer();
         var securityStore = yamcs.getSecurityStore();
@@ -41,7 +55,7 @@ public class LocalScriptRun implements ScriptRun {
         }
 
         try {
-            var pb = new ProcessBuilder(cmdline.split("\\s+"));
+            var pb = new ProcessBuilder(cmdline);
             pb.environment().put("YAMCS", "1");
 
             var yamcsInstance = scriptExecution.getYamcsInstance();
