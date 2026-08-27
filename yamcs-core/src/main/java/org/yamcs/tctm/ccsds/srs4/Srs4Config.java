@@ -16,8 +16,7 @@ final class Srs4Config {
     record Route(CspEndpoint csp, Ipv4Endpoint ipv4Udp) {
     }
 
-    record CspSettings(boolean enabled, CspEndpoint fixedEndpoint, int priority, boolean hmac, boolean xtea,
-            boolean rdp, boolean crc) {
+    record CspSettings(boolean enabled, CspEndpoint fixedEndpoint) {
     }
 
     record Ipv4UdpSettings(boolean enabled, Ipv4Endpoint fixedEndpoint, int ttl, boolean calculateUdpChecksum) {
@@ -71,7 +70,7 @@ final class Srs4Config {
         checkRange("radio spacecraftId", radioId, 0, 0xFFFF);
 
         CspSettings csp = cspEnabled ? parseCsp(config.getConfig("csp"), tc)
-                : new CspSettings(false, null, 0, false, false, false, false);
+                : new CspSettings(false, null);
         Ipv4UdpSettings ip = ipEnabled ? parseIpv4Udp(config.getConfig("ipv4Udp"), tc)
                 : new Ipv4UdpSettings(false, null, 64, false);
 
@@ -84,7 +83,8 @@ final class Srs4Config {
             CspEndpoint cspEndpoint = null;
             if (cspEnabled) {
                 YConfiguration endpoint = routeConfig.getConfig("csp");
-                cspEndpoint = parseCspEndpoint(endpoint, tc ? "destination" : "source");
+                cspEndpoint = tc ? parseCspEndpoint(endpoint, "destination")
+                        : new CspEndpoint(parseCspAddress(endpoint, "source"), 0);
             }
             Ipv4Endpoint ipEndpoint = null;
             if (ipEnabled) {
@@ -109,12 +109,9 @@ final class Srs4Config {
     }
 
     private static CspSettings parseCsp(YConfiguration config, boolean tc) {
-        CspEndpoint fixed = parseCspEndpoint(config, tc ? "source" : "destination");
-        int priority = config.getInt("priority", 0);
-        checkRange("CSP priority", priority, 0, 3);
-        return new CspSettings(true, fixed, priority, config.getBoolean("hmac", false),
-                config.getBoolean("xtea", false), config.getBoolean("rdp", false),
-                config.getBoolean("crc", false));
+        CspEndpoint fixed = tc ? new CspEndpoint(parseCspAddress(config, "source"), 0)
+                : parseCspEndpoint(config, "destination");
+        return new CspSettings(true, fixed);
     }
 
     private static Ipv4UdpSettings parseIpv4Udp(YConfiguration config, boolean tc) {
@@ -124,8 +121,14 @@ final class Srs4Config {
         return new Ipv4UdpSettings(true, fixed, ttl, config.getBoolean("calculateUdpChecksum", false));
     }
 
-    private static CspEndpoint parseCspEndpoint(YConfiguration config, String prefix) {
+    private static int parseCspAddress(YConfiguration config, String prefix) {
         int address = config.getInt(prefix + "Address");
+        checkRange("CSP " + prefix + "Address", address, 0, 31);
+        return address;
+    }
+
+    private static CspEndpoint parseCspEndpoint(YConfiguration config, String prefix) {
+        int address = parseCspAddress(config, prefix);
         int port = config.getInt(prefix + "Port");
         checkRange("CSP " + prefix + "Address", address, 0, 31);
         checkRange("CSP " + prefix + "Port", port, 0, 63);

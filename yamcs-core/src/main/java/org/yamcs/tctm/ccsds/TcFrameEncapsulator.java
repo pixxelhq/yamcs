@@ -25,7 +25,7 @@ public interface TcFrameEncapsulator {
     byte[] encapsulate(UplinkTransferFrame frame);
 
     /**
-     * Validates the provider configuration against the parent CCSDS link.
+     * Validates the provider configuration against the parent data link.
      */
     default void validate(int maximumFrameLength, Collection<Integer> virtualChannelIds) {
     }

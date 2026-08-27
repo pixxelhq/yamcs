@@ -111,7 +111,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
             int maxdfl = frameHandler.getMaxFrameSize() + getFrameDecapsulationOverhead();
             if (dfl < mindfl || dfl > maxdfl) {
                 throw new ConfigurationException("Raw frame decoder output frame length " + dfl +
-                        " does not match the defined frame length including decapsulation overhead "
+                        " does not match the defined frame length, including decapsulation overhead "
                         + (mindfl == maxdfl ? Integer.toString(mindfl) : "[" + mindfl + ", " + maxdfl + "]"));
             }
         }
@@ -150,7 +150,11 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                 }
             }
             if (frameDecapsulator != null) {
-                var frame = frameDecapsulator.decapsulate(data, offset, length);
+                int minimumCcsdsFrameLength = frameHandler.getMinFrameSize();
+                int maximumCcsdsFrameLength = frameHandler.getMaxFrameSize();
+                int expectedCcsdsFrameLength = minimumCcsdsFrameLength == maximumCcsdsFrameLength
+                        ? maximumCcsdsFrameLength : -1;
+                var frame = frameDecapsulator.decapsulate(data, offset, length, expectedCcsdsFrameLength);
                 data = frame.data();
                 offset = frame.offset();
                 length = frame.length();
@@ -167,6 +171,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                 eventProducer.sendWarning("Error processing frame: size " + length + " longer than maximum allowed "
                         + frameHandler.getMaxFrameSize());
                 errFrameCount++;
+                return;
             }
 
             frameHandler.handleFrame(ert, data, offset, length, expectedVcId);

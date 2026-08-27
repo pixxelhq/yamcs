@@ -31,18 +31,22 @@ public class Srs4TmFrameDecapsulator implements TmFrameDecapsulator {
     }
 
     @Override
-    public DecapsulatedFrame decapsulate(byte[] data, int offset, int length) throws TcTmException {
+    public DecapsulatedFrame decapsulate(byte[] data, int offset, int length, int expectedInnerFrameLength)
+            throws TcTmException {
         var radioFrame = radioCodec.decode(data, offset, length);
         if (radioFrame.flow() == Srs4Flow.CAN) {
             if (cspCodec == null) {
                 throw new TcTmException("SRS4 radio selected CAN but the CSP decoder is disabled");
             }
+            validateFrameLength(length, expectedInnerFrameLength, Srs4CspHeaderCodec.HEADER_LENGTH, "CSP");
             var frame = cspCodec.decode(radioFrame.data(), radioFrame.offset(), radioFrame.length());
             return new DecapsulatedFrame(frame.data(), frame.offset(), frame.length(), frame.virtualChannelId());
         } else {
             if (ipv4UdpCodec == null) {
                 throw new TcTmException("SRS4 radio selected Ethernet but the IPv4/UDP decoder is disabled");
             }
+            validateFrameLength(length, expectedInnerFrameLength, Srs4Ipv4UdpHeaderCodec.HEADER_LENGTH,
+                    "IPv4/UDP");
             var frame = ipv4UdpCodec.decode(radioFrame.data(), radioFrame.offset(), radioFrame.length());
             return new DecapsulatedFrame(frame.data(), frame.offset(), frame.length(), frame.virtualChannelId());
         }
@@ -69,6 +73,19 @@ public class Srs4TmFrameDecapsulator implements TmFrameDecapsulator {
         if (Srs4RadioHeaderCodec.SPACECRAFT_ID_LENGTH + busOverhead + maximumFrameLength > Srs4RadioHeaderCodec.MAX_CONTENT_LENGTH) {
             throw new ConfigurationException("SRS4 radio length field cannot contain maximum CCSDS frame length "
                     + maximumFrameLength + " plus " + busOverhead + " bytes of bus header");
+        }
+    }
+
+    private void validateFrameLength(int receivedLength, int expectedInnerFrameLength, int busHeaderLength,
+            String flow) throws TcTmException {
+        if (expectedInnerFrameLength == -1) {
+            return;
+        }
+        int expectedLength = expectedInnerFrameLength + Srs4RadioHeaderCodec.TYPE_AND_LENGTH_LENGTH
+                + Srs4RadioHeaderCodec.SPACECRAFT_ID_LENGTH + busHeaderLength;
+        if (receivedLength != expectedLength) {
+            throw new TcTmException("Bad SRS4 " + flow + " frame length " + receivedLength + "; expected "
+                    + expectedLength);
         }
     }
 }
