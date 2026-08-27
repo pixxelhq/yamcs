@@ -1341,7 +1341,7 @@ export default class YamcsClient implements HttpHandler {
   }
 
   async deleteQuery(instance: string, resource: string, queryId: string) {
-    const url = `${this.apiUrl}/queries/${instance}/${resource}/${queryId}`;
+    const url = `${this.apiUrl}/web/queries/${instance}/${resource}/${queryId}`;
     return await this.doFetch(url, {
       method: 'DELETE',
     });
