@@ -107,6 +107,33 @@ public class Pus3Service extends AbstractPusService {
                 bb -> rcs.fillPacket(bb.slice()), rcs.dataSize()));
         hkStructures.put(4, new HkStructure(4, 1000, true,
                 bb -> eps.fillPacket(bb.slice()), eps.dataSize()));
+        // HK struct 5: enum-chart test parameters (see landing.xml "EnumTest" container).
+        hkStructures.put(5, new HkStructure(5, 1000, true,
+                bb -> fillEnumTest(bb.slice()), 4));
+    }
+
+    // Non-monotonic / sparse ordinals for EnumTest_Sparse (must match EnumTestSparseType in landing.xml).
+    private static final int[] ENUM_TEST_SPARSE_ORDINALS = { 0, 3, 7, 25, 100, 200 };
+    private int enumTestCounter = 0;
+
+    /**
+     * Fills the 4-byte payload of HK struct 5. One report per second, cycling through every enum case the
+     * Parameter -&gt; Chart enum support needs to handle:
+     * <ul>
+     * <li>{@code EnumTest_State} - dense ordinals 0..4 (includes 0), simple step line.</li>
+     * <li>{@code EnumTest_Sparse} - sparse, non-monotonic ordinals (0,3,7,25,100,200): exercises label
+     * mapping and the half-ordinal Y-tick edge case.</li>
+     * <li>{@code EnumTest_Partial} - normally NOMINAL/WARNING/ALARM (10/20/30) but every 4th sample emits
+     * ordinal 99, which is absent from the MDB enum table: exercises unmapped-value handling.</li>
+     * <li>{@code EnumTest_Flag} - boolean, toggles every sample.</li>
+     * </ul>
+     */
+    private void fillEnumTest(ByteBuffer bb) {
+        int c = enumTestCounter++;
+        bb.put((byte) (c % 5));
+        bb.put((byte) ENUM_TEST_SPARSE_ORDINALS[c % ENUM_TEST_SPARSE_ORDINALS.length]);
+        bb.put((byte) (c % 4 == 3 ? 99 : 10 + 10 * (c % 3)));
+        bb.put((byte) (c % 2));
     }
 
     @Override

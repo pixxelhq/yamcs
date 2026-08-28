@@ -28,6 +28,53 @@
   z-index: 50;
 }
 
+.enum-key-overlay {
+  position: absolute;
+  top: 42px;
+  right: 12px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(100% - 60px);
+  overflow: auto;
+}
+
+.enum-key-overlay .enum-key {
+  border: 1px solid var(--y-border-color);
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.enum-key-overlay .enum-key caption {
+  caption-side: top;
+  text-align: left;
+  padding: 2px 6px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--y-border-color);
+}
+
+.enum-key-overlay .enum-key .swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.enum-key-overlay .enum-key td {
+  padding: 1px 6px;
+}
+
+.enum-key-overlay .enum-key .enum-code {
+  text-align: right;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+}
+
 .hide {
   visibility: hidden;
 }

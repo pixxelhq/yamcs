@@ -23,6 +23,7 @@ import {
 import {
   BaseComponent,
   ConfigService,
+  EnumValue,
   Formatter,
   Parameter,
   utils,
@@ -229,6 +230,12 @@ export class ParameterChartTabComponent
         // Whether to fetch a new set of data
         fetch ||= traceForm.valueType! !== config.valueType;
         config.valueType = traceForm.valueType!;
+
+        // Enum labels only apply to the engineering value.
+        config.enumValues = this.resolveEnumValues(
+          config.parameter,
+          config.valueType,
+        );
       }
       this.band.applyTraceConfigs();
       if (fetch) {
@@ -486,13 +493,33 @@ export class ParameterChartTabComponent
             : requestedName;
 
         if (parameter) {
+          const valueType = traceState?.valueType ?? 'engineering';
+          const enumValues = this.resolveEnumValues(parameter, valueType);
+          const enumTrace = !!enumValues;
+
+          // Enum traces default to a step line. Keep the plain default when the
+          // user has not touched the control; respect any explicit choice.
+          const lineStyleControl =
+            traceFormsById.get(traceId)!.controls.lineStyle;
+          const useEnumStepDefault =
+            enumTrace &&
+            lineStyleControl.pristine &&
+            lineStyleControl.value === 'straight';
+          const lineStyle = useEnumStepDefault
+            ? 'step'
+            : (traceState?.lineStyle ?? 'straight');
+          if (useEnumStepDefault) {
+            lineStyleControl.setValue('step', { emitEvent: false });
+          }
+
           const trace: TraceConfig = {
             parameter,
             color,
             lineWidth: traceState?.lineWidth ?? 2,
-            lineStyle: traceState?.lineStyle ?? 'straight',
+            lineStyle,
             fill: traceState?.fill ?? false,
-            valueType: traceState?.valueType ?? 'engineering',
+            valueType,
+            enumValues,
           };
           this.band.addOrUpdateTrace(traceId, trace);
 
@@ -527,7 +554,7 @@ export class ParameterChartTabComponent
       const rtValue = this.band.getParameterValue(item.traceId);
 
       if (rtValue !== undefined) {
-        item.value.set(String(rtValue));
+        item.value.set(this.band.getValueLabel(item.traceId, rtValue));
       } else {
         item.value.set(null);
       }
@@ -643,6 +670,77 @@ export class ParameterChartTabComponent
 
   get traces() {
     return this.form.controls['traces'] as FormArray<FormGroup<TraceForm>>;
+  }
+
+  /**
+   * Enum value↔label table for a trace, shown as a read-only key in the detail
+   * pane. Returns undefined for numeric traces or a trace showing raw values.
+   */
+  enumValuesForTrace(traceForm: FormGroup<TraceForm>) {
+    const traceId = traceForm.value.traceId;
+    return traceId ? this.band?.getTrace(traceId)?.enumValues : undefined;
+  }
+
+  /**
+   * Ordinal↔label keys for every enum trace on the chart, rendered as an
+   * always-visible overlay next to the plot so the Y-axis ordinals can be read
+   * off against their enumeration labels.
+   */
+  enumKeys(): {
+    traceId: string;
+    name: string;
+    color: string;
+    values: EnumValue[];
+  }[] {
+    const keys: {
+      traceId: string;
+      name: string;
+      color: string;
+      values: EnumValue[];
+    }[] = [];
+    for (const traceForm of this.traces.controls) {
+      const traceId = traceForm.value.traceId;
+      if (!traceId) {
+        continue;
+      }
+      const trace = this.band?.getTrace(traceId);
+      if (trace?.enumValues?.length) {
+        keys.push({
+          traceId,
+          name: trace.parameter.name,
+          color: trace.color,
+          values: trace.enumValues,
+        });
+      }
+    }
+    return keys;
+  }
+
+  /**
+   * Value↔label table for a categorical engineering trace, used both for the
+   * Y-axis label formatter and the on-chart key. Covers enumerations (ordinals
+   * are serialized as strings by the MDB API, so coerce) and booleans (a
+   * synthetic 0/1 table from the type's zero/one string values). Returns
+   * undefined for a numeric parameter or a trace showing the raw value.
+   */
+  private resolveEnumValues(
+    parameter: Parameter,
+    valueType: string,
+  ): EnumValue[] | undefined {
+    const type = parameter.type;
+    if (valueType !== 'engineering' || !type) {
+      return undefined;
+    }
+    if (type.engType === 'enumeration' && type.enumValues?.length) {
+      return type.enumValues.map((ev) => ({ ...ev, value: Number(ev.value) }));
+    }
+    if (type.engType === 'boolean') {
+      return [
+        { value: 0, label: type.zeroStringValue || 'FALSE' },
+        { value: 1, label: type.oneStringValue || 'TRUE' },
+      ];
+    }
+    return undefined;
   }
 
   /**

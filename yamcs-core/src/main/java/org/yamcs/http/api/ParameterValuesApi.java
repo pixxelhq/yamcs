@@ -9,7 +9,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.yamcs.YamcsServer;
@@ -56,7 +58,10 @@ import org.yamcs.utils.ParameterFormatter;
 import org.yamcs.utils.ParameterFormatter.Header;
 import org.yamcs.utils.TimeEncoding;
 import org.yamcs.utils.ValueUtility;
+import org.yamcs.xtce.EnumeratedParameterType;
 import org.yamcs.xtce.Parameter;
+import org.yamcs.xtce.ParameterType;
+import org.yamcs.xtce.ValueEnumeration;
 import org.yamcs.yarch.TableDefinition;
 import org.yamcs.yarch.YarchDatabase;
 import org.yamcs.yarch.YarchDatabaseInstance;
@@ -540,6 +545,20 @@ public class ParameterValuesApi extends AbstractParameterValuesApi<Context> {
         Downsampler sampler = new Downsampler(start, stop, sampleCount);
         sampler.setUseRawValue(useRawValue);
         sampler.setGapTime(request.hasGapTime() ? request.getGapTime() : 120000);
+
+        // Enum (engineering) parameters are categorical: switch the sampler to last-value-per-bucket and give it the
+        // label->ordinal table so the columnar retrieval path (which delivers String labels) can plot numeric ordinals.
+        // Raw values of an enum parameter are plain integers and need none of this.
+        if (!useRawValue && pid.getPath() == null) {
+            ParameterType ptype = pid.getParameter().getParameterType();
+            if (ptype instanceof EnumeratedParameterType enumType) {
+                Map<String, Integer> labelToOrdinal = new HashMap<>();
+                for (ValueEnumeration ve : enumType.getValueEnumerationList()) {
+                    labelToOrdinal.put(ve.getLabel(), (int) ve.getValue());
+                }
+                sampler.enableCategoricalMode(labelToOrdinal);
+            }
+        }
 
         ParameterRetrievalService prs = getParameterRetrievalService(ysi);
         ParameterRetrievalOptions opts = ParameterRetrievalOptions.newBuilder()
