@@ -78,7 +78,9 @@
             <ya-icon-action icon="add_circle" matTooltip="Add trace below" (click)="addTrace(i)" />
           </ya-stepper-step-actions>
 
-          <app-trace-config [form]="traceForm" />
+          <app-trace-config
+            [form]="traceForm"
+            [enumValues]="enumValuesForTrace(traceForm)" />
         </ya-stepper-step>
       }
     </ya-stepper>
@@ -133,6 +135,25 @@
       backgroundColor="#fff"
       [borderColor]="gridColor" />
   </div>
+
+  @if (enumKeys().length) {
+    <div class="enum-key-overlay">
+      @for (key of enumKeys(); track key.traceId) {
+        <table class="enum-key">
+          <caption>
+            <span class="swatch" [style.background]="key.color"></span>
+            {{ key.name }}
+          </caption>
+          @for (ev of key.values; track ev.value) {
+            <tr>
+              <td class="enum-code">{{ ev.value }}</td>
+              <td class="enum-label">{{ ev.label }}</td>
+            </tr>
+          }
+        </table>
+      }
+    </div>
+  }
 
   <div #container class="timeline-container"></div>
 </div>

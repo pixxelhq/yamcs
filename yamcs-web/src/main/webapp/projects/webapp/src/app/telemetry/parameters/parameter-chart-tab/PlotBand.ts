@@ -227,6 +227,53 @@ export class PlotBand extends LinePlot {
     }
 
     this.lines = orderedLines;
+
+    this.updateValueFormatters();
+  }
+
+  /**
+   * Sets axis / tooltip formatters so enum traces render labels instead of raw
+   * ordinals. Labels from every enum trace on the band are merged into one
+   * ordinal→label table (last write wins on a collision). Resets to the plain
+   * numeric formatting when no enum trace is present.
+   */
+  private updateValueFormatters() {
+    const labelByOrdinal = new Map<number, string>();
+    for (const config of this.traceConfigById.values()) {
+      if (config.valueType === 'engineering') {
+        for (const ev of config.enumValues ?? []) {
+          labelByOrdinal.set(ev.value, ev.label);
+        }
+      }
+    }
+
+    if (labelByOrdinal.size > 0) {
+      const fmt = (value: number) =>
+        Number.isInteger(value) && labelByOrdinal.has(value)
+          ? labelByOrdinal.get(value)!
+          : String(value);
+      this.axisLabelFormatter = fmt;
+      this.hoveredValueLabelFormatter = fmt;
+    } else {
+      // Library defaults.
+      this.axisLabelFormatter = (value) => String(value);
+      this.hoveredValueLabelFormatter = (value) => value.toFixed(2);
+    }
+  }
+
+  /**
+   * Formats a realtime value for a single trace, mapping enum ordinals to their
+   * label. Used by the legend.
+   */
+  getValueLabel(traceId: string, value: number): string {
+    const config = this.getTrace(traceId);
+    if (config?.valueType === 'engineering') {
+      const ev = config.enumValues?.find((e) => e.value === value);
+      if (ev) {
+        return ev.label;
+      }
+    }
+    return String(value);
   }
 
   toggleFill(enabled: boolean) {
