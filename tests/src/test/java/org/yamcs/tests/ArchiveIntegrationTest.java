@@ -239,14 +239,14 @@ public class ArchiveIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     public void testReplayWithPpExclusion() throws Exception {
-        generatePkt13AndPps("2015-02-01T10:00:00", 300);
+        generatePkt13AndPps("2015-02-06T10:00:00", 300);
 
         CreateProcessorRequest prequest = CreateProcessorRequest.newBuilder()
                 .setInstance("instance1")
                 .setName("testReplayWithPpExclusion")
                 .setType("ArchiveWithPpExclusion")
                 .setPersistent(true) // TODO temp
-                .setConfig("{\"start\": \"2015-02-01T10:01:00Z\", \"stop\": \"2015-02-01T10:05:00Z\"}")
+                .setConfig("{\"start\": \"2015-02-06T10:01:00Z\", \"stop\": \"2015-02-06T10:05:00Z\"}")
                 .build();
         ProcessorClient replay = yamcsClient.createProcessor(prequest).get();
         Thread.sleep(2000);
@@ -283,27 +283,27 @@ public class ArchiveIntegrationTest extends AbstractIntegrationTest {
         /*
          * Now seek to the beginning (this also starts it)
          */
-        replay.seek(Instant.parse("2015-02-01T10:01:00Z")).get();
+        replay.seek(Instant.parse("2015-02-06T10:01:00Z")).get();
 
         List<ParameterValue> values = captor.expectTimely();
 
         assertEquals(2, values.size());
         ParameterValue p1_1_6 = values.get(0);
         assertEquals("/REFMDB/SUBSYS1/IntegerPara1_1_6", p1_1_6.getId().getName());
-        assertEquals(Timestamps.parse("2015-02-01T10:01:00.000Z"), p1_1_6.getGenerationTime());
+        assertEquals(Timestamps.parse("2015-02-06T10:01:00.000Z"), p1_1_6.getGenerationTime());
 
         values = captor.expectTimely();
         assertEquals(1, values.size());
         ParameterValue pp_para_uint = values.get(0);
         assertEquals("/REFMDB/SUBSYS1/processed_para_uint", pp_para_uint.getId().getName());
-        assertEquals(Timestamps.parse("2015-02-01T10:01:00.030Z"), pp_para_uint.getGenerationTime());
+        assertEquals(Timestamps.parse("2015-02-06T10:01:00.030Z"), pp_para_uint.getGenerationTime());
 
         values = captor.expectTimely();
 
         assertEquals(2, values.size());
         p1_1_6 = values.get(0);
         assertEquals("/REFMDB/SUBSYS1/IntegerPara1_1_6", p1_1_6.getId().getName());
-        assertEquals(Timestamps.parse("2015-02-01T10:01:01.000Z"), p1_1_6.getGenerationTime());
+        assertEquals(Timestamps.parse("2015-02-06T10:01:01.000Z"), p1_1_6.getGenerationTime());
     }
 
     @Test
