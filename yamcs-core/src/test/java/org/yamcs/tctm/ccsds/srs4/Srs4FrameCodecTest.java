@@ -83,10 +83,9 @@ public class Srs4FrameCodecTest {
     @Test
     public void testTmCspSourceAddressMapsToMultipleVcIds() throws Exception {
         Map<String, Object> srs4 = base(true, false, false, false);
-        var routes = new java.util.ArrayList<Map<String, Object>>();
-        routes.add(Map.of("vcId", 3, "csp", List.of(Map.of("sourceAddress", 1))));
-        routes.add(Map.of("vcId", 4, "csp", List.of(Map.of("sourceAddress", 1))));
-        srs4.put("virtualChannels", routes);
+        srs4.put("virtualChannels", List.of(Map.of(
+                "vcIds", List.of(3, 4),
+                "csp", List.of(Map.of("sourceAddress", 1)))));
 
         var encoder = new Srs4TcFrameEncapsulator(tcConfig(true, false, false));
         byte[] encoded = encoder.encapsulate(frame(new byte[] { 9, 8, 7, 6 }, 3, null));
@@ -98,12 +97,9 @@ public class Srs4FrameCodecTest {
     @Test
     public void testTmIpv4EndpointMapsToMultipleVcIds() throws Exception {
         Map<String, Object> srs4 = base(false, true, false, false);
-        var routes = new java.util.ArrayList<Map<String, Object>>();
-        routes.add(Map.of("vcId", 3,
-                "ipv4Udp", List.of(Map.of("sourceAddress", "10.0.0.1", "sourcePort", 1000))));
-        routes.add(Map.of("vcId", 4,
-                "ipv4Udp", List.of(Map.of("sourceAddress", "10.0.0.1", "sourcePort", 1000))));
-        srs4.put("virtualChannels", routes);
+        srs4.put("virtualChannels", List.of(Map.of(
+                "vcIds", List.of(3, 4),
+                "ipv4Udp", List.of(Map.of("sourceAddress", "10.0.0.1", "sourcePort", 1000)))));
 
         var encoder = new Srs4TcFrameEncapsulator(tcConfig(false, true, false));
         byte[] encoded = encoder.encapsulate(frame(new byte[] { 9, 8, 7, 6 }, 3, null));
@@ -126,6 +122,33 @@ public class Srs4FrameCodecTest {
         var decoder = new Srs4TmFrameDecapsulator(YConfiguration.wrap(Map.of("srs4", srs4)));
         var decoded = decoder.decapsulate(encoded, 0, encoded.length, 4);
         assertIterableEquals(List.of(3), decoded.expectedVirtualChannelIds());
+    }
+
+    @Test
+    public void testTmVcIdCanAppearInMultipleRouteGroups() throws Exception {
+        Map<String, Object> srs4 = base(false, true, false, false);
+        srs4.put("virtualChannels", List.of(
+                Map.of("vcIds", List.of(3, 4),
+                        "ipv4Udp", List.of(Map.of("sourceAddress", "10.0.0.1", "sourcePort", 1000))),
+                Map.of("vcIds", List.of(3),
+                        "ipv4Udp", List.of(Map.of("sourceAddress", "10.0.0.3", "sourcePort", 1001)))));
+
+        var encoder = new Srs4TcFrameEncapsulator(tcConfig(false, true, false));
+        byte[] encoded = encoder.encapsulate(frame(new byte[] { 9, 8, 7, 6 }, 3, null));
+        var decoder = new Srs4TmFrameDecapsulator(YConfiguration.wrap(Map.of("srs4", srs4)));
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length, 4);
+        assertIterableEquals(List.of(3, 4), decoded.expectedVirtualChannelIds());
+    }
+
+    @Test
+    public void testRejectsEmptyTmVcIds() {
+        Map<String, Object> srs4 = base(true, false, false, false);
+        srs4.put("virtualChannels", List.of(Map.of(
+                "vcIds", List.of(),
+                "csp", List.of(Map.of("sourceAddress", 1)))));
+
+        assertThrows(ConfigurationException.class,
+                () -> new Srs4TmFrameDecapsulator(YConfiguration.wrap(Map.of("srs4", srs4))));
     }
 
     @Test
@@ -234,6 +257,9 @@ public class Srs4FrameCodecTest {
         assertThrows(ValidationException.class, () -> spec.validate(Map.of("frameEncapsulation", Map.of(
                 "class", Srs4ConfigSpec.TC_CLASS,
                 "args", Map.of("srs4", legacySrs4)))));
+        assertThrows(ValidationException.class, () -> spec.validate(Map.of("frameEncapsulation", Map.of(
+                "class", Srs4ConfigSpec.TC_CLASS,
+                "args", Map.of("srs4", tcRouteWithPluralVcIds())))));
         assertDoesNotThrow(() -> spec.validate(Map.of("frameEncapsulation", Map.of(
                 "class", "example.CustomEncapsulator",
                 "args", Map.of("customOption", "accepted")))));
@@ -254,6 +280,9 @@ public class Srs4FrameCodecTest {
                 "args", Map.of("srs4", Map.of("radio", Map.of("spacecraftId", "not-an-integer")))))));
         assertThrows(ValidationException.class, () -> spec.validate(Map.of("frameDecapsulation", Map.of(
                 "class", Srs4ConfigSpec.TM_CLASS))));
+        assertThrows(ValidationException.class, () -> spec.validate(Map.of("frameDecapsulation", Map.of(
+                "class", Srs4ConfigSpec.TM_CLASS,
+                "args", Map.of("srs4", tmRouteWithSingularVcId())))));
         assertDoesNotThrow(() -> spec.validate(Map.of("frameDecapsulation", Map.of(
                 "class", "example.CustomDecapsulator",
                 "args", Map.of("customOption", "accepted")))));
@@ -300,7 +329,7 @@ public class Srs4FrameCodecTest {
         }
 
         Map<String, Object> route = new LinkedHashMap<>();
-        route.put("vcId", 3);
+        route.put(tc ? "vcId" : "vcIds", tc ? 3 : List.of(3));
         if (csp) {
             Map<String, Object> endpoint = tc ? Map.of("destinationAddress", 2, "destinationPort", 20)
                     : Map.of("sourceAddress", 1);
@@ -312,6 +341,22 @@ public class Srs4FrameCodecTest {
             route.put("ipv4Udp", tc ? endpoint : List.of(endpoint));
         }
         srs4.put("virtualChannels", List.of(route));
+        return srs4;
+    }
+
+    private static Map<String, Object> tmRouteWithSingularVcId() {
+        Map<String, Object> srs4 = base(true, false, false, false);
+        srs4.put("virtualChannels", List.of(Map.of(
+                "vcId", 3,
+                "csp", List.of(Map.of("sourceAddress", 1)))));
+        return srs4;
+    }
+
+    private static Map<String, Object> tcRouteWithPluralVcIds() {
+        Map<String, Object> srs4 = base(true, false, false, true);
+        srs4.put("virtualChannels", List.of(Map.of(
+                "vcIds", List.of(3),
+                "csp", Map.of("destinationAddress", 2, "destinationPort", 20))));
         return srs4;
     }
 

@@ -42,7 +42,7 @@ public class Srs4TcFrameEncapsulator implements TcFrameEncapsulator {
     @Override
     public byte[] encapsulate(UplinkTransferFrame frame) {
         Srs4Flow flow = flowFor(frame);
-        Srs4Config.Route route = config.routes.get(frame.getVirtualChannelId());
+        Srs4Config.TcRoute route = config.tcRoutes.get(frame.getVirtualChannelId());
         if (route == null) {
             throw new IllegalArgumentException("No SRS4 route configured for vcId " + frame.getVirtualChannelId());
         }
@@ -65,7 +65,7 @@ public class Srs4TcFrameEncapsulator implements TcFrameEncapsulator {
     @Override
     public void validate(int maximumFrameLength, Collection<Integer> virtualChannelIds) {
         for (int vcId : virtualChannelIds) {
-            Srs4Config.Route route = config.routes.get(vcId);
+            Srs4Config.TcRoute route = config.tcRoutes.get(vcId);
             if (route == null || (config.csp.enabled() && route.csp() == null)
                     || (config.ipv4Udp.enabled() && route.ipv4Udp() == null)) {
                 throw new ConfigurationException("Incomplete SRS4 route for configured vcId " + vcId);

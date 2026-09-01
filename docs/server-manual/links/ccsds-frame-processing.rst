@@ -509,7 +509,7 @@ The following TC example enables both buses. The boolean command option ``useCan
                 destinationAddress: 10.0.0.2
                 destinationPort: 2000
 
-For TM, the spacecraft source is selected by VC and the ground destination is fixed:
+For TM, spacecraft source endpoints resolve to candidate VCs and the ground destination is fixed:
 
 .. code-block:: yaml
 
@@ -530,12 +530,12 @@ For TM, the spacecraft source is selected by VC and the ground destination is fi
             destinationPort: 1000
             ttl: 64
           virtualChannels:
-            - vcId: 0
+            - vcIds: [0, 1]
               csp:
-                sourceAddress: 2
+                - sourceAddress: 2
               ipv4Udp:
-                sourceAddress: 10.0.0.2
-                sourcePort: 2000
+                - sourceAddress: 10.0.0.2
+                  sourcePort: 2000
 
 Provider activation and flow selection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -637,10 +637,13 @@ Virtual-channel endpoint fields
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``virtualChannels``
-    **Required.** SRS4 routing entries. Every VC configured on the parent CCSDS link must have exactly one SRS4 route containing an endpoint for each enabled bus layer. Duplicate VC entries are rejected.
+    **Required.** SRS4 routing entries. Every VC configured on the parent CCSDS link must occur in at least one SRS4 route containing endpoints for each enabled bus layer.
 
 ``virtualChannels[].vcId``
-    CCSDS virtual-channel identifier to which the nested endpoints apply.
+    **Required for TC.** CCSDS virtual-channel identifier to which the nested destination endpoints apply. Each TC VC may have only one SRS4 route.
+
+``virtualChannels[].vcIds``
+    **Required for TM.** Non-empty list of CCSDS virtual-channel identifiers to which all nested source endpoints apply. A VC may occur in multiple TM route groups.
 
 For TC, the fixed endpoints are the ground sources and each VC supplies spacecraft destinations:
 
@@ -650,15 +653,15 @@ For TC, the fixed endpoints are the ground sources and each VC supplies spacecra
 ``virtualChannels[].ipv4Udp.destinationAddress`` / ``destinationPort``
     IPv4/UDP destination for this VC.
 
-For TM, the fixed endpoints are the ground destinations and each VC supplies spacecraft sources:
+For TM, the fixed endpoints are the ground destinations and each route group supplies lists of spacecraft sources:
 
-``virtualChannels[].csp.sourceAddress``
-    Expected CSP source address for this VC. Source ports are ignored.
+``virtualChannels[].csp[].sourceAddress``
+    Expected CSP source address for every VC in ``vcIds``. Source ports are ignored.
 
-``virtualChannels[].ipv4Udp.sourceAddress`` / ``sourcePort``
-    Expected IPv4/UDP source for this VC.
+``virtualChannels[].ipv4Udp[].sourceAddress`` / ``sourcePort``
+    Expected IPv4/UDP source endpoint for every VC in ``vcIds``.
 
-TM CSP source addresses and IPv4/UDP source endpoint pairs must be unique within their respective bus layers. Yamcs first resolves the received source to an expected VC, then compares it with the VC decoded from the inner CCSDS frame. A mismatch causes the frame to be discarded.
+TM routing is many-to-many: a source may map to multiple candidate VCIDs, and a VCID may occur in multiple endpoint groups. Yamcs resolves the received source to the candidate set, then requires the VCID decoded from the inner CCSDS frame to belong to that set. A mismatch causes the frame to be discarded.
 
 ``controlFrameFlow`` and COP-1
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

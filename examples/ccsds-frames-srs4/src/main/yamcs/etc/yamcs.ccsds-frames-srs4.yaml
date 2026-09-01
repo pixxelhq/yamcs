@@ -130,7 +130,7 @@ dataLinks:
             ttl: 64
 
           virtualChannels:
-            - vcId: 0
+            - vcIds: [0]
               csp:
                 - sourceAddress: 2
               ipv4Udp:

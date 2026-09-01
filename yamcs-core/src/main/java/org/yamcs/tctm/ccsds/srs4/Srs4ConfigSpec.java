@@ -63,11 +63,12 @@ public final class Srs4ConfigSpec {
                 .withRequired(true);
 
         Spec route = new Spec();
-        route.addOption("vcId", OptionType.INTEGER).withRequired(true);
         if (tc) {
+            route.addOption("vcId", OptionType.INTEGER).withRequired(true);
             route.addOption("csp", OptionType.MAP).withSpec(routeCsp);
             route.addOption("ipv4Udp", OptionType.MAP).withSpec(routeIpv4Udp);
         } else {
+            route.addOption("vcIds", OptionType.LIST).withElementType(OptionType.INTEGER).withRequired(true);
             route.addOption("csp", OptionType.LIST).withElementType(OptionType.MAP).withSpec(routeCsp);
             route.addOption("ipv4Udp", OptionType.LIST).withElementType(OptionType.MAP).withSpec(routeIpv4Udp);
         }

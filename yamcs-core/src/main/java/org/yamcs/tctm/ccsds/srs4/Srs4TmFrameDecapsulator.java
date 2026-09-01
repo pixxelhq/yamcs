@@ -21,14 +21,16 @@ public class Srs4TmFrameDecapsulator implements TmFrameDecapsulator {
         ipv4UdpCodec = config.ipv4Udp.enabled() ? new Srs4Ipv4UdpHeaderCodec(config.ipv4Udp) : null;
 
         for (var route : config.tmRoutes) {
-            if (cspCodec != null) {
-                for (int sourceAddress : route.cspSourceAddresses()) {
-                    cspCodec.addSourceRoute(sourceAddress, route.vcId());
+            for (int vcId : route.vcIds()) {
+                if (cspCodec != null) {
+                    for (int sourceAddress : route.cspSourceAddresses()) {
+                        cspCodec.addSourceRoute(sourceAddress, vcId);
+                    }
                 }
-            }
-            if (ipv4UdpCodec != null) {
-                for (var endpoint : route.ipv4Udp()) {
-                    ipv4UdpCodec.addSourceRoute(endpoint, route.vcId());
+                if (ipv4UdpCodec != null) {
+                    for (var endpoint : route.ipv4Udp()) {
+                        ipv4UdpCodec.addSourceRoute(endpoint, vcId);
+                    }
                 }
             }
         }
@@ -66,7 +68,7 @@ public class Srs4TmFrameDecapsulator implements TmFrameDecapsulator {
     @Override
     public void validate(int maximumFrameLength, Collection<Integer> virtualChannelIds) {
         for (int vcId : virtualChannelIds) {
-            boolean found = config.tmRoutes.stream().anyMatch(route -> route.vcId() == vcId);
+            boolean found = config.tmRoutes.stream().anyMatch(route -> route.vcIds().contains(vcId));
             if (!found) {
                 throw new ConfigurationException("Incomplete SRS4 route for configured vcId " + vcId);
             }
