@@ -140,7 +140,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
      */
     protected void handleFrame(Instant ert, byte[] data, int offset, int length) {
         try {
-            Integer expectedVcId = null;
+            Collection<Integer> expectedVcIds = null;
             if (rawFrameDecoder != null) {
                 length = rawFrameDecoder.decodeFrame(data, offset, length);
                 if (length == -1) {
@@ -154,7 +154,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                 data = frame.data();
                 offset = frame.offset();
                 length = frame.length();
-                expectedVcId = frame.expectedVirtualChannelId();
+                expectedVcIds = frame.expectedVirtualChannelIds();
             }
 
             if (length < frameHandler.getMinFrameSize()) {
@@ -169,7 +169,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                 errFrameCount++;
             }
 
-            frameHandler.handleFrame(ert, data, offset, length, expectedVcId);
+            frameHandler.handleFrame(ert, data, offset, length, expectedVcIds);
 
             validFrameCount.getAndIncrement();
         } catch (TcTmException e) {

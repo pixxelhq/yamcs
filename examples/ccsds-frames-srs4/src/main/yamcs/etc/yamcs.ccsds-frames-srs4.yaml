@@ -137,11 +137,11 @@ dataLinks:
           virtualChannels:
             - vcId: 0
               csp:
-                sourceAddress: 2
-                sourcePort: 20
+                - sourceAddress: 2
+                  sourcePort: 20
               ipv4Udp:
-                sourceAddress: 192.0.2.2
-                sourcePort: 11000
+                - sourceAddress: 192.0.2.2
+                  sourcePort: 11000
 
     virtualChannels:
       - vcId: 0

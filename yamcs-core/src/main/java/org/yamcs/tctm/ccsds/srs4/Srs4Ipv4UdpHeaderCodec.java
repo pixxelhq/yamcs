@@ -1,7 +1,11 @@
 package org.yamcs.tctm.ccsds.srs4;
 
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.yamcs.tctm.TcTmException;
 import org.yamcs.utils.ByteArrayUtils;
@@ -15,22 +19,18 @@ final class Srs4Ipv4UdpHeaderCodec {
     static final int HEADER_LENGTH = IPV4_HEADER_LENGTH + UDP_HEADER_LENGTH;
     private static final int UDP_PROTOCOL = 17;
 
-    record DecodedIpv4UdpFrame(byte[] data, int offset, int length, int virtualChannelId) {
+    record DecodedIpv4UdpFrame(byte[] data, int offset, int length, Collection<Integer> virtualChannelIds) {
     }
 
     private final Ipv4UdpSettings settings;
-    private final Map<Ipv4Endpoint, Integer> sourceRoutes = new HashMap<>();
+    private final Map<Ipv4Endpoint, Set<Integer>> sourceRoutes = new HashMap<>();
 
     Srs4Ipv4UdpHeaderCodec(Ipv4UdpSettings settings) {
         this.settings = settings;
     }
 
     void addSourceRoute(Ipv4Endpoint endpoint, int vcId) {
-        Integer previous = sourceRoutes.putIfAbsent(endpoint, vcId);
-        if (previous != null && previous != vcId) {
-            throw new IllegalArgumentException("Duplicate SRS4 IPv4/UDP source endpoint for vcId " + previous
-                    + " and vcId " + vcId);
-        }
+        sourceRoutes.computeIfAbsent(endpoint, k -> new LinkedHashSet<>()).add(vcId);
     }
 
     byte[] encode(Ipv4Endpoint destination, byte[] payload) {
@@ -102,11 +102,11 @@ final class Srs4Ipv4UdpHeaderCodec {
         if (receivedChecksum != 0 && udpChecksum(data, offset, length) != 0) {
             throw new TcTmException("Invalid SRS4 UDP checksum");
         }
-        Integer vcId = sourceRoutes.get(new Ipv4Endpoint(sourceAddress, sourcePort));
-        if (vcId == null) {
+        Set<Integer> vcIds = sourceRoutes.get(new Ipv4Endpoint(sourceAddress, sourcePort));
+        if (vcIds == null) {
             throw new TcTmException("Unknown SRS4 IPv4/UDP source endpoint");
         }
-        return new DecodedIpv4UdpFrame(data, offset + HEADER_LENGTH, length - HEADER_LENGTH, vcId);
+        return new DecodedIpv4UdpFrame(data, offset + HEADER_LENGTH, length - HEADER_LENGTH, List.copyOf(vcIds));
     }
 
     private static int udpChecksum(byte[] data, int ipOffset, int totalLength) {

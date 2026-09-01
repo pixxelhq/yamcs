@@ -1,7 +1,11 @@
 package org.yamcs.tctm.ccsds.srs4;
 
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.yamcs.tctm.TcTmException;
 import org.yamcs.tctm.csp.CspPacket;
@@ -12,22 +16,18 @@ import org.yamcs.tctm.ccsds.srs4.Srs4Config.CspSettings;
 final class Srs4CspHeaderCodec {
     static final int HEADER_LENGTH = 4;
 
-    record DecodedCspFrame(byte[] data, int offset, int length, int virtualChannelId) {
+    record DecodedCspFrame(byte[] data, int offset, int length, Collection<Integer> virtualChannelIds) {
     }
 
     private final CspSettings settings;
-    private final Map<CspEndpoint, Integer> sourceRoutes = new HashMap<>();
+    private final Map<CspEndpoint, Set<Integer>> sourceRoutes = new HashMap<>();
 
     Srs4CspHeaderCodec(CspSettings settings) {
         this.settings = settings;
     }
 
     void addSourceRoute(CspEndpoint endpoint, int vcId) {
-        Integer previous = sourceRoutes.putIfAbsent(endpoint, vcId);
-        if (previous != null && previous != vcId) {
-            throw new IllegalArgumentException("Duplicate SRS4 CSP source endpoint for vcId " + previous
-                    + " and vcId " + vcId);
-        }
+        sourceRoutes.computeIfAbsent(endpoint, k -> new LinkedHashSet<>()).add(vcId);
     }
 
     byte[] encode(CspEndpoint destination, byte[] payload) {
@@ -69,10 +69,10 @@ final class Srs4CspHeaderCodec {
         if (destinationAddress != destination.address() || destinationPort != destination.port()) {
             throw new TcTmException("Unexpected SRS4 CSP destination endpoint");
         }
-        Integer vcId = sourceRoutes.get(new CspEndpoint(sourceAddress, sourcePort));
-        if (vcId == null) {
+        Set<Integer> vcIds = sourceRoutes.get(new CspEndpoint(sourceAddress, sourcePort));
+        if (vcIds == null) {
             throw new TcTmException("Unknown SRS4 CSP source endpoint " + sourceAddress + ":" + sourcePort);
         }
-        return new DecodedCspFrame(data, offset + HEADER_LENGTH, length - HEADER_LENGTH, vcId);
+        return new DecodedCspFrame(data, offset + HEADER_LENGTH, length - HEADER_LENGTH, List.copyOf(vcIds));
     }
 }

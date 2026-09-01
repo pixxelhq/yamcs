@@ -7,7 +7,7 @@ import org.yamcs.tctm.TcTmException;
 /** Removes mission-specific outer layers before CCSDS transfer-frame decoding. */
 public interface TmFrameDecapsulator {
 
-    record DecapsulatedFrame(byte[] data, int offset, int length, Integer expectedVirtualChannelId) {
+    record DecapsulatedFrame(byte[] data, int offset, int length, Collection<Integer> expectedVirtualChannelIds) {
     }
 
     DecapsulatedFrame decapsulate(byte[] data, int offset, int length) throws TcTmException;

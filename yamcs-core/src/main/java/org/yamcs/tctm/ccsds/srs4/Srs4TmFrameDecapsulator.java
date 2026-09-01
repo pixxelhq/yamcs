@@ -1,6 +1,7 @@
 package org.yamcs.tctm.ccsds.srs4;
 
 import java.util.Collection;
+import java.util.List;
 
 import org.yamcs.ConfigurationException;
 import org.yamcs.YConfiguration;
@@ -20,12 +21,16 @@ public class Srs4TmFrameDecapsulator implements TmFrameDecapsulator {
         cspCodec = config.csp.enabled() ? new Srs4CspHeaderCodec(config.csp) : null;
         ipv4UdpCodec = config.ipv4Udp.enabled() ? new Srs4Ipv4UdpHeaderCodec(config.ipv4Udp) : null;
 
-        for (var entry : config.routes.entrySet()) {
+        for (var route : config.tmRoutes) {
             if (cspCodec != null) {
-                cspCodec.addSourceRoute(entry.getValue().csp(), entry.getKey());
+                for (var endpoint : route.csp()) {
+                    cspCodec.addSourceRoute(endpoint, route.vcId());
+                }
             }
             if (ipv4UdpCodec != null) {
-                ipv4UdpCodec.addSourceRoute(entry.getValue().ipv4Udp(), entry.getKey());
+                for (var endpoint : route.ipv4Udp()) {
+                    ipv4UdpCodec.addSourceRoute(endpoint, route.vcId());
+                }
             }
         }
     }
@@ -38,13 +43,13 @@ public class Srs4TmFrameDecapsulator implements TmFrameDecapsulator {
                 throw new TcTmException("SRS4 radio selected CAN but the CSP decoder is disabled");
             }
             var frame = cspCodec.decode(radioFrame.data(), radioFrame.offset(), radioFrame.length());
-            return new DecapsulatedFrame(frame.data(), frame.offset(), frame.length(), frame.virtualChannelId());
+            return new DecapsulatedFrame(frame.data(), frame.offset(), frame.length(), frame.virtualChannelIds());
         } else {
             if (ipv4UdpCodec == null) {
                 throw new TcTmException("SRS4 radio selected Ethernet but the IPv4/UDP decoder is disabled");
             }
             var frame = ipv4UdpCodec.decode(radioFrame.data(), radioFrame.offset(), radioFrame.length());
-            return new DecapsulatedFrame(frame.data(), frame.offset(), frame.length(), frame.virtualChannelId());
+            return new DecapsulatedFrame(frame.data(), frame.offset(), frame.length(), frame.virtualChannelIds());
         }
     }
 
@@ -58,9 +63,8 @@ public class Srs4TmFrameDecapsulator implements TmFrameDecapsulator {
     @Override
     public void validate(int maximumFrameLength, Collection<Integer> virtualChannelIds) {
         for (int vcId : virtualChannelIds) {
-            Srs4Config.Route route = config.routes.get(vcId);
-            if (route == null || (config.csp.enabled() && route.csp() == null)
-                    || (config.ipv4Udp.enabled() && route.ipv4Udp() == null)) {
+            boolean found = config.tmRoutes.stream().anyMatch(route -> route.vcId() == vcId);
+            if (!found) {
                 throw new ConfigurationException("Incomplete SRS4 route for configured vcId " + vcId);
             }
         }

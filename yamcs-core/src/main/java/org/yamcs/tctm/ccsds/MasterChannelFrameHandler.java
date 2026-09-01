@@ -77,8 +77,8 @@ public class MasterChannelFrameHandler {
         handleFrame(ertime, data, offset, length, null);
     }
 
-    public void handleFrame(Instant ertime, byte[] data, int offset, int length, Integer expectedVcId)
-            throws TcTmException {
+    public void handleFrame(Instant ertime, byte[] data, int offset, int length,
+            Collection<Integer> expectedVcIds) throws TcTmException {
         DownlinkTransferFrame frame = null;
         try {
             frame = frameDecoder.decode(data, offset, length);
@@ -97,8 +97,8 @@ public class MasterChannelFrameHandler {
             return;
         }
 
-        if (expectedVcId != null && frame.getVirtualChannelId() != expectedVcId) {
-            String reason = "outer header identifies vcId " + expectedVcId + " but CCSDS frame contains vcId "
+        if (expectedVcIds != null && !expectedVcIds.contains(frame.getVirtualChannelId())) {
+            String reason = "outer header identifies vcIds " + expectedVcIds + " but CCSDS frame contains vcId "
                     + frame.getVirtualChannelId();
             badframeCount++;
             frameStreamHelper.sendBadFrame(badframeCount, ertime, data, offset, length, reason);

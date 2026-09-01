@@ -1,6 +1,8 @@
 package org.yamcs.tctm.ccsds.srs4;
 
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import org.yamcs.ConfigurationException;
@@ -16,6 +18,9 @@ final class Srs4Config {
     record Route(CspEndpoint csp, Ipv4Endpoint ipv4Udp) {
     }
 
+    record TmRoute(int vcId, List<CspEndpoint> csp, List<Ipv4Endpoint> ipv4Udp) {
+    }
+
     record CspSettings(boolean enabled, CspEndpoint fixedEndpoint, int priority, boolean hmac, boolean xtea,
             boolean rdp, boolean crc) {
     }
@@ -27,16 +32,18 @@ final class Srs4Config {
     final CspSettings csp;
     final Ipv4UdpSettings ipv4Udp;
     final Map<Integer, Route> routes;
+    final List<TmRoute> tmRoutes;
     final boolean dualFlow;
     final Srs4Flow fixedFlow;
     final Srs4Flow controlFrameFlow;
 
     private Srs4Config(int radioSpacecraftId, CspSettings csp, Ipv4UdpSettings ipv4Udp,
-            Map<Integer, Route> routes, Srs4Flow controlFrameFlow) {
+            Map<Integer, Route> routes, List<TmRoute> tmRoutes, Srs4Flow controlFrameFlow) {
         this.radioSpacecraftId = radioSpacecraftId;
         this.csp = csp;
         this.ipv4Udp = ipv4Udp;
         this.routes = routes;
+        this.tmRoutes = tmRoutes;
         dualFlow = csp.enabled() && ipv4Udp.enabled();
         fixedFlow = dualFlow ? null : csp.enabled() ? Srs4Flow.CAN : Srs4Flow.ETHERNET;
         this.controlFrameFlow = controlFrameFlow;
@@ -76,22 +83,29 @@ final class Srs4Config {
                 : new Ipv4UdpSettings(false, null, 64, false);
 
         Map<Integer, Route> routes = new HashMap<>();
+        List<TmRoute> tmRoutes = new ArrayList<>();
         for (YConfiguration routeConfig : config.getConfigList("virtualChannels")) {
             int vcId = routeConfig.getInt("vcId");
-            if (routes.containsKey(vcId)) {
-                throw new ConfigurationException("Duplicate SRS4 route for vcId " + vcId);
+            if (tc) {
+                if (routes.containsKey(vcId)) {
+                    throw new ConfigurationException("Duplicate SRS4 route for vcId " + vcId);
+                }
+                CspEndpoint cspEndpoint = null;
+                if (cspEnabled) {
+                    YConfiguration endpoint = routeConfig.getConfig("csp");
+                    cspEndpoint = parseCspEndpoint(endpoint, "destination");
+                }
+                Ipv4Endpoint ipEndpoint = null;
+                if (ipEnabled) {
+                    YConfiguration endpoint = routeConfig.getConfig("ipv4Udp");
+                    ipEndpoint = parseIpv4Endpoint(endpoint, "destination");
+                }
+                routes.put(vcId, new Route(cspEndpoint, ipEndpoint));
+            } else {
+                List<CspEndpoint> cspEndpoints = cspEnabled ? parseCspEndpoints(routeConfig) : List.of();
+                List<Ipv4Endpoint> ipEndpoints = ipEnabled ? parseIpv4Endpoints(routeConfig) : List.of();
+                tmRoutes.add(new TmRoute(vcId, cspEndpoints, ipEndpoints));
             }
-            CspEndpoint cspEndpoint = null;
-            if (cspEnabled) {
-                YConfiguration endpoint = routeConfig.getConfig("csp");
-                cspEndpoint = parseCspEndpoint(endpoint, tc ? "destination" : "source");
-            }
-            Ipv4Endpoint ipEndpoint = null;
-            if (ipEnabled) {
-                YConfiguration endpoint = routeConfig.getConfig("ipv4Udp");
-                ipEndpoint = parseIpv4Endpoint(endpoint, tc ? "destination" : "source");
-            }
-            routes.put(vcId, new Route(cspEndpoint, ipEndpoint));
         }
 
         Srs4Flow controlFlow = config.getEnum("controlFrameFlow", Srs4Flow.class, Srs4Flow.ETHERNET);
@@ -101,7 +115,35 @@ final class Srs4Config {
         if (!ipEnabled && controlFlow == Srs4Flow.ETHERNET) {
             controlFlow = Srs4Flow.CAN;
         }
-        return new Srs4Config(radioId, csp, ip, routes, controlFlow);
+        return new Srs4Config(radioId, csp, ip, routes, tmRoutes, controlFlow);
+    }
+
+    private static List<CspEndpoint> parseCspEndpoints(YConfiguration routeConfig) {
+        if (!routeConfig.containsKey("csp")) {
+            throw new ConfigurationException("SRS4 TM route is missing CSP source endpoints");
+        }
+        List<CspEndpoint> endpoints = new ArrayList<>();
+        for (YConfiguration endpoint : routeConfig.getConfigList("csp")) {
+            endpoints.add(parseCspEndpoint(endpoint, "source"));
+        }
+        if (endpoints.isEmpty()) {
+            throw new ConfigurationException("SRS4 TM route must contain at least one CSP source endpoint");
+        }
+        return List.copyOf(endpoints);
+    }
+
+    private static List<Ipv4Endpoint> parseIpv4Endpoints(YConfiguration routeConfig) {
+        if (!routeConfig.containsKey("ipv4Udp")) {
+            throw new ConfigurationException("SRS4 TM route is missing IPv4/UDP source endpoints");
+        }
+        List<Ipv4Endpoint> endpoints = new ArrayList<>();
+        for (YConfiguration endpoint : routeConfig.getConfigList("ipv4Udp")) {
+            endpoints.add(parseIpv4Endpoint(endpoint, "source"));
+        }
+        if (endpoints.isEmpty()) {
+            throw new ConfigurationException("SRS4 TM route must contain at least one IPv4/UDP source endpoint");
+        }
+        return List.copyOf(endpoints);
     }
 
     private static boolean enabled(YConfiguration config, String key) {
