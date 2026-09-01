@@ -75,9 +75,6 @@ final class Srs4Ipv4UdpHeaderCodec {
         if (ByteArrayUtils.decodeUnsignedShort(data, offset + 2) != length) {
             throw new TcTmException("SRS4 IPv4 total length does not match received frame");
         }
-        if (ByteArrayUtils.decodeUnsignedShort(data, offset + 6) != 0) {
-            throw new TcTmException("Fragmented SRS4 IPv4 packets are not supported");
-        }
         if ((data[offset + 8] & 0xFF) != settings.ttl() || (data[offset + 9] & 0xFF) != UDP_PROTOCOL) {
             throw new TcTmException("Unexpected SRS4 IPv4 TTL or protocol");
         }

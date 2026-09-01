@@ -122,11 +122,6 @@ dataLinks:
             enabled: true
             destinationAddress: 1
             destinationPort: 10
-            priority: 0
-            hmac: false
-            xtea: false
-            rdp: false
-            crc: false
 
           ipv4Udp:
             enabled: true
@@ -138,7 +133,6 @@ dataLinks:
             - vcId: 0
               csp:
                 - sourceAddress: 2
-                  sourcePort: 20
               ipv4Udp:
                 - sourceAddress: 192.0.2.2
                   sourcePort: 11000

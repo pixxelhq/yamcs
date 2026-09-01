@@ -37,8 +37,8 @@ public class Srs4FrameCodecTest {
         assertEquals(0x45, encoded[4] & 0xFF);
 
         var decoder = new Srs4TmFrameDecapsulator(tmConfig(false, true, true));
-        decoder.validate(100, List.of(3));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
+        decoder.validate(ccsds.length, List.of(3));
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length, ccsds.length);
         assertIterableEquals(List.of(3), decoded.expectedVirtualChannelIds());
         assertArrayEquals(ccsds,
                 java.util.Arrays.copyOfRange(decoded.data(), decoded.offset(), decoded.offset() + decoded.length()));
@@ -52,67 +52,125 @@ public class Srs4FrameCodecTest {
 
         assertEquals(4 + 4 + ccsds.length, encoded.length);
         assertEquals(0, (encoded[0] >>> 3) & 1);
+        assertEquals(0, encoded[4] & 0xC0);
+        assertEquals(0, encoded[6] & 0x3F);
+        assertEquals(0, encoded[7] & 0x0F);
 
         var decoder = new Srs4TmFrameDecapsulator(tmConfig(true, false, false));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
+        decoder.validate(ccsds.length, List.of(3));
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length, ccsds.length);
         assertIterableEquals(List.of(3), decoded.expectedVirtualChannelIds());
         assertArrayEquals(ccsds,
                 java.util.Arrays.copyOfRange(decoded.data(), decoded.offset(), decoded.offset() + decoded.length()));
     }
 
     @Test
-    public void testTmEndpointMapsToMultipleVcIds() throws Exception {
+    public void testCspTmIgnoresSourcePortPriorityAndFlags() throws Exception {
         byte[] ccsds = new byte[] { 9, 8, 7, 6 };
         var encoder = new Srs4TcFrameEncapsulator(tcConfig(true, false, false));
         byte[] encoded = encoder.encapsulate(frame(ccsds, 3, null));
 
+        encoded[4] |= (byte) 0xC0; // priority
+        encoded[6] = (byte) ((encoded[6] & 0xC0) | 0x3F); // source port
+        encoded[7] |= 0x0F; // flags
+
+        var decoder = new Srs4TmFrameDecapsulator(tmConfig(true, false, false));
+        decoder.validate(ccsds.length, List.of(3));
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length, ccsds.length);
+        assertIterableEquals(List.of(3), decoded.expectedVirtualChannelIds());
+    }
+
+    @Test
+    public void testTmCspSourceAddressMapsToMultipleVcIds() throws Exception {
         Map<String, Object> srs4 = base(true, false, false, false);
-        Map<String, Object> secondRoute = new LinkedHashMap<>();
-        secondRoute.put("vcId", 4);
-        secondRoute.put("csp", List.of(Map.of("sourceAddress", 1, "sourcePort", 10)));
-        List<Object> routes = new java.util.ArrayList<>((List<?>) srs4.get("virtualChannels"));
-        routes.add(secondRoute);
+        var routes = new java.util.ArrayList<Map<String, Object>>();
+        routes.add(Map.of("vcId", 3, "csp", List.of(Map.of("sourceAddress", 1))));
+        routes.add(Map.of("vcId", 4, "csp", List.of(Map.of("sourceAddress", 1))));
         srs4.put("virtualChannels", routes);
 
+        var encoder = new Srs4TcFrameEncapsulator(tcConfig(true, false, false));
+        byte[] encoded = encoder.encapsulate(frame(new byte[] { 9, 8, 7, 6 }, 3, null));
         var decoder = new Srs4TmFrameDecapsulator(YConfiguration.wrap(Map.of("srs4", srs4)));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length, 4);
         assertIterableEquals(List.of(3, 4), decoded.expectedVirtualChannelIds());
     }
 
     @Test
     public void testTmIpv4EndpointMapsToMultipleVcIds() throws Exception {
-        byte[] ccsds = new byte[] { 9, 8, 7, 6 };
-        var encoder = new Srs4TcFrameEncapsulator(tcConfig(false, true, false));
-        byte[] encoded = encoder.encapsulate(frame(ccsds, 3, null));
-
         Map<String, Object> srs4 = base(false, true, false, false);
-        Map<String, Object> secondRoute = new LinkedHashMap<>();
-        secondRoute.put("vcId", 4);
-        secondRoute.put("ipv4Udp", List.of(Map.of("sourceAddress", "10.0.0.1", "sourcePort", 1000)));
-        List<Object> routes = new java.util.ArrayList<>((List<?>) srs4.get("virtualChannels"));
-        routes.add(secondRoute);
+        var routes = new java.util.ArrayList<Map<String, Object>>();
+        routes.add(Map.of("vcId", 3,
+                "ipv4Udp", List.of(Map.of("sourceAddress", "10.0.0.1", "sourcePort", 1000))));
+        routes.add(Map.of("vcId", 4,
+                "ipv4Udp", List.of(Map.of("sourceAddress", "10.0.0.1", "sourcePort", 1000))));
         srs4.put("virtualChannels", routes);
 
+        var encoder = new Srs4TcFrameEncapsulator(tcConfig(false, true, false));
+        byte[] encoded = encoder.encapsulate(frame(new byte[] { 9, 8, 7, 6 }, 3, null));
         var decoder = new Srs4TmFrameDecapsulator(YConfiguration.wrap(Map.of("srs4", srs4)));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length, 4);
         assertIterableEquals(List.of(3, 4), decoded.expectedVirtualChannelIds());
     }
 
     @Test
-    public void testTmVcIdHasMultipleSourceEndpoints() throws Exception {
-        byte[] ccsds = new byte[] { 9, 8, 7, 6 };
-        var encoder = new Srs4TcFrameEncapsulator(tcConfig(true, false, false));
-        byte[] encoded = encoder.encapsulate(frame(ccsds, 3, null));
-
-        Map<String, Object> srs4 = base(true, false, false, false);
+    public void testTmVcIdHasMultipleIpv4SourceEndpoints() throws Exception {
+        Map<String, Object> srs4 = base(false, true, false, false);
+        @SuppressWarnings("unchecked")
         Map<String, Object> route = (Map<String, Object>) ((List<?>) srs4.get("virtualChannels")).get(0);
-        route.put("csp", List.of(
-                Map.of("sourceAddress", 1, "sourcePort", 10),
-                Map.of("sourceAddress", 1, "sourcePort", 11)));
+        route.put("ipv4Udp", List.of(
+                Map.of("sourceAddress", "10.0.0.1", "sourcePort", 1000),
+                Map.of("sourceAddress", "10.0.0.3", "sourcePort", 1001)));
 
+        var encoder = new Srs4TcFrameEncapsulator(tcConfig(false, true, false));
+        byte[] encoded = encoder.encapsulate(frame(new byte[] { 9, 8, 7, 6 }, 3, null));
         var decoder = new Srs4TmFrameDecapsulator(YConfiguration.wrap(Map.of("srs4", srs4)));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length, 4);
         assertIterableEquals(List.of(3), decoded.expectedVirtualChannelIds());
+    }
+
+    @Test
+    public void testIpv4TmAcceptsFragmentFields() throws Exception {
+        byte[] ccsds = new byte[] { 1, 2, 3, 4 };
+        var encoder = new Srs4TcFrameEncapsulator(tcConfig(false, true, false));
+        byte[] encoded = encoder.encapsulate(frame(ccsds, 3, null));
+        int ipOffset = Srs4RadioHeaderCodec.HEADER_LENGTH;
+        encoded[ipOffset + 6] = 0x20;
+        encoded[ipOffset + 7] = 0x01;
+        updateIpv4HeaderChecksum(encoded, ipOffset);
+
+        var decoder = new Srs4TmFrameDecapsulator(tmConfig(false, true, false));
+        decoder.validate(ccsds.length, List.of(3));
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length, ccsds.length);
+        assertIterableEquals(List.of(3), decoded.expectedVirtualChannelIds());
+    }
+
+    @Test
+    public void testSrs4TmLengthIsValidatedForEachFlow() throws Exception {
+        byte[] expectedCcsds = new byte[] { 1, 2, 3, 4 };
+        byte[] longerCcsds = new byte[] { 1, 2, 3, 4, 5 };
+
+        var cspEncoder = new Srs4TcFrameEncapsulator(tcConfig(true, false, false));
+        var cspDecoder = new Srs4TmFrameDecapsulator(tmConfig(true, false, false));
+        byte[] encodedCsp = cspEncoder.encapsulate(frame(longerCcsds, 3, null));
+        assertThrows(TcTmException.class,
+                () -> cspDecoder.decapsulate(encodedCsp, 0, encodedCsp.length, expectedCcsds.length));
+
+        var ipEncoder = new Srs4TcFrameEncapsulator(tcConfig(false, true, false));
+        byte[] encodedIp = ipEncoder.encapsulate(frame(longerCcsds, 3, null));
+        var ipDecoder = new Srs4TmFrameDecapsulator(tmConfig(false, true, false));
+        assertThrows(TcTmException.class,
+                () -> ipDecoder.decapsulate(encodedIp, 0, encodedIp.length, expectedCcsds.length));
+    }
+
+    @Test
+    public void testSrs4AcceptsVariableLengthInnerFrames() throws Exception {
+        byte[] ccsds = new byte[] { 1, 2, 3, 4, 5 };
+        var encoder = new Srs4TcFrameEncapsulator(tcConfig(false, true, false));
+        byte[] encoded = encoder.encapsulate(frame(ccsds, 3, null));
+        var decoder = new Srs4TmFrameDecapsulator(tmConfig(false, true, false));
+
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length, -1);
+        assertEquals(ccsds.length, decoded.length());
     }
 
     @Test
@@ -136,10 +194,10 @@ public class Srs4FrameCodecTest {
         var decoder = new Srs4TmFrameDecapsulator(tmConfig(true, false, false));
 
         encoded[3] ^= 1;
-        assertThrows(TcTmException.class, () -> decoder.decapsulate(encoded, 0, encoded.length));
+        assertThrows(TcTmException.class, () -> decoder.decapsulate(encoded, 0, encoded.length, 2));
         encoded[3] ^= 1;
         encoded[1]--;
-        assertThrows(TcTmException.class, () -> decoder.decapsulate(encoded, 0, encoded.length));
+        assertThrows(TcTmException.class, () -> decoder.decapsulate(encoded, 0, encoded.length, 2));
     }
 
     @Test
@@ -168,6 +226,14 @@ public class Srs4FrameCodecTest {
                 "args", Map.of("srs4", Map.of("radio", Map.of("spacecraftId", "not-an-integer")))))));
         assertThrows(ValidationException.class, () -> spec.validate(Map.of("frameEncapsulation", Map.of(
                 "class", Srs4ConfigSpec.TC_CLASS))));
+        Map<String, Object> legacySrs4 = base(true, false, false, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> legacyCsp = (Map<String, Object>) legacySrs4.get("csp");
+        legacyCsp.put("sourcePort", 10);
+        legacyCsp.put("priority", 1);
+        assertThrows(ValidationException.class, () -> spec.validate(Map.of("frameEncapsulation", Map.of(
+                "class", Srs4ConfigSpec.TC_CLASS,
+                "args", Map.of("srs4", legacySrs4)))));
         assertDoesNotThrow(() -> spec.validate(Map.of("frameEncapsulation", Map.of(
                 "class", "example.CustomEncapsulator",
                 "args", Map.of("customOption", "accepted")))));
@@ -218,9 +284,9 @@ public class Srs4FrameCodecTest {
             Map<String, Object> cspConfig = new LinkedHashMap<>();
             cspConfig.put("enabled", true);
             cspConfig.put(tc ? "sourceAddress" : "destinationAddress", tc ? 1 : 2);
-            cspConfig.put(tc ? "sourcePort" : "destinationPort", tc ? 10 : 20);
-            cspConfig.put("priority", 2);
-            cspConfig.put("rdp", true);
+            if (!tc) {
+                cspConfig.put("destinationPort", 20);
+            }
             srs4.put("csp", cspConfig);
         }
         if (ethernet) {
@@ -236,8 +302,8 @@ public class Srs4FrameCodecTest {
         Map<String, Object> route = new LinkedHashMap<>();
         route.put("vcId", 3);
         if (csp) {
-            Map<String, Object> endpoint = Map.of(tc ? "destinationAddress" : "sourceAddress", tc ? 2 : 1,
-                    tc ? "destinationPort" : "sourcePort", tc ? 20 : 10);
+            Map<String, Object> endpoint = tc ? Map.of("destinationAddress", 2, "destinationPort", 20)
+                    : Map.of("sourceAddress", 1);
             route.put("csp", tc ? endpoint : List.of(endpoint));
         }
         if (ethernet) {
@@ -247,5 +313,20 @@ public class Srs4FrameCodecTest {
         }
         srs4.put("virtualChannels", List.of(route));
         return srs4;
+    }
+
+    private static void updateIpv4HeaderChecksum(byte[] data, int offset) {
+        data[offset + 10] = 0;
+        data[offset + 11] = 0;
+        int sum = 0;
+        for (int i = 0; i < Srs4Ipv4UdpHeaderCodec.IPV4_HEADER_LENGTH; i += 2) {
+            sum += ((data[offset + i] & 0xFF) << 8) | (data[offset + i + 1] & 0xFF);
+        }
+        while ((sum >>> 16) != 0) {
+            sum = (sum & 0xFFFF) + (sum >>> 16);
+        }
+        int checksum = (~sum) & 0xFFFF;
+        data[offset + 10] = (byte) (checksum >>> 8);
+        data[offset + 11] = (byte) checksum;
     }
 }

@@ -29,17 +29,15 @@ public final class Srs4ConfigSpec {
         radio.addOption("spacecraftId", OptionType.INTEGER).withRequired(true);
 
         String fixedCspAddress = tc ? "sourceAddress" : "destinationAddress";
-        String fixedCspPort = tc ? "sourcePort" : "destinationPort";
         Spec csp = new Spec();
         csp.addOption("enabled", OptionType.BOOLEAN).withDefault(true);
         csp.addOption(fixedCspAddress, OptionType.INTEGER);
-        csp.addOption(fixedCspPort, OptionType.INTEGER);
-        csp.addOption("priority", OptionType.INTEGER).withDefault(0);
-        csp.addOption("hmac", OptionType.BOOLEAN).withDefault(false);
-        csp.addOption("xtea", OptionType.BOOLEAN).withDefault(false);
-        csp.addOption("rdp", OptionType.BOOLEAN).withDefault(false);
-        csp.addOption("crc", OptionType.BOOLEAN).withDefault(false);
-        csp.when("enabled", true).requireAll(fixedCspAddress, fixedCspPort);
+        if (tc) {
+            csp.when("enabled", true).requireAll(fixedCspAddress);
+        } else {
+            csp.addOption("destinationPort", OptionType.INTEGER);
+            csp.when("enabled", true).requireAll(fixedCspAddress, "destinationPort");
+        }
 
         String fixedIpv4Address = tc ? "sourceAddress" : "destinationAddress";
         String fixedIpv4Port = tc ? "sourcePort" : "destinationPort";
@@ -54,8 +52,9 @@ public final class Srs4ConfigSpec {
         Spec routeCsp = new Spec();
         routeCsp.addOption(tc ? "destinationAddress" : "sourceAddress", OptionType.INTEGER)
                 .withRequired(true);
-        routeCsp.addOption(tc ? "destinationPort" : "sourcePort", OptionType.INTEGER)
-                .withRequired(true);
+        if (tc) {
+            routeCsp.addOption("destinationPort", OptionType.INTEGER).withRequired(true);
+        }
 
         Spec routeIpv4Udp = new Spec();
         routeIpv4Udp.addOption(tc ? "destinationAddress" : "sourceAddress", OptionType.STRING)
