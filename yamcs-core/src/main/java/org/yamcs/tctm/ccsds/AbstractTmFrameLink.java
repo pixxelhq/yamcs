@@ -106,15 +106,8 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
             frameDecapsulator.validate(frameHandler.getMaxFrameSize(), vcIds);
         }
 
-        if (dfl != -1) {
-            int mindfl = frameHandler.getMinFrameSize();
-            int maxdfl = frameHandler.getMaxFrameSize() + getFrameDecapsulationOverhead();
-            if (dfl < mindfl || dfl > maxdfl) {
-                throw new ConfigurationException("Raw frame decoder output frame length " + dfl +
-                        " does not match the defined frame length including decapsulation overhead "
-                        + (mindfl == maxdfl ? Integer.toString(mindfl) : "[" + mindfl + ", " + maxdfl + "]"));
-            }
-        }
+        ComposedFrameLinkSupport.validateDecodedFrameLength("Raw frame decoder", dfl,
+                frameHandler.getMinFrameSize(), frameHandler.getMaxFrameSize(), getFrameDecapsulationOverhead());
 
         subLinks = new ArrayList<>();
         for (VcDownlinkHandler vch : frameHandler.getVcHandlers()) {
@@ -140,7 +133,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
      */
     protected void handleFrame(Instant ert, byte[] data, int offset, int length) {
         try {
-            Integer expectedVcId = null;
+            Collection<Integer> expectedVcIds = null;
             if (rawFrameDecoder != null) {
                 length = rawFrameDecoder.decodeFrame(data, offset, length);
                 if (length == -1) {
@@ -154,7 +147,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                 data = frame.data();
                 offset = frame.offset();
                 length = frame.length();
-                expectedVcId = frame.expectedVirtualChannelId();
+                expectedVcIds = frame.expectedVirtualChannelIds();
             }
 
             if (length < frameHandler.getMinFrameSize()) {
@@ -167,9 +160,10 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                 eventProducer.sendWarning("Error processing frame: size " + length + " longer than maximum allowed "
                         + frameHandler.getMaxFrameSize());
                 errFrameCount++;
+                return;
             }
 
-            frameHandler.handleFrame(ert, data, offset, length, expectedVcId);
+            frameHandler.handleFrame(ert, data, offset, length, expectedVcIds);
 
             validFrameCount.getAndIncrement();
         } catch (TcTmException e) {

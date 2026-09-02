@@ -493,12 +493,6 @@ The following TC example enables both buses. The boolean command option ``useCan
           csp:
             enabled: true
             sourceAddress: 1
-            sourcePort: 10
-            priority: 0
-            hmac: false
-            xtea: false
-            rdp: false
-            crc: false
           ipv4Udp:
             enabled: true
             sourceAddress: 10.0.0.1
@@ -515,7 +509,7 @@ The following TC example enables both buses. The boolean command option ``useCan
                 destinationAddress: 10.0.0.2
                 destinationPort: 2000
 
-For TM, the spacecraft source is selected by VC and the ground destination is fixed:
+For TM, spacecraft source endpoints resolve to candidate VCs and the ground destination is fixed:
 
 .. code-block:: yaml
 
@@ -536,13 +530,12 @@ For TM, the spacecraft source is selected by VC and the ground destination is fi
             destinationPort: 1000
             ttl: 64
           virtualChannels:
-            - vcId: 0
+            - vcIds: [0, 1]
               csp:
-                sourceAddress: 2
-                sourcePort: 20
+                - sourceAddress: 2
               ipv4Udp:
-                sourceAddress: 10.0.0.2
-                sourcePort: 2000
+                - sourceAddress: 10.0.0.2
+                  sourcePort: 2000
 
 Provider activation and flow selection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -594,7 +587,7 @@ The radio header is four bytes in network byte order:
 * bits 10 to 0: content length;
 * the following two bytes: ``radio.spacecraftId``.
 
-The 11-bit length excludes the two-byte type/length word. It includes the two-byte radio spacecraft ID, the selected bus header, and the complete CCSDS transfer frame including SDLS overhead and the CCSDS frame error-control field. Therefore the maximum value is 2047. Yamcs rejects a configuration whose maximum CCSDS frame length plus SRS4 overhead cannot fit in this field.
+The 11-bit length excludes the two-byte type/length word. It includes the two-byte radio spacecraft ID, the selected bus header, and the complete CCSDS transfer frame including SDLS overhead and the CCSDS frame error-control field. Therefore the maximum value is 2047. Yamcs rejects a configuration whose maximum CCSDS frame length plus SRS4 overhead cannot fit in this field. For fixed-length TM, AOS, and USLP frames, SRS4 derives the received outer-frame length as the CCSDS ``frameLength`` plus the selected bus header, two-byte SCID, and two-byte radio type/length field: ``+8`` for CSP and ``+32`` for IPv4/UDP. Variable-length USLP frames are accepted within the configured inner-frame range after decapsulation.
 
 On TM, Yamcs verifies the reserved bits, declared length, configured spacecraft ID and type before selecting a bus-header decoder.
 
@@ -607,7 +600,7 @@ The CSP layer uses the existing Yamcs CSP v1 bit layout. All CSP integers are en
     **Required for TC.** Fixed ground source address in the range 0 to 31.
 
 ``csp.sourcePort``
-    **Required for TC.** Fixed ground source port in the range 0 to 63.
+    Not configurable. TC always writes source port ``0``.
 
 ``csp.destinationAddress``
     **Required for TM.** Fixed ground destination address in the range 0 to 31.
@@ -615,22 +608,7 @@ The CSP layer uses the existing Yamcs CSP v1 bit layout. All CSP integers are en
 ``csp.destinationPort``
     **Required for TM.** Fixed ground destination port in the range 0 to 63.
 
-``csp.priority``
-    CSP priority in the range 0 to 3. Default: ``0``. TM requires the received priority to equal this configured value.
-
-``csp.hmac``
-    Sets or validates the CSP HMAC flag. Default: ``false``.
-
-``csp.xtea``
-    Sets or validates the CSP XTEA flag. Default: ``false``.
-
-``csp.rdp``
-    Sets or validates the CSP RDP flag. Default: ``false``.
-
-``csp.crc``
-    Sets or validates the CSP CRC flag. Default: ``false``.
-
-The four CSP flags affect only the bits in the CSP header. The SRS4 provider does not perform CSP authentication, encryption or RDP processing, and does not append or remove a CSP CRC trailer. Any such processing must be implemented outside this provider.
+TC always writes CSP priority ``0`` with all CSP flags clear. TM ignores the received priority, source port, and flags. The SRS4 provider does not perform CSP authentication, encryption, RDP processing, or CSP CRC handling.
 
 IPv4/UDP fields
 ~~~~~~~~~~~~~~~
@@ -653,16 +631,19 @@ IPv4/UDP fields
 ``ipv4Udp.calculateUdpChecksum``
     TC-only option controlling UDP checksum generation. Default: ``false``. If false, Yamcs writes zero, which indicates that no UDP checksum is supplied for IPv4. If true, Yamcs calculates the checksum using the IPv4 pseudo-header. TM always accepts zero and verifies every nonzero UDP checksum, independently of this setting.
 
-Yamcs constructs a fixed 20-byte IPv4 header followed by an eight-byte UDP header. It sets IPv4 version 4, IHL 5, DSCP/ECN zero, identification zero, no fragmentation and protocol UDP. IP total length, UDP length and the IPv4 header checksum are calculated automatically. IPv4 options and fragmented packets are not supported.
+Yamcs constructs a fixed 20-byte IPv4 header followed by an eight-byte UDP header. It sets IPv4 version 4, IHL 5, DSCP/ECN zero, identification zero, no fragmentation and protocol UDP. IP total length, UDP length and the IPv4 header checksum are calculated automatically. TM accepts any IPv4 fragmentation-field value but does not perform fragment reassembly; IPv4 options are not supported.
 
 Virtual-channel endpoint fields
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``virtualChannels``
-    **Required.** SRS4 routing entries. Every VC configured on the parent CCSDS link must have exactly one SRS4 route containing an endpoint for each enabled bus layer. Duplicate VC entries are rejected.
+    **Required.** SRS4 routing entries. Every VC configured on the parent CCSDS link must occur in at least one SRS4 route containing endpoints for each enabled bus layer.
 
 ``virtualChannels[].vcId``
-    CCSDS virtual-channel identifier to which the nested endpoints apply.
+    **Required for TC.** CCSDS virtual-channel identifier to which the nested destination endpoints apply. Each TC VC may have only one SRS4 route.
+
+``virtualChannels[].vcIds``
+    **Required for TM.** Non-empty list of CCSDS virtual-channel identifiers to which all nested source endpoints apply. A VC may occur in multiple TM route groups.
 
 For TC, the fixed endpoints are the ground sources and each VC supplies spacecraft destinations:
 
@@ -672,15 +653,15 @@ For TC, the fixed endpoints are the ground sources and each VC supplies spacecra
 ``virtualChannels[].ipv4Udp.destinationAddress`` / ``destinationPort``
     IPv4/UDP destination for this VC.
 
-For TM, the fixed endpoints are the ground destinations and each VC supplies spacecraft sources:
+For TM, the fixed endpoints are the ground destinations and each route group supplies lists of spacecraft sources:
 
-``virtualChannels[].csp.sourceAddress`` / ``sourcePort``
-    Expected CSP source for this VC.
+``virtualChannels[].csp[].sourceAddress``
+    Expected CSP source address for every VC in ``vcIds``. Source ports are ignored.
 
-``virtualChannels[].ipv4Udp.sourceAddress`` / ``sourcePort``
-    Expected IPv4/UDP source for this VC.
+``virtualChannels[].ipv4Udp[].sourceAddress`` / ``sourcePort``
+    Expected IPv4/UDP source endpoint for every VC in ``vcIds``.
 
-TM source endpoint pairs must be unique within each bus layer. Yamcs first resolves the received source endpoint to an expected VC, then compares it with the VC decoded from the inner CCSDS frame. A mismatch causes the frame to be discarded.
+TM routing is many-to-many: a source may map to multiple candidate VCIDs, and a VCID may occur in multiple endpoint groups. Yamcs resolves the received source to the candidate set, then requires the VCID decoded from the inner CCSDS frame to belong to that set. A mismatch causes the frame to be discarded.
 
 ``controlFrameFlow`` and COP-1
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -701,7 +682,7 @@ This field is meaningful only when both CSP and IPv4/UDP are enabled. With a sin
 TM validation and processing order
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After validating the radio header, TM performs strict validation of the selected bus header. CSP destination, source route, priority, flags and reserved bits must match configuration. IPv4 version, IHL, DSCP/ECN, fragmentation, TTL, protocol, lengths and checksum are validated, followed by UDP lengths, checksum and endpoints.
+After validating the radio header, TM performs strict validation of the selected bus header. CSP destination, source-address route, and reserved bits must match configuration; source port, priority, and flags are ignored. IPv4 version, IHL, DSCP/ECN, TTL, protocol, lengths and checksum are validated, followed by UDP lengths, checksum and endpoints. SRS4 does not validate the expected length of the inner CCSDS frame; the TM/AOS/USLP decoder performs that validation after decapsulation.
 
 TC processing order is:
 
