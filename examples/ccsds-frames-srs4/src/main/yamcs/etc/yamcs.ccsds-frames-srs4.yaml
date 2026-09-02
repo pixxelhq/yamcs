@@ -53,13 +53,6 @@ dataLinks:
           csp:
             enabled: true
             sourceAddress: 1
-            sourcePort: 10
-            priority: 0
-            hmac: false
-            xtea: false
-            rdp: false
-            # This controls only the CSP header bit. No CSP CRC trailer is added.
-            crc: false
 
           # Nominal Ethernet flow: 20-byte IPv4 + 8-byte UDP header.
           ipv4Udp:
