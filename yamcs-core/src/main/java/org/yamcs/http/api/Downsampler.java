@@ -118,7 +118,12 @@ public class Downsampler implements Consumer<ParameterValueArray> {
             process(gentime, value.getUint64Value(), expireMillis);
             break;
         case ENUMERATED:
-            process(gentime, value.getSint64Value(), expireMillis);
+            if (categorical && enumLabelToOrdinal != null
+                    && !enumLabelToOrdinal.containsKey(value.getStringValue())) {
+                process(gentime, Double.NaN, expireMillis);
+            } else {
+                process(gentime, value.getSint64Value(), expireMillis);
+            }
             break;
         case BOOLEAN:
             process(gentime, value.getBooleanValue() ? 1 : 0, expireMillis);
