@@ -107,7 +107,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
         }
 
         if (dfl != -1) {
-            int mindfl = frameHandler.getMinFrameSize();
+            int mindfl = frameHandler.getMinFrameSize() + getFrameDecapsulationOverhead();
             int maxdfl = frameHandler.getMaxFrameSize() + getFrameDecapsulationOverhead();
             if (dfl < mindfl || dfl > maxdfl) {
                 throw new ConfigurationException("Raw frame decoder output frame length " + dfl +
@@ -150,11 +150,7 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
                 }
             }
             if (frameDecapsulator != null) {
-                int minimumCcsdsFrameLength = frameHandler.getMinFrameSize();
-                int maximumCcsdsFrameLength = frameHandler.getMaxFrameSize();
-                int expectedCcsdsFrameLength = minimumCcsdsFrameLength == maximumCcsdsFrameLength
-                        ? maximumCcsdsFrameLength : -1;
-                var frame = frameDecapsulator.decapsulate(data, offset, length, expectedCcsdsFrameLength);
+                var frame = frameDecapsulator.decapsulate(data, offset, length);
                 data = frame.data();
                 offset = frame.offset();
                 length = frame.length();

@@ -11,12 +11,9 @@ public interface TmFrameDecapsulator {
     }
 
     /**
-     * Removes mission-specific outer layers, optionally validating against a fixed expected inner frame length.
-     *
-     * @param expectedInnerFrameLength
-     *            the expected inner frame length, or {@code -1} when it is not fixed
+     * Removes mission-specific outer layers
      */
-    DecapsulatedFrame decapsulate(byte[] data, int offset, int length, int expectedInnerFrameLength) throws TcTmException;
+    DecapsulatedFrame decapsulate(byte[] data, int offset, int length) throws TcTmException;
 
     /** Maximum number of bytes which may surround a inner transfer frame. */
     int maxFrameOverhead();

@@ -38,7 +38,7 @@ public class Srs4FrameCodecTest {
 
         var decoder = new Srs4TmFrameDecapsulator(tmConfig(false, true, true));
         decoder.validate(ccsds.length, List.of(3));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length, ccsds.length);
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
         assertIterableEquals(List.of(3), decoded.expectedVirtualChannelIds());
         assertArrayEquals(ccsds,
                 java.util.Arrays.copyOfRange(decoded.data(), decoded.offset(), decoded.offset() + decoded.length()));
@@ -58,7 +58,7 @@ public class Srs4FrameCodecTest {
 
         var decoder = new Srs4TmFrameDecapsulator(tmConfig(true, false, false));
         decoder.validate(ccsds.length, List.of(3));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length, ccsds.length);
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
         assertIterableEquals(List.of(3), decoded.expectedVirtualChannelIds());
         assertArrayEquals(ccsds,
                 java.util.Arrays.copyOfRange(decoded.data(), decoded.offset(), decoded.offset() + decoded.length()));
@@ -76,7 +76,7 @@ public class Srs4FrameCodecTest {
 
         var decoder = new Srs4TmFrameDecapsulator(tmConfig(true, false, false));
         decoder.validate(ccsds.length, List.of(3));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length, ccsds.length);
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
         assertIterableEquals(List.of(3), decoded.expectedVirtualChannelIds());
     }
 
@@ -90,7 +90,7 @@ public class Srs4FrameCodecTest {
         var encoder = new Srs4TcFrameEncapsulator(tcConfig(true, false, false));
         byte[] encoded = encoder.encapsulate(frame(new byte[] { 9, 8, 7, 6 }, 3, null));
         var decoder = new Srs4TmFrameDecapsulator(YConfiguration.wrap(Map.of("srs4", srs4)));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length, 4);
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
         assertIterableEquals(List.of(3, 4), decoded.expectedVirtualChannelIds());
     }
 
@@ -104,7 +104,7 @@ public class Srs4FrameCodecTest {
         var encoder = new Srs4TcFrameEncapsulator(tcConfig(false, true, false));
         byte[] encoded = encoder.encapsulate(frame(new byte[] { 9, 8, 7, 6 }, 3, null));
         var decoder = new Srs4TmFrameDecapsulator(YConfiguration.wrap(Map.of("srs4", srs4)));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length, 4);
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
         assertIterableEquals(List.of(3, 4), decoded.expectedVirtualChannelIds());
     }
 
@@ -120,7 +120,7 @@ public class Srs4FrameCodecTest {
         var encoder = new Srs4TcFrameEncapsulator(tcConfig(false, true, false));
         byte[] encoded = encoder.encapsulate(frame(new byte[] { 9, 8, 7, 6 }, 3, null));
         var decoder = new Srs4TmFrameDecapsulator(YConfiguration.wrap(Map.of("srs4", srs4)));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length, 4);
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
         assertIterableEquals(List.of(3), decoded.expectedVirtualChannelIds());
     }
 
@@ -136,7 +136,7 @@ public class Srs4FrameCodecTest {
         var encoder = new Srs4TcFrameEncapsulator(tcConfig(false, true, false));
         byte[] encoded = encoder.encapsulate(frame(new byte[] { 9, 8, 7, 6 }, 3, null));
         var decoder = new Srs4TmFrameDecapsulator(YConfiguration.wrap(Map.of("srs4", srs4)));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length, 4);
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
         assertIterableEquals(List.of(3, 4), decoded.expectedVirtualChannelIds());
     }
 
@@ -163,26 +163,8 @@ public class Srs4FrameCodecTest {
 
         var decoder = new Srs4TmFrameDecapsulator(tmConfig(false, true, false));
         decoder.validate(ccsds.length, List.of(3));
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length, ccsds.length);
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
         assertIterableEquals(List.of(3), decoded.expectedVirtualChannelIds());
-    }
-
-    @Test
-    public void testSrs4TmLengthIsValidatedForEachFlow() throws Exception {
-        byte[] expectedCcsds = new byte[] { 1, 2, 3, 4 };
-        byte[] longerCcsds = new byte[] { 1, 2, 3, 4, 5 };
-
-        var cspEncoder = new Srs4TcFrameEncapsulator(tcConfig(true, false, false));
-        var cspDecoder = new Srs4TmFrameDecapsulator(tmConfig(true, false, false));
-        byte[] encodedCsp = cspEncoder.encapsulate(frame(longerCcsds, 3, null));
-        assertThrows(TcTmException.class,
-                () -> cspDecoder.decapsulate(encodedCsp, 0, encodedCsp.length, expectedCcsds.length));
-
-        var ipEncoder = new Srs4TcFrameEncapsulator(tcConfig(false, true, false));
-        byte[] encodedIp = ipEncoder.encapsulate(frame(longerCcsds, 3, null));
-        var ipDecoder = new Srs4TmFrameDecapsulator(tmConfig(false, true, false));
-        assertThrows(TcTmException.class,
-                () -> ipDecoder.decapsulate(encodedIp, 0, encodedIp.length, expectedCcsds.length));
     }
 
     @Test
@@ -192,7 +174,7 @@ public class Srs4FrameCodecTest {
         byte[] encoded = encoder.encapsulate(frame(ccsds, 3, null));
         var decoder = new Srs4TmFrameDecapsulator(tmConfig(false, true, false));
 
-        var decoded = decoder.decapsulate(encoded, 0, encoded.length, -1);
+        var decoded = decoder.decapsulate(encoded, 0, encoded.length);
         assertEquals(ccsds.length, decoded.length());
     }
 
@@ -217,10 +199,10 @@ public class Srs4FrameCodecTest {
         var decoder = new Srs4TmFrameDecapsulator(tmConfig(true, false, false));
 
         encoded[3] ^= 1;
-        assertThrows(TcTmException.class, () -> decoder.decapsulate(encoded, 0, encoded.length, 2));
+        assertThrows(TcTmException.class, () -> decoder.decapsulate(encoded, 0, encoded.length));
         encoded[3] ^= 1;
         encoded[1]--;
-        assertThrows(TcTmException.class, () -> decoder.decapsulate(encoded, 0, encoded.length, 2));
+        assertThrows(TcTmException.class, () -> decoder.decapsulate(encoded, 0, encoded.length));
     }
 
     @Test

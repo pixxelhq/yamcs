@@ -37,22 +37,19 @@ public class Srs4TmFrameDecapsulator implements TmFrameDecapsulator {
     }
 
     @Override
-    public DecapsulatedFrame decapsulate(byte[] data, int offset, int length, int expectedInnerFrameLength)
+    public DecapsulatedFrame decapsulate(byte[] data, int offset, int length)
             throws TcTmException {
         var radioFrame = radioCodec.decode(data, offset, length);
         if (radioFrame.flow() == Srs4Flow.CAN) {
             if (cspCodec == null) {
                 throw new TcTmException("SRS4 radio selected CAN but the CSP decoder is disabled");
             }
-            validateFrameLength(length, expectedInnerFrameLength, Srs4CspHeaderCodec.HEADER_LENGTH, "CSP");
             var frame = cspCodec.decode(radioFrame.data(), radioFrame.offset(), radioFrame.length());
             return new DecapsulatedFrame(frame.data(), frame.offset(), frame.length(), frame.virtualChannelIds());
         } else {
             if (ipv4UdpCodec == null) {
                 throw new TcTmException("SRS4 radio selected Ethernet but the IPv4/UDP decoder is disabled");
             }
-            validateFrameLength(length, expectedInnerFrameLength, Srs4Ipv4UdpHeaderCodec.HEADER_LENGTH,
-                    "IPv4/UDP");
             var frame = ipv4UdpCodec.decode(radioFrame.data(), radioFrame.offset(), radioFrame.length());
             return new DecapsulatedFrame(frame.data(), frame.offset(), frame.length(), frame.virtualChannelIds());
         }
@@ -81,6 +78,7 @@ public class Srs4TmFrameDecapsulator implements TmFrameDecapsulator {
         }
     }
 
+    @SuppressWarnings("unused")
     private void validateFrameLength(int receivedLength, int expectedInnerFrameLength, int busHeaderLength,
             String flow) throws TcTmException {
         if (expectedInnerFrameLength == -1) {

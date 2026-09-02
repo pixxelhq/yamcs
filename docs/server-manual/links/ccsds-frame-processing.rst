@@ -682,7 +682,7 @@ This field is meaningful only when both CSP and IPv4/UDP are enabled. With a sin
 TM validation and processing order
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After validating the radio header and the selected flow's derived outer length, TM performs strict validation of the selected bus header. CSP destination, source-address route, and reserved bits must match configuration; source port, priority, and flags are ignored. IPv4 version, IHL, DSCP/ECN, TTL, protocol, lengths and checksum are validated, followed by UDP lengths, checksum and endpoints.
+After validating the radio header, TM performs strict validation of the selected bus header. CSP destination, source-address route, and reserved bits must match configuration; source port, priority, and flags are ignored. IPv4 version, IHL, DSCP/ECN, TTL, protocol, lengths and checksum are validated, followed by UDP lengths, checksum and endpoints. SRS4 does not validate the expected length of the inner CCSDS frame; the TM/AOS/USLP decoder performs that validation after decapsulation.
 
 TC processing order is:
 
