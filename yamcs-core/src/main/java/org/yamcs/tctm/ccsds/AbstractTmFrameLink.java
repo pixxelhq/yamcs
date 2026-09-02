@@ -106,15 +106,8 @@ public abstract class AbstractTmFrameLink extends AbstractLink implements Aggreg
             frameDecapsulator.validate(frameHandler.getMaxFrameSize(), vcIds);
         }
 
-        if (dfl != -1) {
-            int mindfl = frameHandler.getMinFrameSize() + getFrameDecapsulationOverhead();
-            int maxdfl = frameHandler.getMaxFrameSize() + getFrameDecapsulationOverhead();
-            if (dfl < mindfl || dfl > maxdfl) {
-                throw new ConfigurationException("Raw frame decoder output frame length " + dfl +
-                        " does not match the defined frame length, including decapsulation overhead "
-                        + (mindfl == maxdfl ? Integer.toString(mindfl) : "[" + mindfl + ", " + maxdfl + "]"));
-            }
-        }
+        ComposedFrameLinkSupport.validateDecodedFrameLength("Raw frame decoder", dfl,
+                frameHandler.getMinFrameSize(), frameHandler.getMaxFrameSize(), getFrameDecapsulationOverhead());
 
         subLinks = new ArrayList<>();
         for (VcDownlinkHandler vch : frameHandler.getVcHandlers()) {

@@ -15,7 +15,7 @@ public interface TmFrameDecapsulator {
      */
     DecapsulatedFrame decapsulate(byte[] data, int offset, int length) throws TcTmException;
 
-    /** Maximum number of bytes which may surround a inner transfer frame. */
+    /** Maximum number of bytes which may surround an inner transfer frame. */
     int maxFrameOverhead();
 
     /** Validates the provider configuration against the parent data link. */
