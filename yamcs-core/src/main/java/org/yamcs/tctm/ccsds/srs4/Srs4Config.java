@@ -1,6 +1,8 @@
 package org.yamcs.tctm.ccsds.srs4;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.yamcs.ConfigurationException;
@@ -13,11 +15,13 @@ final class Srs4Config {
     record Ipv4Endpoint(int address, int port) {
     }
 
-    record Route(CspEndpoint csp, Ipv4Endpoint ipv4Udp) {
+    record TcRoute(CspEndpoint csp, Ipv4Endpoint ipv4Udp) {
     }
 
-    record CspSettings(boolean enabled, CspEndpoint fixedEndpoint, int priority, boolean hmac, boolean xtea,
-            boolean rdp, boolean crc) {
+    record TmRoute(List<Integer> vcIds, List<Integer> cspSourceAddresses, List<Ipv4Endpoint> ipv4Udp) {
+    }
+
+    record CspSettings(boolean enabled, CspEndpoint fixedEndpoint) {
     }
 
     record Ipv4UdpSettings(boolean enabled, Ipv4Endpoint fixedEndpoint, int ttl, boolean calculateUdpChecksum) {
@@ -26,17 +30,19 @@ final class Srs4Config {
     final int radioSpacecraftId;
     final CspSettings csp;
     final Ipv4UdpSettings ipv4Udp;
-    final Map<Integer, Route> routes;
+    final Map<Integer, TcRoute> tcRoutes;
+    final List<TmRoute> tmRoutes;
     final boolean dualFlow;
     final Srs4Flow fixedFlow;
     final Srs4Flow controlFrameFlow;
 
     private Srs4Config(int radioSpacecraftId, CspSettings csp, Ipv4UdpSettings ipv4Udp,
-            Map<Integer, Route> routes, Srs4Flow controlFrameFlow) {
+            Map<Integer, TcRoute> tcRoutes, List<TmRoute> tmRoutes, Srs4Flow controlFrameFlow) {
         this.radioSpacecraftId = radioSpacecraftId;
         this.csp = csp;
         this.ipv4Udp = ipv4Udp;
-        this.routes = routes;
+        this.tcRoutes = tcRoutes;
+        this.tmRoutes = tmRoutes;
         dualFlow = csp.enabled() && ipv4Udp.enabled();
         fixedFlow = dualFlow ? null : csp.enabled() ? Srs4Flow.CAN : Srs4Flow.ETHERNET;
         this.controlFrameFlow = controlFrameFlow;
@@ -71,27 +77,36 @@ final class Srs4Config {
         checkRange("radio spacecraftId", radioId, 0, 0xFFFF);
 
         CspSettings csp = cspEnabled ? parseCsp(config.getConfig("csp"), tc)
-                : new CspSettings(false, null, 0, false, false, false, false);
+                : new CspSettings(false, null);
         Ipv4UdpSettings ip = ipEnabled ? parseIpv4Udp(config.getConfig("ipv4Udp"), tc)
                 : new Ipv4UdpSettings(false, null, 64, false);
 
-        Map<Integer, Route> routes = new HashMap<>();
+        Map<Integer, TcRoute> tcRoutes = new HashMap<>();
+        List<TmRoute> tmRoutes = new ArrayList<>();
         for (YConfiguration routeConfig : config.getConfigList("virtualChannels")) {
-            int vcId = routeConfig.getInt("vcId");
-            if (routes.containsKey(vcId)) {
-                throw new ConfigurationException("Duplicate SRS4 route for vcId " + vcId);
+            if (tc) {
+                int vcId = routeConfig.getInt("vcId");
+                if (tcRoutes.containsKey(vcId)) {
+                    throw new ConfigurationException("Duplicate SRS4 route for vcId " + vcId);
+                }
+                CspEndpoint cspEndpoint = null;
+                if (cspEnabled) {
+                    cspEndpoint = parseCspEndpoint(routeConfig.getConfig("csp"), "destination");
+                }
+                Ipv4Endpoint ipEndpoint = null;
+                if (ipEnabled) {
+                    ipEndpoint = parseIpv4Endpoint(routeConfig.getConfig("ipv4Udp"), "destination");
+                }
+                tcRoutes.put(vcId, new TcRoute(cspEndpoint, ipEndpoint));
+            } else {
+                List<Integer> vcIds = routeConfig.getList("vcIds");
+                if (vcIds.isEmpty()) {
+                    throw new ConfigurationException("SRS4 TM route must contain at least one vcId");
+                }
+                List<Integer> cspSourceAddresses = cspEnabled ? parseCspSourceAddresses(routeConfig) : List.of();
+                List<Ipv4Endpoint> ipv4Endpoints = ipEnabled ? parseIpv4Endpoints(routeConfig) : List.of();
+                tmRoutes.add(new TmRoute(List.copyOf(vcIds), cspSourceAddresses, ipv4Endpoints));
             }
-            CspEndpoint cspEndpoint = null;
-            if (cspEnabled) {
-                YConfiguration endpoint = routeConfig.getConfig("csp");
-                cspEndpoint = parseCspEndpoint(endpoint, tc ? "destination" : "source");
-            }
-            Ipv4Endpoint ipEndpoint = null;
-            if (ipEnabled) {
-                YConfiguration endpoint = routeConfig.getConfig("ipv4Udp");
-                ipEndpoint = parseIpv4Endpoint(endpoint, tc ? "destination" : "source");
-            }
-            routes.put(vcId, new Route(cspEndpoint, ipEndpoint));
         }
 
         Srs4Flow controlFlow = config.getEnum("controlFrameFlow", Srs4Flow.class, Srs4Flow.ETHERNET);
@@ -101,7 +116,35 @@ final class Srs4Config {
         if (!ipEnabled && controlFlow == Srs4Flow.ETHERNET) {
             controlFlow = Srs4Flow.CAN;
         }
-        return new Srs4Config(radioId, csp, ip, routes, controlFlow);
+        return new Srs4Config(radioId, csp, ip, tcRoutes, tmRoutes, controlFlow);
+    }
+
+    private static List<Integer> parseCspSourceAddresses(YConfiguration routeConfig) {
+        if (!routeConfig.containsKey("csp")) {
+            throw new ConfigurationException("SRS4 TM route is missing CSP source addresses");
+        }
+        List<Integer> addresses = new ArrayList<>();
+        for (YConfiguration endpoint : routeConfig.getConfigList("csp")) {
+            addresses.add(parseCspAddress(endpoint, "source"));
+        }
+        if (addresses.isEmpty()) {
+            throw new ConfigurationException("SRS4 TM route must contain at least one CSP source address");
+        }
+        return List.copyOf(addresses);
+    }
+
+    private static List<Ipv4Endpoint> parseIpv4Endpoints(YConfiguration routeConfig) {
+        if (!routeConfig.containsKey("ipv4Udp")) {
+            throw new ConfigurationException("SRS4 TM route is missing IPv4/UDP source endpoints");
+        }
+        List<Ipv4Endpoint> endpoints = new ArrayList<>();
+        for (YConfiguration endpoint : routeConfig.getConfigList("ipv4Udp")) {
+            endpoints.add(parseIpv4Endpoint(endpoint, "source"));
+        }
+        if (endpoints.isEmpty()) {
+            throw new ConfigurationException("SRS4 TM route must contain at least one IPv4/UDP source endpoint");
+        }
+        return List.copyOf(endpoints);
     }
 
     private static boolean enabled(YConfiguration config, String key) {
@@ -109,12 +152,9 @@ final class Srs4Config {
     }
 
     private static CspSettings parseCsp(YConfiguration config, boolean tc) {
-        CspEndpoint fixed = parseCspEndpoint(config, tc ? "source" : "destination");
-        int priority = config.getInt("priority", 0);
-        checkRange("CSP priority", priority, 0, 3);
-        return new CspSettings(true, fixed, priority, config.getBoolean("hmac", false),
-                config.getBoolean("xtea", false), config.getBoolean("rdp", false),
-                config.getBoolean("crc", false));
+        CspEndpoint fixed = tc ? new CspEndpoint(parseCspAddress(config, "source"), 0)
+                : parseCspEndpoint(config, "destination");
+        return new CspSettings(true, fixed);
     }
 
     private static Ipv4UdpSettings parseIpv4Udp(YConfiguration config, boolean tc) {
@@ -124,8 +164,14 @@ final class Srs4Config {
         return new Ipv4UdpSettings(true, fixed, ttl, config.getBoolean("calculateUdpChecksum", false));
     }
 
-    private static CspEndpoint parseCspEndpoint(YConfiguration config, String prefix) {
+    private static int parseCspAddress(YConfiguration config, String prefix) {
         int address = config.getInt(prefix + "Address");
+        checkRange("CSP " + prefix + "Address", address, 0, 31);
+        return address;
+    }
+
+    private static CspEndpoint parseCspEndpoint(YConfiguration config, String prefix) {
+        int address = parseCspAddress(config, prefix);
         int port = config.getInt(prefix + "Port");
         checkRange("CSP " + prefix + "Address", address, 0, 31);
         checkRange("CSP " + prefix + "Port", port, 0, 63);

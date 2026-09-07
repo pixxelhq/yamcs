@@ -4,9 +4,10 @@ import org.yamcs.tctm.TcTmException;
 import org.yamcs.utils.ByteArrayUtils;
 
 final class Srs4RadioHeaderCodec {
-    static final int HEADER_LENGTH = 4;
+    static final int TYPE_AND_LENGTH_LENGTH = 2;
     static final int MAX_CONTENT_LENGTH = 0x7FF;
     static final int SPACECRAFT_ID_LENGTH = 2;
+    static final int HEADER_LENGTH = TYPE_AND_LENGTH_LENGTH + SPACECRAFT_ID_LENGTH;
 
     record DecodedRadioFrame(Srs4Flow flow, byte[] data, int offset, int length) {
     }
@@ -25,7 +26,7 @@ final class Srs4RadioHeaderCodec {
         byte[] result = new byte[HEADER_LENGTH + payload.length];
         int typeAndLength = (flow == Srs4Flow.ETHERNET ? 1 << 11 : 0) | contentLength;
         ByteArrayUtils.encodeUnsignedShort(typeAndLength, result, 0);
-        ByteArrayUtils.encodeUnsignedShort(spacecraftId, result, SPACECRAFT_ID_LENGTH);
+        ByteArrayUtils.encodeUnsignedShort(spacecraftId, result, TYPE_AND_LENGTH_LENGTH);
         System.arraycopy(payload, 0, result, HEADER_LENGTH, payload.length);
         return result;
     }
@@ -39,10 +40,11 @@ final class Srs4RadioHeaderCodec {
             throw new TcTmException("SRS4 radio reserved bits are not zero");
         }
         int declaredLength = word & MAX_CONTENT_LENGTH;
-        if (declaredLength != length - SPACECRAFT_ID_LENGTH) {
-            throw new TcTmException("SRS4 radio length is " + declaredLength + ", received " + (length - SPACECRAFT_ID_LENGTH));
+        if (declaredLength != length - TYPE_AND_LENGTH_LENGTH) {
+            throw new TcTmException("SRS4 radio length is " + declaredLength + ", received "
+                    + (length - TYPE_AND_LENGTH_LENGTH));
         }
-        int receivedSpacecraftId = ByteArrayUtils.decodeUnsignedShort(data, offset + SPACECRAFT_ID_LENGTH);
+        int receivedSpacecraftId = ByteArrayUtils.decodeUnsignedShort(data, offset + TYPE_AND_LENGTH_LENGTH);
         if (receivedSpacecraftId != spacecraftId) {
             throw new TcTmException("Unexpected SRS4 radio spacecraft ID " + receivedSpacecraftId
                     + " (expected " + spacecraftId + ")");
