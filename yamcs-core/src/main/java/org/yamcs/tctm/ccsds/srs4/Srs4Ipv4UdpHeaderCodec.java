@@ -101,7 +101,7 @@ final class Srs4Ipv4UdpHeaderCodec {
         }
         Set<Integer> vcIds = sourceRoutes.get(new Ipv4Endpoint(sourceAddress, sourcePort));
         if (vcIds == null) {
-            throw new TcTmException("Unknown SRS4 IPv4/UDP source endpoint");
+            throw new TcTmException(String.format("Unknown SRS4 IPv4/UDP source endpoint: received value in header %s:%s", sourceAddress, sourcePort));
         }
         return new DecodedIpv4UdpFrame(data, offset + HEADER_LENGTH, length - HEADER_LENGTH, List.copyOf(vcIds));
     }
