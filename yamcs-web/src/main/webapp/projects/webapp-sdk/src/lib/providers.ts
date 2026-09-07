@@ -22,6 +22,7 @@ import { UtcDateAdapter } from './components/date-time-input/UtcDateAdapter';
 import { AppearanceService } from './services/appearance.service';
 import { AuthService } from './services/auth.service';
 import { ConfigService } from './services/config.service';
+import { MessageService } from './services/message.service';
 import { SdkBridge } from './services/sdk-bridge.service';
 import { YamcsService } from './services/yamcs.service';
 
@@ -93,6 +94,7 @@ export function provideSdkBridge(): EnvironmentProviders[] {
       sdkBridge.appearanceService = inject(AppearanceService);
       sdkBridge.router = inject(Router);
       sdkBridge.yamcs = inject(YamcsService);
+      sdkBridge.messageService = inject(MessageService);
     }),
   ];
 }

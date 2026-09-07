@@ -335,6 +335,7 @@ export interface DownloadPacketsOptions {
    * Exclusive upper bound
    */
   stop?: string;
+  filter?: string;
   name?: string | string[];
   link?: string;
   format?: 'raw';

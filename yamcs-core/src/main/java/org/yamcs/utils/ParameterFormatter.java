@@ -126,6 +126,10 @@ public class ParameterFormatter implements Closeable {
                 if (idx != -1) {
                     name = name.substring(idx + 1);
                 }
+            } else if (header == Header.QUALIFIED_NAME) {
+                if (noid.hasNamespace() && noid.getNamespace().startsWith("/")) {
+                    name = noid.getNamespace() + "/" + name;
+                }
             }
             h.add(name);
             if (printRaw) {

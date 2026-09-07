@@ -282,6 +282,9 @@ export class PacketListComponent
     if (this.validStop) {
       dlOptions.stop = this.validStop.toISOString();
     }
+    if (filter) {
+      dlOptions.filter = filter;
+    }
     if (name !== 'ANY') {
       dlOptions.name = name;
     }

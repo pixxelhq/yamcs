@@ -1,3 +1,9 @@
+Version 5.13.5 released 31-Aug-2026
+- Move stacks/scripts to top level of navigation
+- Fix cascading link not reconnecting after long upstream downtime
+- Fix misc issues around stack activities
+- Minor tweaks and fixes
+
 Version 5.13.4 released 7-Aug-2026
 - Fix OPI sizing issues on Firefox
 

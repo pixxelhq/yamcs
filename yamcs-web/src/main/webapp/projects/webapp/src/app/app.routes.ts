@@ -1,4 +1,4 @@
-import { Routes } from '@angular/router';
+import { Params, Routes } from '@angular/router';
 import { CreateInstancePage1Component } from './appbase/create-instance-page1/create-instance-page1.component';
 import { CreateInstancePage2Component } from './appbase/create-instance-page2/create-instance-page2.component';
 import { ExtensionComponent } from './appbase/extension/extension.component';
@@ -121,6 +121,27 @@ export const APP_ROUTES: Routes = [
             canActivate: [authGuardFn],
           },
           {
+            // DEPRECATED: '/automation/script' was renamed to '/scripts'
+            path: 'automation/script',
+            pathMatch: 'full',
+            redirectTo: ({ queryParams }) =>
+              createUrlWithQueryParams('/scripts', queryParams),
+          },
+          {
+            // DEPRECATED: '/automation/**' was moved to '/**'
+            path: 'automation/**',
+            redirectTo: ({ url, queryParams }) => {
+              const segments = url.map((s) => s.path);
+              if (segments[0] === 'automation') {
+                segments.shift();
+              }
+              return createUrlWithQueryParams(
+                '/' + segments.join('/'),
+                queryParams,
+              );
+            },
+          },
+          {
             path: 'commanding',
             loadChildren: () =>
               import('./commanding/commanding.routes').then((m) => m.ROUTES),
@@ -174,9 +195,9 @@ export const APP_ROUTES: Routes = [
             canActivate: [authGuardFn],
           },
           {
-            path: 'automation',
+            path: 'scripts',
             loadChildren: () =>
-              import('./automation/automation.routes').then((m) => m.ROUTES),
+              import('./scripts/scripts.routes').then((m) => m.ROUTES),
             canActivate: [authGuardFn],
           },
           {
@@ -185,6 +206,12 @@ export const APP_ROUTES: Routes = [
               import('./search/search.routes').then((m) => m.ROUTES),
             canActivate: [authGuardFn],
             data: { preload: true },
+          },
+          {
+            path: 'stacks',
+            loadChildren: () =>
+              import('./stacks/stacks.routes').then((m) => m.ROUTES),
+            canActivate: [authGuardFn],
           },
           {
             path: 'telemetry',
@@ -210,3 +237,12 @@ export const APP_ROUTES: Routes = [
     ],
   },
 ];
+
+function createUrlWithQueryParams(path: string, params: Params): string {
+  const pairs = Object.entries(params).flatMap(([key, value]) =>
+    (Array.isArray(value) ? value : [value]).map(
+      (v) => `${encodeURIComponent(key)}=${encodeURIComponent(v)}`,
+    ),
+  );
+  return pairs.length ? `${path}?${pairs.join('&')}` : path;
+}

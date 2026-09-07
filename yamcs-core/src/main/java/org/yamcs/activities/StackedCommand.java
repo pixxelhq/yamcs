@@ -16,7 +16,7 @@ public class StackedCommand implements Step {
     // -1 means: inherit from stack
     private int waitTime = -1;
     private MetaCommand meta;
-    private Map<Argument, String> assignments = new LinkedHashMap<>();
+    private Map<Argument, Object> assignments = new LinkedHashMap<>();
     private Map<String, Object> extra = new LinkedHashMap<>();
     private String stream;
     private String comment;
@@ -61,11 +61,11 @@ public class StackedCommand implements Step {
         return meta;
     }
 
-    public void addAssignment(Argument arg, String value) {
+    public void addAssignment(Argument arg, Object value) {
         assignments.put(arg, value);
     }
 
-    public Map<Argument, String> getAssignments() {
+    public Map<Argument, Object> getAssignments() {
         return assignments;
     }
 

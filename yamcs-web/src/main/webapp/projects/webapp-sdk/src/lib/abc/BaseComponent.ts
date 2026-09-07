@@ -26,7 +26,6 @@ export abstract class BaseComponent {
 
   constructor() {
     this.changeDetection = inject(ChangeDetectorRef);
-    this.messageService = inject(MessageService);
     this.sdkBridge = inject(SdkBridge);
     this.synchronizer = inject(Synchronizer);
     this.title = inject(Title);
@@ -35,6 +34,7 @@ export abstract class BaseComponent {
     this.appearanceService = this.sdkBridge.appearanceService;
     this.router = this.sdkBridge.router;
     this.yamcs = this.sdkBridge.yamcs;
+    this.messageService = this.sdkBridge.messageService;
     this.routeData = this.sdkBridge.routeData.asReadonly();
 
     this.detailPane$ = this.appearanceService.detailPane$.asObservable();

@@ -33,6 +33,7 @@ export abstract class YamcsWebExtension implements OnChanges {
     this.sdkBridge.appearanceService = extensionService.appearanceService;
     this.sdkBridge.router = extensionService.router;
     this.sdkBridge.yamcs = extensionService.yamcs;
+    this.sdkBridge.messageService = extensionService.messageService;
 
     this.extensionInitialized = true;
     this.onExtensionInit();

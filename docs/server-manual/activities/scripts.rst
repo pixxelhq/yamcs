@@ -78,6 +78,10 @@ script (string)
 args (string, or list of strings)
     Command line arguments.
 
+    When given as a single string, it is treated as a command line and split into arguments on whitespace.
+    When given as a list, each element is passed to the script as exactly one argument, verbatim, even if it
+    contains whitespace.
+
 processor (string)
     If provided this information is passed to the called script as a ``YAMCS_PROCESSOR`` environment variable.
 

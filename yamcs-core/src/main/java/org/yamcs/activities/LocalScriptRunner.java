@@ -102,16 +102,19 @@ public class LocalScriptRunner implements ScriptRunner {
             throw new IllegalArgumentException("Unexpected script '" + script + "'");
         }
 
-        var program = scriptFile.toString();
+        var command = new ArrayList<String>();
         var fileExtension = FileUtils.getFileExtension(scriptFile);
         if (fileExtension != null) {
             var assoc = fileAssociations.get(fileExtension);
-            if (assoc != null) {
-                program = assoc + " " + scriptFile.toString();
+            if (assoc != null && !assoc.isBlank()) {
+                for (var token : assoc.trim().split("\\s+")) {
+                    command.add(token);
+                }
             }
         }
+        command.add(scriptFile.toString());
 
-        return new LocalScriptRun(program, scriptArgs);
+        return new LocalScriptRun(command, scriptArgs);
     }
 
     private Path locateScript(String script) throws IOException {
