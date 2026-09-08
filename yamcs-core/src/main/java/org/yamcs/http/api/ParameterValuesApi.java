@@ -58,6 +58,7 @@ import org.yamcs.utils.ParameterFormatter;
 import org.yamcs.utils.ParameterFormatter.Header;
 import org.yamcs.utils.TimeEncoding;
 import org.yamcs.utils.ValueUtility;
+import org.yamcs.xtce.BooleanParameterType;
 import org.yamcs.xtce.EnumeratedParameterType;
 import org.yamcs.xtce.Parameter;
 import org.yamcs.xtce.ParameterType;
@@ -546,9 +547,11 @@ public class ParameterValuesApi extends AbstractParameterValuesApi<Context> {
         sampler.setUseRawValue(useRawValue);
         sampler.setGapTime(request.hasGapTime() ? request.getGapTime() : 120000);
 
-        // Enum (engineering) parameters are categorical: switch the sampler to last-value-per-bucket and give it the
-        // label->ordinal table so the columnar retrieval path (which delivers String labels) can plot numeric ordinals.
-        // Raw values of an enum parameter are plain integers and need none of this.
+        // Enum and boolean (engineering) parameters are categorical: switch the sampler to last-value-per-bucket, so
+        // that a bucket spanning two states reports a state that actually occurred instead of an average between them.
+        // Enums additionally need the label->ordinal table, because the columnar retrieval path delivers String labels
+        // where the plot needs numeric ordinals. Booleans arrive as BOOLEAN values on both paths and need no table.
+        // Raw values of an enum or boolean parameter are plain integers and need none of this.
         if (!useRawValue && pid.getPath() == null) {
             ParameterType ptype = pid.getParameter().getParameterType();
             if (ptype instanceof EnumeratedParameterType enumType) {
@@ -557,6 +560,8 @@ public class ParameterValuesApi extends AbstractParameterValuesApi<Context> {
                     labelToOrdinal.put(ve.getLabel(), (int) ve.getValue());
                 }
                 sampler.enableCategoricalMode(labelToOrdinal);
+            } else if (ptype instanceof BooleanParameterType) {
+                sampler.enableCategoricalMode(null);
             }
         }
 
