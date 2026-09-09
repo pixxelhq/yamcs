@@ -63,13 +63,13 @@ The primary ground-side workflow uses `yamcs-client` with the `pus11ScheduleAt` 
 
 > **Java column** = simulator (`Pus11Service.java`) — **test/demo code only**. MDB column reflects the YAMCS operator interface, which is the production-relevant concern.
 >
-> All subtypes are now implemented in both MDB and the Java simulator. Two items remain: Gap #1 (`filter_type` hardcoded to `0x01` on the four filter-based commands) and Gap #2 (scheduling groups are bookkeeping-only — activities cannot be assigned to a group, so group enable/disable has no effect on release).
+> All subtypes are now implemented in both MDB and the Java simulator. Three items remain: Gap #1 (`filter_type` hardcoded to `0x01` on the four filter-based commands), Gap #2 (scheduling groups are bookkeeping-only — activities cannot be assigned to a group, so group enable/disable has no effect on release), and Gap #3 (the global `enabled` flag is written but never read, so `DISABLE_SCHEDULER` is inert).
 
 | Subtype | Type | Name | MDB | Java (sim) | Action Required |
 |---------|------|------|-----|------|-----------------|
-| 1 | TC | Enable Scheduler | ✅ | ✅ | None |
-| 2 | TC | Disable Scheduler | ✅ | ✅ | None |
-| 3 | TC | Reset Scheduler | ✅ | ✅ | None |
+| 1 | TC | Enable Scheduler | ✅ | ⚠️ | `enabled` never read (Gap #3) |
+| 2 | TC | Disable Scheduler | ✅ | ⚠️ | `enabled` never read — command is inert (Gap #3) |
+| 3 | TC | Reset Scheduler | ✅ | ⚠️ | queue clear works; `enabled = false` inert (Gap #3) |
 | 4 | TC | Insert Activities | ✅ | ✅ | No `group_id` per activity (Gap #2) |
 | 5 | TC | Delete by Request ID | ✅ | ✅ | None |
 | 6 | TC | Delete by Filter | ✅ | ✅ | `filter_type` hardcoded (Gap #1) |
@@ -101,17 +101,27 @@ The primary ground-side workflow uses `yamcs-client` with the `pus11ScheduleAt` 
 
 **Spec**: No application data. Enables the scheduler so stored commands are released at their times.
 **MDB**: ✅ `ENABLE_SCHEDULER` defined, no args.
-**Java**: ✅ Sets `enabled = true`, sends ACK[1,3] + ACK[1,7].
-**Action**: None.
+**Java**: ⚠️ Sets `enabled = true` (`Pus11Service.java:53`) and sends ACK[1,3] + ACK[1,7], but
+the flag is never read — see Gap #3.
+**Action**: None for the MDB. Simulator: make `runSchedule()` honour `enabled` (Gap #3).
 
 ---
 
 ### TC[11,2] — Disable the time-based schedule execution function
 
-**Spec**: No application data. Disables the scheduler; queued commands are retained but not released.
+**Spec**: No application data. Sets the execution function status to "disabled". Per
+§6.11.4.6.b.1 a scheduled activity is then *disabled*, and per §6.11.4.6.c the activity is
+**still deleted from the schedule when its release time is reached** — it is simply not
+released first. **Queued commands are therefore discarded as their release times pass, not
+retained.** §6.11.4.6 NOTE 2 confirms no notification is sent to ground when this happens.
 **MDB**: ✅ `DISABLE_SCHEDULER`, no args.
-**Java**: ✅ Sets `enabled = false`.
-**Action**: None.
+**Java**: ⚠️ Sets `enabled = false` (`Pus11Service.java:60`), but the flag is never read, so
+this command currently has **no effect at all** — see Gap #3.
+**Action**: None for the MDB. Simulator: Gap #3.
+
+> **Operational consequence**: disabling the scheduler is *not* a safe "pause". It silently
+> destroys every activity whose release time elapses while disabled. To genuinely retain
+> activities, time-shift them (TC[11,15]) past the outage instead.
 
 ---
 
@@ -119,8 +129,9 @@ The primary ground-side workflow uses `yamcs-client` with the `pus11ScheduleAt` 
 
 **Spec**: No application data. Clears all scheduled activities and disables the scheduler.
 **MDB**: ✅ `RESET_SCHEDULER`, no args.
-**Java**: ✅ Clears `commands` queue, sets `enabled = false`.
-**Action**: None.
+**Java**: ⚠️ Clears the `commands` queue (this part works) and sets `enabled = false`
+(`Pus11Service.java:67`), which has no effect — see Gap #3.
+**Action**: None for the MDB. Simulator: Gap #3.
 
 ---
 
@@ -451,9 +462,9 @@ repeat N:
 
 ## C. Gaps & Shortcomings
 
-> Previous revisions of this doc tracked five other gaps (missing `INSERT_ACTIVITIES` MDB definition, missing `time_offset_ms` on TC[11,7]/[11,8], wrong argument list on TC[11,15], unimplemented scheduling groups TC[11,22–26]/TM[11,27], and a single-ID-only bug in the simulator's TC[11,20]/[11,21] handlers). All five are now resolved in both the MDB (`pus11.xml`) and the Java simulator (`Pus11Service.java`) — see the per-subtype sections in Part B for details. Two gaps remain open.
+> Previous revisions of this doc tracked five other gaps (missing `INSERT_ACTIVITIES` MDB definition, missing `time_offset_ms` on TC[11,7]/[11,8], wrong argument list on TC[11,15], unimplemented scheduling groups TC[11,22–26]/TM[11,27], and a single-ID-only bug in the simulator's TC[11,20]/[11,21] handlers). All five are now resolved in both the MDB (`pus11.xml`) and the Java simulator (`Pus11Service.java`) — see the per-subtype sections in Part B for details. Three gaps remain open.
 >
-> **Scheduling capability summary**: sub-scheduling works end to end (assign → gate at release → report). Group scheduling does **not** — the group commands maintain state that nothing acts on (Gap #2).
+> **Scheduling capability summary**: sub-scheduling works end to end (assign → gate at release → report). Group scheduling does **not** — the group commands maintain state that nothing acts on (Gap #2). Neither does the global enable/disable — same failure shape (Gap #3). Of the three release gates §6.11.4.6.b requires, the simulator implements exactly one.
 
 ### Gap 1 — TC[11,6/8/11/14]: `filter_type` hardcoded to `0x01`
 
@@ -493,12 +504,49 @@ Net effect: TC[11,22–26] and TM[11,27] faithfully maintain a `Map<Integer, Boo
 
 ---
 
+---
+
+### Gap 3 — TC[11,1]/[11,2]/[11,3]: the `enabled` flag is written but never read
+
+**Problem**: `Pus11Service.enabled` is assigned at lines 29, 53 (TC[11,1]), 60 (TC[11,2]) and
+67 (TC[11,3]), and **read nowhere**. `runSchedule()` (lines 531–559) gates only on
+`subschStatus`. So `DISABLE_SCHEDULER` has no observable effect: activities continue to be
+released on schedule while the scheduler reports itself disabled.
+
+This is the same failure shape as Gap #2. §6.11.4.6.b requires three independent release
+gates — function status, sub-schedule, group — and the simulator implements only the
+sub-schedule one.
+
+**Impact**: Medium. TC[11,2] ACKs successfully and the state is tracked internally, so it
+reads as working while doing nothing — the same silent-inertness trap as the group commands.
+Anyone using `DISABLE_SCHEDULER` as a safing action in a test scenario gets no safing.
+
+**Fix**: add the function-status check to `runSchedule()`, alongside the existing
+`subschStatus` check and the `groupStatus` check from Gap #2:
+
+```java
+if (!enabled) { /* disabled: fall through to the unconditional delete, do not release */ }
+```
+
+Note the correct behaviour is **not** "skip and keep the activity". Per §6.11.4.6.c the
+activity is deleted when its release time is reached regardless of whether it was released —
+so a disabled scheduler discards activities as their times pass. The existing
+`commands.remove()` in the drop branches is already right; only the gate is missing.
+
+**Scope**: Java simulator only. The MDB is correct.
+
+**Effort**: Minor — one condition, plus a walkthrough step to verify a disabled scheduler
+blocks a release *and* still drops the activity.
+
+---
+
 ### Summary
 
 | Gap | Severity | Scope | XTCE-only fix? | Effort |
 |-----|----------|-------|----------------|--------|
 | #1 TC[11,6/8/11/14] filter_type hardcoded | Low | MCS (operator interface) | ✅ Yes | Minor |
 | #2 Scheduling groups bookkeeping-only (no `group_id` on activities, no release gate) | Medium | MDB + Java simulator | ❌ No | Moderate |
+| #3 `enabled` flag never read — TC[11,2] inert | Medium | Java simulator | ❌ No | Minor |
 
 ---
 
@@ -762,8 +810,10 @@ actually happened on-board rather than being sent from ground (same pattern as S
     `runSchedule()` never consults `groupStatus`, only `subschStatus` (step 5), so releasing an
     activity while its group is disabled will **not** block it; only the subschedule gate does.
 11. **Reset**: `RESET_SCHEDULER` and confirm `GET_SUMMARY_REPORT`/`GET_DETAIL_REPORT` both return
-    `n=0`, and a subsequent `ENABLE_SCHEDULER` is required before newly inserted activities will
-    actually release (`enabled=false` after reset).
+    `n=0`. Note that per spec a subsequent `ENABLE_SCHEDULER` *should* be required before newly
+    inserted activities release, but in this simulator it is **not** — `enabled` is never read
+    (Gap #3), so activities inserted after a reset release regardless. Insert one and confirm it
+    still fires; that is the reproducer for Gap #3.
 
 ### E.5 Caveats specific to this simulator
 
@@ -790,6 +840,16 @@ actually happened on-board rather than being sent from ground (same pattern as S
   `/PUS11` (`/PUS11/DETAIL_REPORT/DETAIL_REPORT` and `/PUS11/SUMMARY_REPORT/SUMMARY_REPORT`) — easy to
   miss if you're tab-completing container names expecting a flat `/PUS11/...` layout like the other
   TM containers in this service.
+- **A disabled scheduler still destroys activities** (spec behaviour, not a simulator quirk):
+  §6.11.4.6.c deletes each activity when its release time is reached whether or not it was
+  released, and §6.11.4.6 NOTE 2 states no notification is sent to ground for those deletions.
+  So `DISABLE_SCHEDULER` is not a safe pause — on real hardware it silently discards everything
+  whose time elapses while disabled. (In *this* simulator it does nothing at all, per Gap #3, so
+  the destructive behaviour is not reproducible here — do not conclude from a simulator run that
+  the flight software is equally harmless.)
+- **`enabled` is never read** (Gap #3): `ENABLE_SCHEDULER`/`DISABLE_SCHEDULER` ACK and update
+  internal state, but `runSchedule()` gates only on `subschStatus`. Only the subschedule gate
+  (walkthrough step 5) actually suppresses a release.
 - **Groups are bookkeeping-only** (Gap #2): `groupStatus` is maintained faithfully by
   TC[11,22–26]/TM[11,27] but never consulted by `runSchedule()`, and there is no `group_id` on an
   activity in the first place — `INSERT_ACTIVITIES` takes only `subschedule_id` — so no scheduled

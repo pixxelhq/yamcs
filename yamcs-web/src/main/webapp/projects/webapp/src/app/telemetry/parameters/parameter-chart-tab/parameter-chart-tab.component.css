@@ -82,3 +82,48 @@
 ya-stepper {
   --ya-stepper-outer-padding: 16px;
 }
+
+/*
+ * Stacked layout: one legend chip per plot, positioned at the top of its
+ * section. Mirrors .legend-box from legend.component.css, which is
+ * component-scoped and therefore not reachable from here.
+ */
+.band-legends {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.band-legends .legend-box {
+  position: absolute;
+  padding-left: 3px;
+  padding-right: 5px;
+  border: 1px solid #efefef;
+  border-radius: 2px;
+  background-color: #fff;
+  font-size: 10px;
+  line-height: 14px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.band-legends .yvalue {
+  margin-left: 5px;
+  font-weight: bold;
+}
+
+.band-legends .units {
+  margin-left: 2px;
+  font-weight: bold;
+}
+
+.band-legends .error {
+  margin-left: 5px;
+  color: var(--y-error-color) !important;
+}
