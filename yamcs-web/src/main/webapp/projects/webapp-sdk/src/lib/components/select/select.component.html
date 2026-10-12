@@ -20,7 +20,7 @@
     @if (option.group) {
       <mat-divider />
     }
-    <button mat-menu-item (click)="writeValue(option.id)">
+    <button mat-menu-item (click)="writeValue(option.id)" [disabled]="option.disabled">
       <mat-icon [style.visibility]="isSelected(option.id) ? 'visible' : 'hidden'">check</mat-icon>
       {{ option.label }}
     </button>
@@ -29,7 +29,7 @@
     @if (option.group()) {
       <mat-divider />
     }
-    <button mat-menu-item (click)="writeValue(option.id())">
+    <button mat-menu-item (click)="writeValue(option.id())" [disabled]="option.disabled()">
       <mat-icon [style.visibility]="isSelected(option.id()) ? 'visible' : 'hidden'">check</mat-icon>
       {{ option.label() }}
     </button>

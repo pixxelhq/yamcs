@@ -1,4 +1,5 @@
 import { BehaviorSubject } from 'rxjs';
+import { PacketArchiveInfo } from './types/monitoring';
 import { FrameLossListener } from './FrameLossListener';
 import { HttpError } from './HttpError';
 import { HttpHandler } from './HttpHandler';
@@ -770,6 +771,21 @@ export default class YamcsClient implements HttpHandler {
     const url = `${this.apiUrl}/archive/${instance}/packets`;
     const response = await this.doFetch(url + this.queryString(options));
     return await response.json() as ListPacketsResponse;
+  }
+
+  async getPacketArchiveInfo(instance: string) {
+    const response = await this.doFetch(
+      `${this.apiUrl}/archive/${instance}/packets:info`,
+    );
+    return (await response.json()) as PacketArchiveInfo;
+  }
+
+  async rebuildReceptionTimeIndex(instance: string) {
+    const response = await this.doFetch(
+      `${this.apiUrl}/archive/${instance}/packets:rebuildReceptionTimeIndex`,
+      { method: 'POST', body: '{}' },
+    );
+    return (await response.json()) as PacketArchiveInfo;
   }
 
   async getEvents(instance: string, options: GetEventsOptions = {}) {
