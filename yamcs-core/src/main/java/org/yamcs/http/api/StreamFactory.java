@@ -3,6 +3,7 @@ package org.yamcs.http.api;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import org.yamcs.http.InternalServerErrorException;
 import org.yamcs.logging.Log;
@@ -24,6 +25,11 @@ public class StreamFactory {
     }
 
     public static void stream(String instance, String selectSql, List<Object> args, StreamSubscriber subscriber) {
+        stream(instance, selectSql, args, subscriber, stream -> { });
+    }
+
+    public static void stream(String instance, String selectSql, List<Object> args, StreamSubscriber subscriber,
+            Consumer<Stream> beforeStart) {
         YarchDatabaseInstance ydb = YarchDatabase.getInstance(instance);
 
         String streamName = "http_stream" + streamCounter.incrementAndGet();
@@ -43,6 +49,7 @@ public class StreamFactory {
 
         Stream stream = ydb.getStream(streamName);
         stream.addSubscriber(subscriber);
+        beforeStart.accept(stream);
         stream.start();
         return;
     }
