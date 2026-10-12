@@ -1,0 +1,9 @@
+services:
+  - class: org.yamcs.archive.XtceTmRecorder
+mdb:
+  - type: xtce
+    args:
+      file: src/test/resources/TmReceptionTest/mdb.xml
+streamConfig:
+  tm:
+    - name: tm_realtime

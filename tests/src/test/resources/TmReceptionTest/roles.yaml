@@ -1,0 +1,3 @@
+PacketArchiveAdmin:
+  ReadPacket: [".*"]
+  System: [ControlArchiving]
