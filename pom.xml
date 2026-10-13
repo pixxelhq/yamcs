@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.yamcs</groupId>
 	<artifactId>yamcs</artifactId>
-	<version>5.10.12-Pixxel-9.4.2</version>
+	<version>5.10.12-Pixxel-9.5.0</version>
 
 	<packaging>pom</packaging>
 
@@ -48,7 +48,7 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<nettyVersion>4.1.94.Final</nettyVersion>
-		<protobufVersion>3.19.6</protobufVersion>
+		<protobufVersion>4.35.0</protobufVersion>
 		<rocksdbVersion>9.4.0.11</rocksdbVersion>
 		<slf4jVersion>2.0.9</slf4jVersion>
 	</properties>
