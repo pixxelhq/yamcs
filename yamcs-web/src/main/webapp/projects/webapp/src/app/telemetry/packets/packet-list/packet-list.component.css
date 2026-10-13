@@ -8,6 +8,12 @@
   box-sizing: border-box;
 }
 
+.filter-bar {
+  height: unset;
+  flex-wrap: wrap;
+  row-gap: 7px;
+}
+
 .table-wrapper {
   position: relative;
   overflow: auto;

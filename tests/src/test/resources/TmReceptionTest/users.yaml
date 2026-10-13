@@ -1,0 +1,3 @@
+admin:
+  password: rootpassword
+  roles: [PacketArchiveAdmin]

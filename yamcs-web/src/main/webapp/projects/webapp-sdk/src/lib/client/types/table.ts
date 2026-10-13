@@ -51,6 +51,7 @@ export interface Table {
   tablespace?: string;
   compressed: boolean;
   partitioningInfo?: PartitioningInfo;
+  secondaryIndexColumn?: string[];
   script: string;
 }
 

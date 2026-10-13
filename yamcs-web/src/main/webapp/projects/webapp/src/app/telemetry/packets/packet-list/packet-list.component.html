@@ -70,6 +70,15 @@
     <div class="panel-content">
       <form [formGroup]="filterForm">
         <div class="filter-bar">
+          <ya-select formControlName="timeBasis" icon="access_time">
+            <ya-option id="GENERATION_TIME" label="Generation time" />
+            <ya-option id="RECEPTION_TIME" label="Reception time"
+              [disabled]="(archiveInfo$ | async)?.receptionTimeIndexState !== 'READY'" />
+          </ya-select>
+          <ya-select formControlName="order">
+            <ya-option id="desc" label="Newest first" />
+            <ya-option id="asc" label="Oldest first" />
+          </ya-select>
           <ya-select [options]="nameOptions$ | async" formControlName="name" />
           <ya-select [options]="linkOptions$ | async" formControlName="link" />
           <ya-select [options]="intervalOptions" icon="access_time" formControlName="interval" />
@@ -90,6 +99,18 @@
           }
         </div>
       </form>
+      @if (archiveInfo$ | async; as archiveInfo) {
+        @if (archiveInfo.receptionTimeIndexState === 'BUILDING') {
+          <p>Reception-time index is building. Processed {{ archiveInfo.processedRows || "0" }} packets.</p>
+        } @else if (archiveInfo.receptionTimeIndexState === 'FAILED') {
+          <p>Reception-time browsing is unavailable: {{ archiveInfo.failure }}</p>
+        } @else if (archiveInfo.receptionTimeIndexState === 'ABSENT') {
+          <p>Reception-time browsing requires an enabled reception-time index.</p>
+        }
+        @if (archiveInfo.missingReceptionTimeRows && archiveInfo.missingReceptionTimeRows !== "0") {
+          <p>{{ archiveInfo.missingReceptionTimeRows }} historical packets lack reception time and are excluded from reception-time browsing.</p>
+        }
+      }
       <table mat-table [dataSource]="dataSource" class="ya-data-table expand">
         <ng-container matColumnDef="packetName">
           <th mat-header-cell *matHeaderCellDef>Packet name</th>

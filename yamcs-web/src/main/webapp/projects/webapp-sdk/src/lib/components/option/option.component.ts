@@ -12,4 +12,5 @@ export class YaOption {
   label = input.required<string>();
   icon = input<string>();
   group = input(false, { transform: booleanAttribute });
+  disabled = input(false, { transform: booleanAttribute });
 }

@@ -13,6 +13,7 @@ export interface YaSelectOption {
   label: string;
   group?: boolean;
   icon?: string;
+  disabled?: boolean;
 }
 
 @Component({

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SpaceSystem name="TmReceptionTest">
+  <TelemetryMetaData>
+    <ContainerSet>
+      <SequenceContainer name="root">
+        <EntryList />
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>
