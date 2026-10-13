@@ -67,6 +67,29 @@ public class TmPacketArchiveQueryTest extends YarchTestCase {
     }
 
     @Test
+    void paginationWithLegacyPnamePrimaryKey() throws Exception {
+        execute("drop table tm");
+        TmReceptionFixture.create(ydb, true);
+        TmReceptionFixture.seed(ydb);
+        TmReceptionTimeIndex.rebuild(ydb).get(30, TimeUnit.SECONDS);
+        TmReceptionFixture.put(ydb, TmReceptionFixture.BASE + 2, 4, TmReceptionFixture.BASE + 25, "a", "live");
+
+        var request = request("asc");
+        List<TmPacketData> packets = new ArrayList<>();
+        ListPacketsResponse page;
+        do {
+            page = list(request.build(), Set.of("a", "b"));
+            packets.addAll(page.getPacketList());
+            request.setNext(page.getContinuationToken());
+        } while (page.hasContinuationToken());
+
+        assertEquals(5, packets.size());
+        assertEquals(List.of(TmReceptionFixture.BASE + 10, TmReceptionFixture.BASE + 20,
+                TmReceptionFixture.BASE + 25, TmReceptionFixture.BASE + 30, TmReceptionFixture.BASE + 30),
+                packets.stream().map(p -> TimeEncoding.fromProtobufTimestamp(p.getReceptionTime())).toList());
+    }
+
+    @Test
     void selectedTimeBoundsNameLinkSearchAndExportParity() throws Exception {
         var request = request("asc").setLimit(100)
                 .setStart(TimeEncoding.toProtobufTimestamp(TmReceptionFixture.BASE + 10))

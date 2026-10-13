@@ -13,6 +13,9 @@ import org.yamcs.yarch.rocksdb.protobuf.Tablespace.SecondaryIndex.State;
 /** TM-specific provisioning; persistence and recovery belong to the storage engine. */
 public final class TmReceptionTimeIndex {
     public static final List<String> COLUMNS = List.of("rectime", "pname");
+    private static final List<List<String>> SUPPORTED_PRIMARY_KEYS = List.of(
+            List.of("gentime", "seqNum"),
+            List.of("gentime", "seqNum", "pname"));
 
     private TmReceptionTimeIndex() {
     }
@@ -60,6 +63,8 @@ public final class TmReceptionTimeIndex {
 
     private static void validate(YarchDatabaseInstance database) {
         TableDefinition definition = database.getTable(XtceTmRecorder.TABLE_NAME);
+        List<String> primaryKey = definition == null ? List.of()
+                : definition.getKeyDefinition().stream().map(c -> c.getName()).toList();
         if (definition == null) {
             throw new IllegalArgumentException("No TM archive table exists");
         }
@@ -68,8 +73,7 @@ public final class TmReceptionTimeIndex {
                 || definition.getColumnDefinition("rectime").getType() != DataType.TIMESTAMP
                 || definition.getColumnDefinition("pname") == null
                 || definition.getColumnDefinition("pname").getType() != DataType.ENUM
-                || !definition.getKeyDefinition().stream().map(c -> c.getName()).toList()
-                        .equals(List.of("gentime", "seqNum"))) {
+                || !SUPPORTED_PRIMARY_KEYS.contains(primaryKey)) {
             throw new IllegalArgumentException("Reception-time indexing requires the standard RocksDB TM schema");
         }
     }
