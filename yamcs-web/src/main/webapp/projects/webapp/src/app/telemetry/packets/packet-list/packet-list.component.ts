@@ -242,9 +242,12 @@ export class PacketListComponent implements OnDestroy {
   }
 
   private queryOptions(): GetPacketsOptions {
+    const { controls } = this.filterForm;
     const options: GetPacketsOptions = {
-      timeBasis: this.filterForm.value['timeBasis'],
-      order: this.filterForm.value['order'],
+      // A child control emits before FormGroup.value is refreshed. Read the
+      // controls directly so selection changes use the newly selected value.
+      timeBasis: controls['timeBasis'].value,
+      order: controls['order'].value,
     };
     if (this.validStart) {
       options.start = this.validStart.toISOString();
@@ -340,6 +343,7 @@ export class PacketListComponent implements OnDestroy {
   }
 
   private updateURL() {
+    const { controls } = this.filterForm;
     this.router.navigate([], {
       replaceUrl: true,
       relativeTo: this.route,
@@ -347,10 +351,10 @@ export class PacketListComponent implements OnDestroy {
         name: this.name || null,
         link: this.link || null,
         interval: this.appliedInterval,
-        timeBasis: this.filterForm.value['timeBasis'] === 'GENERATION_TIME' ? null : this.filterForm.value['timeBasis'],
-        order: this.filterForm.value['order'] === 'desc' ? null : this.filterForm.value['order'],
-        customStart: this.appliedInterval === 'CUSTOM' ? this.filterForm.value['customStart'] : null,
-        customStop: this.appliedInterval === 'CUSTOM' ? this.filterForm.value['customStop'] : null,
+        timeBasis: controls['timeBasis'].value === 'GENERATION_TIME' ? null : controls['timeBasis'].value,
+        order: controls['order'].value === 'desc' ? null : controls['order'].value,
+        customStart: this.appliedInterval === 'CUSTOM' ? controls['customStart'].value : null,
+        customStop: this.appliedInterval === 'CUSTOM' ? controls['customStop'].value : null,
       },
       queryParamsHandling: 'merge',
     });
