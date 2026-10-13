@@ -15,8 +15,13 @@ public final class TmReceptionFixture {
     }
 
     public static TableDefinition create(YarchDatabaseInstance database) throws Exception {
+        return create(database, false);
+    }
+
+    public static TableDefinition create(YarchDatabaseInstance database, boolean pnameInPrimaryKey) throws Exception {
         database.executeDiscardingResult("create table tm(gentime timestamp,seqNum int,rectime timestamp,pname enum,"
-                + "packet binary,link enum,primary key(gentime,seqNum))"
+                + "packet binary,link enum,primary key(gentime,seqNum"
+                + (pnameInPrimaryKey ? ",pname" : "") + "))"
                 + " partition by time_and_value(gentime('YYYY/MM'),pname)"
                 + " table_format=compressed,column_family:rt_data");
         return database.getTable("tm");
@@ -35,8 +40,15 @@ public final class TmReceptionFixture {
         var writer = RdbStorageEngine.getInstance().getTablespace(database)
                 .newTableWriter(database, definition, InsertMode.INSERT);
         try {
-            writer.onTuple(null, new Tuple(definition.getTupleDefinition(),
-                    new Object[] { generation, seq, reception, name, new byte[] { (byte) seq }, link }));
+            var tupleDefinition = definition.getTupleDefinition();
+            var tuple = new Tuple(tupleDefinition, new Object[tupleDefinition.size()]);
+            tuple.setColumn("gentime", generation);
+            tuple.setColumn("seqNum", seq);
+            tuple.setColumn("rectime", reception);
+            tuple.setColumn("pname", name);
+            tuple.setColumn("packet", new byte[] { (byte) seq });
+            tuple.setColumn("link", link);
+            writer.onTuple(null, tuple);
         } finally {
             writer.close();
         }

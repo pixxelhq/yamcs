@@ -45,22 +45,40 @@ public final class SecondaryIndexKey {
         return key.toArray();
     }
 
+    /** Checks that a key suffix contains the configured secondary columns followed by a complete primary key. */
+    public static boolean isValidSuffix(TableDefinition definition, byte[] suffix) {
+        try {
+            ByteBuffer buffer = ByteBuffer.wrap(suffix);
+            skipSecondaryColumns(definition, buffer);
+            for (TableColumnDefinition column : definition.getKeyDefinition()) {
+                column.getSerializer().deserialize(buffer, column);
+            }
+            return !buffer.hasRemaining();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     static byte[] primaryKey(TableDefinition definition, byte[] dbKey) {
         try {
             ByteBuffer buffer = ByteBuffer.wrap(dbKey);
             buffer.position(RdbStorageEngine.TBS_INDEX_SIZE);
-            for (String name : definition.getSecondaryIndex()) {
-                TableColumnDefinition column = definition.getColumnDefinition(name);
-                byte marker = buffer.get();
-                if (marker == (byte) (0x70 | column.getType().getTypeId())) {
-                    column.getSerializer().deserialize(buffer, column);
-                } else if (marker != column.getType().getTypeId()) {
-                    throw new IllegalArgumentException("Invalid secondary-key type marker");
-                }
-            }
+            skipSecondaryColumns(definition, buffer);
             return Arrays.copyOfRange(dbKey, buffer.position(), dbKey.length);
         } catch (RuntimeException e) {
             throw new DatabaseCorruptionException("Cannot decode secondary index key", e);
+        }
+    }
+
+    private static void skipSecondaryColumns(TableDefinition definition, ByteBuffer buffer) {
+        for (String name : definition.getSecondaryIndex()) {
+            TableColumnDefinition column = definition.getColumnDefinition(name);
+            byte marker = buffer.get();
+            if (marker == (byte) (0x70 | column.getType().getTypeId())) {
+                column.getSerializer().deserialize(buffer, column);
+            } else if (marker != column.getType().getTypeId()) {
+                throw new IllegalArgumentException("Invalid secondary-key type marker");
+            }
         }
     }
 }

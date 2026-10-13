@@ -105,9 +105,7 @@ public final class TmPacketArchiveQuery implements AutoCloseable {
             byte[] cursor;
             try {
                 cursor = Base64.getUrlDecoder().decode(token.key);
-                if (cursor.length != 24
-                        || cursor[0] != (byte) (0x70 | definition.getColumnDefinition("rectime").getType().getTypeId())
-                        || cursor[9] != (byte) (0x70 | definition.getColumnDefinition("pname").getType().getTypeId())) {
+                if (!SecondaryIndexKey.isValidSuffix(definition, cursor)) {
                     throw new IllegalArgumentException();
                 }
             } catch (RuntimeException e) {
