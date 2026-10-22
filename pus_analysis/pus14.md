@@ -5,6 +5,34 @@
 
 ---
 
+## Current simulator profile
+
+The simulator and `examples/pus` MDB now retain mandatory subsampling rates
+in TC[14,5/9] and TM[14,8/12]. Structure IDs are uint8 and rates are uint16,
+matching Hermes Service 14's existing defaults (Service 15 rates are uint8).
+The HK and diagnostic tables gate TM[3,25/26]. These existing ST[3] report
+bodies carry uint32 structure IDs; selection matches their numeric value.
+Rates 0/1 pass every matching packet; N>1 passes the first and every Nth
+thereafter, independently per APID/structure. Empty tables retain the example's
+pass-all startup convention; once populated, a missing APID/structure is blocked.
+PUS-1 verification and Service 14 reports still bypass forwarding control.
+
+Nested zero-count commands use the same regular parser: N2=0 replaces an APID's
+application configuration with all services; N3=0 replaces a service's subtype
+selection with all subtypes. TC[14,2/6/10] N1=0 empties the relevant table.
+TC[14,13] N2=0 removes selected APIDs; N1=0 has no whole-event-table meaning,
+and the old example `TC_14_13_EMPTY_EVENT_FCC` alias has been removed.
+The Hermes nested wildcard constructors fix parent counts to one and expose
+only the APID/service selection. No special telemetry containers are needed
+for empty reports. Truncated fields cannot consume the CRC as payload.
+
+The detailed walkthrough below records the earlier simulator design. Its
+statements that subsampling is omitted or HK/diagnostic tables are bookkeeping
+only are historical; the current behavior is specified in this section and
+implemented in `Pus14Service` and the example MDB. See the migrated
+[Service 15 profile](pus15.md#simulator-compatibility) for shared CUC and
+simulator compatibility conventions.
+
 ## a) General PUS 14 Context
 
 ### Purpose

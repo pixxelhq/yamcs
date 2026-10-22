@@ -1,65 +1,29 @@
 # PUS Simulator Architecture Reference
 
+This document distinguishes the checked-in `examples/pus` simulator from the
+current Hermes ground profile. Use [Service 15](pus15.md) for the agreed wire
+layouts, shared `PusHeader` configuration, and remaining compatibility gaps.
+
 ## Contents
 
-| § | Section | Line |
-|---|---------|------|
-| — | Key File Locations | 66 |
-| — | Service Registration Pattern (PusSimulator.java) | 88 |
-| — | AbstractPusService API | 110 |
-| — | Packet Classes | 143 |
-| — | · PusTmPacket (APID != 0, has secondary header) | 145 |
-| — | · PusTmTimePacket (APID = 0, NO secondary header) | 151 |
-| — | · PusTcPacket | 156 |
-| — | PusTime (CUC format) | 163 |
-| — | Periodic Task Pattern (from Pus5Service) | 172 |
-| — | MDB Container Hierarchy | 194 |
-| — | MDB File Pattern (pus5.xml as template) | 208 |
-| — | · Base container for a new service (type==N) | 210 |
-| — | · Abstract TC base | 222 |
-| — | · Dynamic-size array (TM side) | 235 |
-| — | · Conditional field | 256 |
-| — | pus.xml Base Parameters | 267 |
-| — | yamcs.pus.yaml — How to Add a New MDB File | 285 |
-| — | Nested Dynamic Array Patterns (Multi-Level) | 303 |
-| — | · TC Side — Sibling-Member ArgumentInstanceRef | 305 |
-| — | · TM Side — Nested ContainerRefEntry + RepeatEntry | 390 |
-| — | Zero-Payload TC/TM Pattern (ST[17] reference) | 450 |
-| — | · Zero-argument MetaCommand (TC[17,1]) | 455 |
-| — | · Zero-payload SequenceContainer (TM[17,2]) | 479 |
-| — | · Python builder for zero-payload TM | 499 |
-| — | · Smoke-test value | 510 |
-| ST[19] | Event-Action Service Patterns | 517 |
-| — | · Embedded TC Packet in TC/TM Payload | 519 |
-| — | · Event-Action Function State Machine | 528 |
-| — | · EventBus Pattern (ST[05]/ST[19] coupling) | 538 |
-| — | · N=0 "All Definitions" Encoding Variants | 556 |
-| ST[14] | Real-Time Forwarding Control Patterns | 567 |
-| — | · Cross-Cutting Forwarding Gate | 569 |
-| — | · APFCC Data Structures | 586 |
-| — | · shouldForward Logic | 606 |
-| — | · Two-Variant MetaCommand Pattern for "Delete-All" TCs | 627 |
-| ST[15] | Service Patterns | 665 |
-| — | · PacketStore State Machine | 667 |
-| — | · "All stores" vs "Specific stores" TC Pattern | 681 |
-| — | · CUC Timestamp in Simplified PUS (test_yamcs style) | 689 |
-| — | · TM Bus / Packet Store Interception Pattern | 703 |
-| — | · Retrieval Background Thread Pattern | 718 |
-| — | · Nested Aggregate Arrays in XTCE | 745 |
-| ST[20] | On-Board Parameter Management Patterns | 755 |
-| — | · Overall Feasibility | 757 |
-| — | · PARAM_STORE Pattern | 762 |
-| — | · Deduced-Value Mission Convention | 775 |
-| — | · Partial Per-Param Execution Pattern | 783 |
-| — | · TC[20,3] Set Values — Packet Layout | 798 |
-| ST[21] | Request Sequencing Patterns | 811 |
-| — | · Fixed-String ID Mission Convention | 813 |
-| — | · SEQUENCE_STORE State Model | 830 |
-| — | · Embedded-TC-in-Sequence Workaround | 844 |
-| — | · Sequence Execution Thread Pattern | 867 |
-| — | · Dual-MetaCommand Variant for Optional File Path | 886 |
-| — | · Sequence Checksum Convention | 895 |
-| — | Build & Run | 912 |
+- [Key File Locations](#key-file-locations)
+- [Service Registration Pattern (PusSimulator.java)](#service-registration-pattern-pussimulatorjava)
+- [AbstractPusService API](#abstractpusservice-api)
+- [Packet Classes](#packet-classes)
+- [PusTime (CUC format)](#pustime-cuc-format)
+- [Periodic Task Pattern (from Pus5Service)](#periodic-task-pattern-from-pus5service)
+- [MDB Container Hierarchy](#mdb-container-hierarchy)
+- [MDB File Pattern (pus5.xml as template)](#mdb-file-pattern-pus5xml-as-template)
+- [pus.xml Base Parameters (reference by `/PUS/paramName`)](#pusxml-base-parameters-reference-by-pusparamname)
+- [yamcs.pus.yaml — How to Add a New MDB File](#yamcspusyaml--how-to-add-a-new-mdb-file)
+- [Nested Dynamic Array Patterns (Multi-Level)](#nested-dynamic-array-patterns-multi-level)
+- [Zero-Payload TC/TM Pattern (ST[17,1/2] reference)](#zero-payload-tctm-pattern-st1712-reference)
+- [ST[19] Event-Action Service Patterns](#st19-event-action-service-patterns)
+- [ST[14] Real-Time Forwarding Control Patterns](#st14-real-time-forwarding-control-patterns)
+- [ST[15] Service Patterns](#st15-service-patterns)
+- [ST[20] On-Board Parameter Management Patterns](#st20-on-board-parameter-management-patterns)
+- [ST[21] Request Sequencing Patterns](#st21-request-sequencing-patterns)
+- [Build & Run](#build--run)
 
 ---
 
@@ -405,7 +369,14 @@ Key rules:
 
 ### TM Side — Nested `ContainerRefEntry` + `RepeatEntry`
 
-For variable-count nested TM structures, the **only** correct YAMCS pattern is nested `ContainerRefEntry` with `RepeatEntry`. Using `ArrayParameterType` with inner dimension referencing a field inside a containing aggregate does **NOT** work.
+Nested aggregate TM arrays are supported by the patched runtime. Hermes uses
+`AggregateMemberValue` for a count in the current aggregate, generating a
+`ParameterInstanceRef` with `yamcs:aggregateMember="true"`. This differs from an
+ordinary top-level parameter reference. Empty arrays must also survive calibration.
+See [array-in-array-tm.xml](../yamcs-core/src/test/resources/xtce/array-in-array-tm.xml).
+
+The repeated-container approach below remains valid for the example MDBs. It is
+an alternative representation, not a requirement for Hermes Service 15 reports.
 
 Confirmed by: `yamcs-xtce/src/main/java/org/yamcs/xtce/ParameterInstanceRef.java` line 53
 
@@ -587,8 +558,13 @@ This decouples the two services; neither needs to import the other.
 
 ### N=0 "All Definitions" Encoding Variants (ST[19] vs ST[15])
 
-ST[15] uses the **zero-payload** convention for "all stores" (empty payload).
-ST[19] uses **both conventions** depending on the subtype:
+The older ST[15] example uses a zero-payload `_ALL` convenience command, but
+that is not the current Hermes profile. Hermes retains explicit counts and empty
+arrays for applicable zero-count selections; TC[15,11/14] retain their shared
+time tag as well. Only TC[15,18/22] have no application-data fields.
+See [Service 15 payloads](pus15.md#payload-catalogue).
+
+The ST[19] example uses **both conventions** depending on the subtype:
 - TC[19,4]/TC[19,5]: zero-payload (per §6.19.7) → use two MetaCommands (`_specific` + `_all`)
 - TC[19,10]: N=0 in-band (per §8.19.2.10c) → single MetaCommand; Python checks `num_entries==0`
 
@@ -696,112 +672,122 @@ This two-variant pattern is spec-faithful, not a workaround — the two forms ar
 
 ## ST[15] Service Patterns
 
-### PacketStore State Machine
+### Current ground profile and example compatibility
+
+[Service 15](pus15.md) is the authoritative mission profile for Hermes and pymdb.
+It covers 30 TC and seven TM subtypes, including copy/type-change commands
+TC[15,24/26/27]. TC[15,24] has between/after/before command variants with raw
+selector values 0/1/2. All fields marked optional in the standard are included
+where applicable, without `include_*` switches or presence-flag bytes.
+
+`Pus15Service` and `examples/pus/src/main/yamcs/mdb/pus15.xml` use these
+payload widths, mandatory priorities/subsampling, counted N=0 all-store
+commands, and all copy/type-change commands. Capacity units are 1 KiB.
+The example retains its operator command names and legacy TM header; see
+[simulator compatibility](pus15.md#simulator-compatibility) for configuring
+that header when using a fully generated Hermes MDB.
+
+### PacketStore state machine
 
 Each packet store has three independent status variables:
 
-| Variable | Values | Changed by |
-|----------|--------|------------|
-| `storage_enabled` | True/False | TC[15,1] / TC[15,2] |
-| `open_retrieval_status` | IN_PROGRESS / SUSPENDED | TC[15,15] / TC[15,16] |
-| `btr_status` | ENABLED / DISABLED | TC[15,9] (start) / TC[15,17] (abort) / auto on completion |
+| Variable | Raw values in the ground profile | Changed by |
+|---|---|---|
+| Storage status | 0=disabled, 1=enabled | TC[15,1] / TC[15,2] |
+| Open retrieval status | 0=suspended, 1=in progress | TC[15,15] / TC[15,16] |
+| Time-range retrieval status | 0=disabled, 1=enabled | TC[15,9] / TC[15,17] / completion |
 
-On TC[15,20] create: storage=DISABLED, open_retrieval=SUSPENDED, btr=DISABLED.
-Delete (TC[15,21]) requires all three to be in their "inactive" state.
-Resize (TC[15,25]) and VC change (TC[15,28]) also require all inactive.
+The example creates stores with all three functions inactive. Delete, resize,
+and channel-change handlers apply their on-board activity constraints. The
+XTCE schema communicates these operations and reports; it does not maintain
+store state or implement retrieval itself.
 
-### "All stores" vs "Specific stores" TC Pattern
+### Counts, field widths, and packet selection
 
-Several ST[15] TCs accept either N specific store IDs or "all stores" (empty payload). XTCE cannot model optional arguments, so use **two MetaCommands per subtype**:
-- `TC_15_N_specific` — arguments: `num_stores:uint8` + `store_ids:uint16[]`
-- `TC_15_N_all` — no arguments
+Hermes store IDs, capacities, priorities, percentages, subsampling rates, virtual
+channels, and every nested count default to unsigned 8-bit fields. Service type
+and message subtype are also plain unsigned 8-bit integers. APIDs are packed
+11-bit fields, with labels from `system.extra["apids"]`. Store/status types and
+mission-specific structure/event identifiers retain their enumerations.
 
-The simulator disambiguates at runtime by checking remaining payload length after the header. Affected subtypes: 1, 2, 12, 14, 15, 16, 17, 21.
+Counted store commands always contain their count. TC[15,11] and TC[15,14] each
+contain one time tag before that count; TC[15,9] and TC[15,15] carry a priority
+per store. Empty arrays preserve applicable standard wildcard meanings instead
+of deleting the count field. No APID-padding octet or flags octet is introduced.
 
-### Packet-Selection Status and Packed Layouts
+Application-process selection has the hierarchy
+`packet_store_id, n_count × {apid, service_count × {service_type,
+subservice_count × subtype}}`, with each count explicitly transmitted before
+its array. HK/diagnostic adds and reports contain
+`structure_id_count × {structure_id, subsampling_rate}` per APID. Deletes omit
+the subsampling field. Event selection uses `event_count × event_id` per APID;
+TC[15,33] deletes and TC[15,34] adds blocking entries.
 
-`Pus15Service` implements the application-process, housekeeping, diagnostic, and event
-packet-selection configurations. New stores follow the ECSS block-all default: enabling storage
-does not capture telemetry until TC[15,3] authorizes the APID/service/subtype. HK and diagnostic
-packets then require their 8-bit structure ID to be authorized; event configuration is a block
-list, where an absent APID permits events, an empty identifier set blocks all events for the APID,
-and a populated set blocks matching 8-bit event IDs.
+The example simulator's block-all initial application configuration and packet
+capture/filtering policies remain separate from the wire schema. Selection reports include the agreed widths and subsampling fields, are
+encoded atomically, and retain an explicit zero count for empty configurations.
 
-All selection commands and reports use nested packed fields:
+### Shared CUC and optional time correlation
 
-- Application process: `store_id:u16, N1:u8, N1×{apid:u11, N2:u8,
-  N2×{service:u8, N3:u8, N3×subtype:u8}}`.
-- HK, diagnostic, and event: `store_id:u16, N1:u8,
-  N1×{apid:u11, N2:u8, N2×identifier:u8}`.
-
-Each content request emits one atomic report containing every APID group. `N1=0` clears the
-corresponding table on delete commands and is also the complete representation of an empty report.
-Reports that exceed an 8-bit count or `PusSimulator.maxTmDataSize()` are rejected with a completion
-failure; no partial report is sent.
-
-### CUC Timestamp in Simplified PUS (test_yamcs style)
-
-The full YAMCS/PUS environment encodes CUC as a 7-byte secondary header field (1B pfield + 4B coarse + 3B fine → decoded via tco0). The test_yamcs Python simulator uses a simplified header without that secondary PUS header. For ST[15] TCs/TMs carrying timestamps (subtypes 9, 11, 13, 14):
-
-**Add to `pus_dt.xml`**:
-```xml
-<IntegerParameterType signed="false" name="uint64">
-    <IntegerDataEncoding encoding="unsigned" sizeInBits="64" />
-</IntegerParameterType>
-```
-Encode CUC as a raw 8-byte big-endian uint64 (pfield byte + 4B coarse + 3B fine, packed as 8 bytes). Handle CUC interpretation in Python, not in XTCE.
-
-Alternative: split into `cuc_coarse:uint32` + `cuc_fine:uint32` (easier for human inspection).
-
-### TM Bus / Packet Store Interception Pattern
-
-In single-service simulators (e.g. `pus20_simulator.py`), TM is sent directly via UDP socket. ST[15] requires that all outgoing TM be optionally copied into packet stores.
-
-**Pattern**: introduce a shared `PacketStoreManager` class:
-```python
-class PacketStoreManager:
-    def submit_tm(self, raw_packet: bytes) -> None:
-        for store in self.stores.values():
-            if store.storage_enabled and self._matches_filter(store, raw_packet):
-                store.append(raw_packet, timestamp=time.time())
-        self.udp_sock.sendto(raw_packet, (TM_HOST, TM_PORT))
-```
-All services call `PacketStoreManager.submit_tm()` instead of direct socket sends. The `_matches_filter` method checks the packet's APID (bytes 0-1), service type (byte 6), and subtype (byte 7) against the store's application-process storage-control config.
-
-### Retrieval Background Thread Pattern (extends Periodic Task Pattern)
-
-Open retrieval and by-time-range retrieval are continuous background processes — not one-shot responses. Use the same executor pattern as ST[11] scheduling:
+Time configuration is constructed once on `PusHeader`:
 
 ```python
-# By-time-range retrieval
-def _start_btr_thread(self, store, start_ts, end_ts):
-    def _run():
-        for pkt, ts in store.packets:
-            if start_ts <= ts <= end_ts:
-                self.manager.udp_sock.sendto(pkt, (TM_HOST, TM_PORT))
-        store.btr_status = BtrStatus.DISABLED
-    threading.Thread(target=_run, daemon=True).start()
-
-# Open retrieval — continuous, cursor-advancing
-def _start_open_retrieval(self, store):
-    def _run():
-        while store.open_retrieval_status == OpenRetrievalStatus.IN_PROGRESS:
-            cursor = store.open_retrieval_start_time
-            new_pkts = [(p, t) for p, t in store.packets if t >= cursor]
-            for pkt, ts in new_pkts:
-                self.manager.udp_sock.sendto(pkt, (TM_HOST, TM_PORT))
-                store.open_retrieval_start_time = ts
-            time.sleep(0.1)
-    threading.Thread(target=_run, daemon=True).start()
+pus_header = pus.add_pus_header(
+    system,
+    cuctime_fields=pus.CucTime(epoch=Y.Epoch.UNIX, pfield=46),
+    tco_service=None,
+)
 ```
 
-### Nested Aggregate Arrays in XTCE (for TM[15,6/36/38/40])
+Adapters read `pus_header.cuctime_fields` and `pus_header.tco_service`; there
+are no separate time-format or TCO arguments on Service 15 builders or generic
+generation. Hermes settings `EPOCH`, `P_FIELD`, optional `P_FIELD_CONTD`, and
+`TCO_SERVICE` enter
+at header construction. The header decoder and every Service 15 time codec
+share the configured service.
 
-These TM packets have a multi-level hierarchy: list of app-processes, each containing a variable-length list of service/struct/event IDs.
+The default is **six bytes**, four seconds bytes plus two standard binary-fraction
+bytes. `pField=46` is implicit and is not sent as a seventh byte. `.123` seconds
+uses fractional bytes `0x1F7C`, not literal milliseconds `0x007B`. The p-field
+and optional extension determine both header and payload widths. Supply the
+extension once as `CucTime.pfield_contd` (Hermes `P_FIELD_CONTD`); generated
+algorithms use `pFieldCont`. There is no `time_size` or FIXED binary-time schema.
+Only runtime-supported layouts are accepted.
 
-**Correct approach**: Use nested `ContainerRefEntry` + `RepeatEntry` (see "Nested Dynamic Array Patterns" section above). The `ParameterInstanceRef` with default `instance=0` resolves to the most recently decoded count — correct per outer iteration. This is confirmed working; no flattening needed.
+`TimeBinaryEncoder` receives `pField` and `implicitPField: true`; the decoder
+receives `pField` and no boolean implicit flag. Both use the header's epoch when
+TCO is absent. With TCO, both correlate the packed raw counter, and unavailable
+coefficients fail conversion. The example's ST15 payload codec defaults to
+implicit CUC/UNIX with pField=46; `pus.storageTimeEncoding` changes it. Its
+legacy TM header is separately configured with `pus.timeEncoding`.
 
-**Do not use**: `ArrayParameterType` with inner `DynamicValue` referencing a field inside a containing `AggregateParameterType`. YAMCS does not resolve inner-aggregate parameter references for TM array dimensions.
+### TM capture and retrieval execution
+
+The Java example captures packets through `Pus15Service.submitToStores`, called
+from `PusSimulator.transmitRealtimeTM`. Storage requires an enabled store and
+matching application-process and specialized selection rules. Internal millisecond clock values are converted through the configured CUC
+codec at the wire boundary. Higher numeric retrieval priorities are dispatched
+first per tick, and stored replay uses each store's virtual channel.
+
+Open retrieval and time-range retrieval execute as background work. The former
+advances a cursor and can be suspended/resumed; the latter stops when its time
+window is exhausted or retrieval is aborted. Retrieved packets use
+`PusSimulator.sendStoredPacket`, bypassing the live ST[14] forwarding gate.
+These runtime policies and capacity bookkeeping remain on-board/simulator work.
+
+### Nested report aggregates
+
+Hermes TM[15,6/36/38/40] use nested aggregate arrays with
+`AggregateMemberValue` counts in the current aggregate scope. Different APID
+entries may have different inner counts, including zero. Command arrays use
+`ArgumentValue` for their counts. Repeated containers in the older example MDB
+remain a valid alternative; they are not the only supported TM representation.
+
+For runtime verification, load generated XTCE and check both command encoding
+and report decoding, including following-field offsets after every time tag,
+zero arrays, and the exact integer types for service/subtype and virtual channel.
+The updated walkthrough uses the legacy header and migrated payload; direct
+Hermes command/report checks also exercise a matching implicit CUC header.
 
 ---
 
