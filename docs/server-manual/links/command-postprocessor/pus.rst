@@ -23,6 +23,24 @@ seqCounterName (string)
 
     If not specified, the counter is local to this link.
 
+    The name is global to the Yamcs server, not to the instance: links in different instances that
+    use the same ``seqCounterName`` share one counter. In a setup with one instance per spacecraft,
+    follow both rules:
+
+    * Use a name that is unique per spacecraft (for example the spacecraft name). A name reused
+      across instances makes each spacecraft see gaps in its sequence count.
+    * Give every TC link of one spacecraft (for example one link per ground station) the same name.
+      Without it each link counts from 0 on its own, so two links can send the same
+      ``(APID, sequence count)``. The spacecraft then holds two commands with the same PUS request
+      ID, and a later ``TC[11,4]`` scheduled command, or a PUS 11 request that addresses entries by
+      request ID, becomes ambiguous.
+
+    .. code-block:: yaml
+
+        # yamcs.sat1.yaml, on every TC link of this instance
+        commandPostprocessorArgs:
+            seqCounterName: sat1
+
 errorDetection (map)
     If specified, a checksum is appended at the end of each command.
     Detailed below.
