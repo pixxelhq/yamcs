@@ -13,8 +13,8 @@ realtime:
       args:
         apid: 1
         timeEncoding:
-          implicitPfield: false
-          pfield: 0x2f
+          implicitPField: false
+          pField: 0x2f
         handlers:
           # ST[05] is ground-station only: no on-board handler is registered, so
           # TC[5,5/6/7] fall through to the TC stream and are radiated to the
