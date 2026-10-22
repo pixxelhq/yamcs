@@ -30,14 +30,15 @@ public class Pus11WrapperParser {
     /**
      * @param groupId
      *            null if the layout has no group id field
+     * @param releaseObt
+     *            release time as raw ticks, exactly as encoded
      * @param releaseTime
-     *            release time as ground time, converted when parsed;
-     *            {@link org.yamcs.utils.TimeEncoding#INVALID_INSTANT} if it cannot be computed (no time correlation
-     *            coefficients)
+     *            release time as ground time, {@link org.yamcs.utils.TimeEncoding#INVALID_INSTANT} if it cannot be
+     *            computed (no time correlation coefficients)
      * @param tc
      *            the embedded command
      */
-    public record Activity(Long groupId, long releaseTime, byte[] tc) {
+    public record Activity(Long groupId, long releaseObt, long releaseTime, byte[] tc) {
         /** APID of the embedded command, part of the request ID its release is reported with */
         public int apid() {
             return CcsdsPacket.getAPID(tc);
@@ -82,11 +83,11 @@ public class Pus11WrapperParser {
             require(o + layout.groupIdBytes() + layout.timeLength() + 6, end);
             Long groupId = decodeId(tc, o, layout.groupIdBytes());
             o += layout.groupIdBytes();
-            long releaseTime = layout.toGroundTime(layout.decodeObt(tc, o));
+            long obt = layout.decodeObt(tc, o);
             o += layout.timeLength();
             int tcLength = ByteArrayUtils.decodeUnsignedShort(tc, o + 4) + 7;
             require(o + tcLength, end);
-            activities.add(new Activity(groupId, releaseTime, Arrays.copyOfRange(tc, o, o + tcLength)));
+            activities.add(new Activity(groupId, obt, layout.toGroundTime(obt), Arrays.copyOfRange(tc, o, o + tcLength)));
             o += tcLength;
         }
         return new InsertRequest(CcsdsPacket.getAPID(tc), CcsdsPacket.getSequenceCount(tc), sourceId, subScheduleId,

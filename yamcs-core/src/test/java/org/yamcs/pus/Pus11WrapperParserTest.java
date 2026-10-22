@@ -146,6 +146,19 @@ public class Pus11WrapperParserTest {
     }
 
     @Test
+    public void testReleaseObtIsTheRawEncodedTicks() {
+        // epoch NONE: the encoded value is the Yamcs instant itself, 4 coarse bytes + 3 fine bytes
+        var pp = newPostprocessor(config(1, 1, explicitPfield(0x2f, "NONE"), true, 0));
+        byte[] wrapped = pp.process(pc(innerCommand(100), scheduleAt(scheduleAt)));
+
+        var act = new Pus11WrapperParser(pp.getPus11WrapperLayout()).parse(wrapped).activities().getFirst();
+
+        long coarse = scheduleAt / 1000;
+        long fine = (scheduleAt % 1000) * (1 << 24) / 1000;
+        assertEquals((coarse << 24) | fine, act.releaseObt());
+    }
+
+    @Test
     public void testReleaseTimeThroughTimeCorrelation() throws Exception {
         var tco = newTco("pus11parser1");
         long t0 = TimeEncoding.parse("2026-10-22T00:00:00Z");
@@ -161,6 +174,7 @@ public class Pus11WrapperParserTest {
 
         var act = new Pus11WrapperParser(pp.getPus11WrapperLayout()).parse(wrapped).activities().getFirst();
 
+        assertEquals(tco.getObt(release), act.releaseObt());
         assertEquals(release, act.releaseTime());
         tco.stopAsync().awaitTerminated();
     }
@@ -176,6 +190,7 @@ public class Pus11WrapperParserTest {
 
         var act = new Pus11WrapperParser(pp.getPus11WrapperLayout()).parse(wrapped).activities().getFirst();
 
+        assertEquals(123_456L << 16, act.releaseObt()); // the raw value is still known
         assertEquals(TimeEncoding.INVALID_INSTANT, act.releaseTime());
         tco.stopAsync().awaitTerminated();
     }
