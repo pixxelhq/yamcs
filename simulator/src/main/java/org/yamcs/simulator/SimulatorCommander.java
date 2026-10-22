@@ -112,6 +112,8 @@ public class SimulatorCommander extends ProcessRunner {
         // Debugging:
         // cmdl.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=8989");
         cmdl.add(SimulatorCommander.class.getName());
+        // doStop() is not called if Yamcs is killed: without this the simulator would outlive it and keep its ports
+        cmdl.add("--exit-with-parent");
         if (config.containsKey("telnet")) {
             YConfiguration telnetArgs = config.getConfig("telnet");
             int telnetPort = telnetArgs.getInt("port", defaultOptions.telnetPort);
@@ -237,6 +239,13 @@ public class SimulatorCommander extends ProcessRunner {
 
         configureLogging();
         TimeEncoding.setUp();
+
+        if (runtimeOptions.exitWithParent) {
+            ProcessHandle.current().parent().ifPresent(parent -> parent.onExit().thenRun(() -> {
+                System.err.println("Parent process " + parent.pid() + " exited, stopping the simulator");
+                System.exit(0);
+            }));
+        }
 
         List<Service> services = createServices(runtimeOptions);
 

@@ -28,6 +28,11 @@ services:
       name: "realtime"
       type: "realtime"
   - class: org.yamcs.archive.CommandHistoryRecorder
+  # Ground model of the on-board PUS 11 schedule, fed by the commands scheduled with pus11ScheduleAt
+  - class: org.yamcs.pus.Pus11ScheduleTracker
+    args:
+      # seconds after the release time before an unconfirmed entry is presumed gone
+      releaseGrace: 60
   - class: org.yamcs.parameterarchive.ParameterArchive
   - class: org.yamcs.simulator.SimulatorCommander
     args:

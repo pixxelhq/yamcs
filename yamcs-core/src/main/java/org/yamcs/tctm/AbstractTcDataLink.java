@@ -89,6 +89,11 @@ public abstract class AbstractTcDataLink extends AbstractLink implements TcDataL
         }
     }
 
+    /** the postprocessor turning commands into binary, null until {@link #init} */
+    public CommandPostprocessor getCommandPostprocessor() {
+        return cmdPostProcessor;
+    }
+
     @Override
     public void setCommandHistoryPublisher(CommandHistoryPublisher commandHistoryListener) {
         this.commandHistoryPublisher = commandHistoryListener;

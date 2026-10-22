@@ -138,6 +138,9 @@ keys generic (time *or* position) — no other change needed now.
   `examples/pus` uses `/dt/pus_report_apid` / `/dt/pus_report_seqcount` correctly. `pus-frames`
   also has no `INSERT_ACTIVITIES` MetaCommand. Fix both before using `pus-frames` (the TCO test
   bed, §4.4) for §6 step 3.
+- **`examples/pus` cannot schedule at all.** Its TC link sets `tcoService: tco0`, but nothing feeds that TCO
+  samples, so every `pus11ScheduleAt` fails with "Time corelation coefficients not available". Use
+  `examples/pus-frames` (real TCO) for PUS 11 work. (Found 2026-10-22.)
 - **`examples/pus-frames/tests/test-pus11.py` `schedule_command()`** returns
   `command.attributes["ccsds-seqcount"]`, which is now the **wrapper** seq (§1.2), then passes it
   to `DELETE_ACTIVITIES_BY_ID`. It should read `pus11-inner-seqcount`. Not yet confirmed by a run.
@@ -403,12 +406,18 @@ Resolved 2026-09-24.
 
 ## 6. Build order
 
-0. Expose the TC[11,4] wrapper layout (widths, `tcoService`, epoch) from `PusCommandPostprocessor`
+0. **Done 2026-10-22** (`Pus11WrapperLayout`, `Pus11WrapperParser`, 20 tests).
+   Expose the TC[11,4] wrapper layout (widths, `tcoService`, epoch) from `PusCommandPostprocessor`
    + `Pus11WrapperParser` for `pus11Binary`. ~½ day. Run the parser tests at 1-byte **and**
    2-byte sub-schedule/group widths (§5 Q3), so a later width change is config only.
    0b. Re-seed `CcsdsSeqCountFiller` from cmdhist on restart (§4.1). ~½ day incl. restart test.
    Independent of the tracker; can ship first.
 1. Model + cmdhist input (`PENDING` → `SCHEDULED` on `CommandComplete`) + sweep. ~1 day
+   **Done 2026-10-22:** `Pus11Schedule` (model) + `Pus11ScheduleTracker` (service; reads `pus11Binary` and
+   `CommandComplete` from `cmdhist_realtime`, publishes the `pus11-release` ack: SCHEDULED, then TIMEOUT when
+   presumed gone). Layout from the TC link's postprocessor (`tcLink`, or the only PUS 11 link). Sweep compares
+   in ground time via the layout, so it follows re-correlation. 19 tests. Wired in `examples/pus-frames`.
+   Not yet: skip-list index by release time, `pus11_schedule` persistence (§8), manual N > 1 inserts.
 2. Sub-schedule/group "will be dropped" flag from TM[11,19]/TM[11,27]. ~2 h. Test: TC[11,4]
    into a new sub-schedule never enabled → flagged, then `PRESUMED_GONE` after release (§5 Q3).
    Simulator: create group 0 at boot. (Execution-disabled banner + count drift: deferred, §5 Q5.)

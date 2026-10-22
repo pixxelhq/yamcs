@@ -100,4 +100,7 @@ public class SimulatorArgs {
 
     @Parameter(names = "--encryption-args", description = "Arguments to pass to the SDLS implementation")
     public String encryptionArgs;
+
+    @Parameter(names = "--exit-with-parent", description = "Exit when the process that started the simulator exits")
+    public boolean exitWithParent;
 }
