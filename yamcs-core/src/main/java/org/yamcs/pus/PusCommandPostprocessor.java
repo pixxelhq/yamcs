@@ -804,6 +804,11 @@ public class PusCommandPostprocessor extends AbstractCommandPostProcessor {
                 + (pus11Crc ? 2 : 0);
     }
 
+    /** true if this postprocessor can wrap commands into TC(11,4), i.e. {@code pus11Apid} is configured */
+    public boolean isPus11Enabled() {
+        return pus11Apid >= 0;
+    }
+
     /**
      * The layout of the TC(11,4) wrappers this postprocessor builds, for components that parse them back from
      * {@code pus11Binary}
