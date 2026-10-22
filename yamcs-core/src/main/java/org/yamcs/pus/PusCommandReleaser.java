@@ -40,8 +40,8 @@ import org.yamcs.yarch.YarchDatabase;
  *     args:
  *       apid: 1
  *       timeEncoding:
- *         implicitPfield: false
- *         pfield: 0x2f
+ *         implicitPField: false
+ *         pField: 0x2f
  *       handlers:
  *         - serviceType: 9
  *           class: org.yamcs.pus.Pus9Service
@@ -202,9 +202,11 @@ public class PusCommandReleaser extends StreamTcCommandReleaser {
     }
 
     private CucTimeEncoder configureTimeEncoding(YConfiguration config) {
-        boolean implicitPfield = config.getBoolean("implicitPfield", true);
-        int pfield1 = config.getInt("pfield");
-        int pfield2 = config.getInt("pfieldCont", -1);
-        return new CucTimeEncoder(pfield1, pfield2, implicitPfield);
+        boolean implicitPField = config.containsKey("implicitPField")
+                ? config.getBoolean("implicitPField") : config.getBoolean("implicitPfield", true);
+        int pField = config.containsKey("pField") ? config.getInt("pField") : config.getInt("pfield");
+        int pFieldCont = config.containsKey("pFieldCont")
+                ? config.getInt("pFieldCont") : config.getInt("pfieldCont", -1);
+        return new CucTimeEncoder(pField, pFieldCont, implicitPField);
     }
 }

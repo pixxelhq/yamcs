@@ -286,7 +286,7 @@ The `EventIdType` aggregate and `EventIdArrayType` are reused by TC[19,4], TC[19
 
 Same structure as TC[19,2]: `N + N×{app_process_id, event_def_id}`.
 
-**N=0 semantics**: `TC[19,4]` with N=0 is not a valid "enable all" convention. Instead, per §6.19.7.1b, a request to enable all definitions contains **exactly one instruction to enable all**, with no argument (zero-payload instruction). In XTCE this means we use **two MetaCommands** (same pattern as ST[15]):
+**N=0 semantics**: `TC[19,4]` with N=0 is not a valid "enable all" convention. Instead, per §6.19.7.1b, a request to enable all definitions contains **exactly one instruction to enable all**, with no argument (zero-payload instruction). In this example MDB, use **two MetaCommands**. This ST[19] convention must not be copied to the [Hermes ST[15] profile](pus15.md#field-types-and-presence), which retains explicit counts and arrays for applicable zero-count selections:
 
 ```xml
 <!-- Specific definitions -->

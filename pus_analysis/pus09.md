@@ -140,7 +140,7 @@ public class Pus9TimeManagementService extends StreamTcCommandReleaser {
 apid = config.getInt("apid", 0);   // must be 0 per PUS spec
 rateExponent = config.getInt("defaultRateExponent", 2);
 // init CucTimeEncoder from timeEncoding sub-config
-// (same as Pus21RequestSequencingService: pfield=0x2F, implicitPfield=false)
+// (same as Pus21RequestSequencingService: pField=0x2F, implicitPField=false)
 
 // resolve realtime TM stream
 String instance = processor.getInstance();
@@ -302,8 +302,8 @@ services:
       apid: 0
       defaultRateExponent: 2
       timeEncoding:
-        implicitPfield: false
-        pfield: 0x2F
+        implicitPField: false
+        pField: 0x2F
 ```
 
 Remove standalone `StreamTcCommandReleaser` if present; non-ST[09] TCs are
@@ -320,6 +320,10 @@ can be handled at the MDB level with two containers and no special preprocessing
 #### Container structure
 
 ```python
+# Counts and offsets derive from the shared CucTime, including its extension.
+basic_bytes, fractional_bytes = cuctime_fields.byte_sizes
+time_bits = cuctime_fields.bits
+
 # pus_tm_time_container — matches APID=0 only (TM[9,2])
 pus_tm_time_container = Container(
     name="pus_time_packet",
@@ -328,8 +332,8 @@ pus_tm_time_container = Container(
     entries=[
         ParameterEntry(rate_exponent),          # byte 6: uint8
         # if explicit P-field: ParameterEntry(time_pfield),  # byte 7: uint8
-        ParameterEntry(absolute_time),          # basic_time (32-bit) + fractional_time (N-bit)
-        ParameterEntry(onboard_cuctime, offset=-(FRACTIONAL_TIME_SIZE + BASIC_TIME_SIZE))
+        ParameterEntry(absolute_time),          # widths from CucTime; fractional_time is omitted when zero
+        ParameterEntry(onboard_cuctime, offset=-time_bits)
     ],
     condition=EqExpression(ref=ccsds_header.tm_apid, value=0)
 )
@@ -347,7 +351,7 @@ pus_tm_nontime_container = Container(
         ParameterEntry(pus_tm_destination_id),
         # if explicit P-field: ParameterEntry(time_pfield),
         ParameterEntry(absolute_time),
-        ParameterEntry(onboard_cuctime, offset=-(FRACTIONAL_TIME_SIZE + BASIC_TIME_SIZE))
+        ParameterEntry(onboard_cuctime, offset=-time_bits)
     ],
 )
 ```
@@ -359,31 +363,51 @@ in pus.xml line 108–112.
 
 #### `onboard_cuctime` encoding
 
+Inside pymdb's `add_pus_header`, the header decoder is configured from the
+supplied `CucTime` and optional TCO service. The helper returns a `PusHeader`
+retaining `cuctime_fields: CucTime` and `tco_service`. Downstream Hermes adapters
+read those attributes instead of accepting separate epoch, p-field, size, or
+TCO arguments. See the [shared Service 15 configuration](pus15.md#shared-time-configuration).
+
 ```python
+import json
+
+time_config = {
+    "type": "CUC",
+    "epoch": cuctime_fields.epoch.name,
+    "pField": cuctime_fields.pfield,
+}
+if cuctime_fields.pfield_contd is not None:
+    time_config["pFieldCont"] = cuctime_fields.pfield_contd
+if tco_service:
+    time_config["tcoService"] = tco_service
+
 onboard_cuctime = AbsoluteTimeParameter(
     encoding=BinaryTimeEncoding(
-        bits=-1,   # size determined by decoder
+        bits=cuctime_fields.bits,
         decoder=UnnamedJavaAlgorithm(
-            java=f"""
-            org.yamcs.algo.TimeBinaryDecoder({{
-                type: CUC,
-                epoch: {cuctime_fields.epoch.name},
-                implicitPField: {cuctime_fields.pfield}
-            }})
-            """
-        )
-    )
+            java=f"org.yamcs.algo.TimeBinaryDecoder({json.dumps(time_config)})"
+        ),
+    ),
 )
 ```
+
+Hermes defaults to `CucTime(epoch=UNIX, pfield=46)`: four seconds bytes and two
+binary-fraction bytes, with no p-field octet in the packet. `.123` seconds has
+fraction `0x1F7C`. Omitted/blank TCO names use epoch conversion; configured TCO
+applies to both this header decoder and the Service 15 payload codecs. Missing
+coefficients with a configured TCO service are errors, not epoch fallbacks.
+The native examples elsewhere in this document may use an explicit p-field and
+three fractional bytes; those are different declared packet formats.
 
 #### Design decisions and open questions
 
 | Item | Detail |
 |------|--------|
 | `rateExponent` must be in time container | The time packet layout (§4 below) has `rateExponent` at byte 6. `absolute_time.basic_time` must start after it (and after the P-field if explicit), not at byte 6. Without a `rate_exponent` entry, `basic_time` reads the wrong bytes. |
-| Explicit vs implicit P-field | `implicitPField: {pfield}` tells the decoder the P-field is **not** in the packet. If the actual packet carries an explicit P-field byte (as in the XML-based approach in §2.1), the decoder must use `implicitPField: false` and a `time_pfield` entry must appear before `absolute_time`. Verify against actual satellite packet format. |
-| `pfield` must be consistent with time sizes | `CucTime.pfield` encodes the CUC format. Its F-bits must match `FRACTIONAL_TIME_SIZE`: F=2 → 2-byte fine (16 bits), F=3 → 3-byte fine (24 bits). Mismatch silently truncates or over-reads fine time. |
-| `+7` magic in `bits` formula | `(((FRACTIONAL_TIME_SIZE // 8) + (BASIC_TIME_SIZE // 8) + 7) * 8)` hardcodes 7 as the pre-time PUS secondary header byte count (version+sc_time_ref=1, service=1, subservice=1, counter=2, destination=2). Fragile if field sizes change; derive from actual field sizes instead. |
+| Explicit vs implicit P-field | A configured `pField` is metadata and is not consumed from the packet. The decoder has no boolean implicit flag. An explicit on-wire p-field uses the shared decoder's `pField=-1` mode and must be included in the bytes/offset covered by that decoder. Hermes Service 15 uses an implicit p-field only. |
+| Derived header widths | `CucTime.byte_sizes` includes `pfield_contd`, and `CucTime.bits` sizes the decoder and overlay. The raw header omits `fractional_time` when no fractional bytes are configured. Invalid or unsupported layouts fail before XTCE generation completes. |
+| Non-time header size | The fixed pre-time PUS secondary header is seven bytes (version+sc_time_ref=1, service=1, subservice=1, counter=2, destination=2). Its total container size is CCSDS-header bits + 56 + `CucTime.bits`; the APID-zero time packet also includes its one-byte rate exponent. |
 
 ---
 

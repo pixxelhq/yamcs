@@ -85,7 +85,7 @@ which lets an operator time-tag **any** existing TC from Yamcs Web or a client.
 | CRC | 2 B if `pus11Crc` | `errorDetection` calculator | — |
 
 Overhead = `14 + timeEncoder.getEncodedLength() + (pus11Crc ? 2 : 0)`. That is 24 B with the example
-config (`pfield: 0x2f`, explicit → 1+4+3 = 8 B time) and 22 B with the default encoder (implicit
+config (`pField: 0x2f`, explicit → 1+4+3 = 8 B time) and 22 B with the default encoder (implicit
 `0x2e` → 4+2 = 6 B).
 
 Command history keys: `ccsds-seqcount` (inner), `binary` (inner), `pus11-apid`, `pus11-ccsds-seqcount`,
@@ -99,8 +99,8 @@ commandPostprocessorArgs:
     errorDetection:
         type: CRC-16-CCIIT
     timeEncoding:
-        implicitPfield: false
-        pfield: 0x2f
+        implicitPField: false
+        pField: 0x2f
         # epoch: TAI | J2000 | UNIX | GPS | CUSTOM | NONE (default NONE = Yamcs internal time)
     tcoService: tco0      # if set, release time is OBT from TCO; otherwise set timeEncoding.epoch
     pus11Apid: 1          # APID of the on-board scheduler. Required for pus11ScheduleAt
@@ -247,9 +247,13 @@ duplicate-ID detection at insert time. **Effort**: Large.
   without `PusCommandPostprocessor` is silently ignored.
 - **Default epoch is `NONE`**: without `tcoService` and `timeEncoding.epoch`, the release time is
   encoded as Yamcs internal time, which no OBC expects.
-- **`CucTimeEncoder` 2-octet P-field bug** (upstream): `(pfield1 & 0x80) == 1` is never true, so
-  `pfieldCont` extra coarse/fine octets are ignored in the size computation. Only affects configs with
-  an extended P-field.
+- **CUC extension bug resolved in the patched runtime**: extension detection now uses
+  `(pfield1 & 0x80) != 0`, and additional basic bytes are extracted with `>> 5`.
+  The canonical continuation key is `pFieldCont`. Shared Yamcs codecs retain extension support;
+  the current [Hermes Service 15 profile](pus15.md#cuc-layout-and-precision) stores an optional
+  extension in `CucTime.pfield_contd` and emits it as `pFieldCont`. Its default remains 46
+  (four basic/two fractional bytes); that does not change this scheduling example's explicit
+  `pField=0x2F` layout.
 - **TCO failure path**: when OBT is unavailable the command fails, but the inner seqcount has already
   been consumed and `ccsds-seqcount`/`binary` published.
 

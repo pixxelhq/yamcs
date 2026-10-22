@@ -317,6 +317,14 @@ The `cmdhist` table uses `upsert_append` — each publish adds new columns witho
 All PUS handlers are registered under a single `PusCommandReleaser` entry in `processor.yaml`.
 `apid` and `timeEncoding` are shared across all handlers.
 
+The explicit `pField=0x2F` below belongs to this native handler example.
+Hermes-generated [Service 15 definitions](pus15.md#shared-time-configuration)
+use `PusHeader.cuctime_fields: CucTime` and optional `PusHeader.tco_service`;
+their default is implicit `pField=46` (four seconds/two binary-fraction bytes).
+The header decoder and payload time algorithms share that configuration.
+Yamcs configuration uses canonical `pField` and, for encoders, `implicitPField`;
+`TimeBinaryDecoder` takes a p-field value and no boolean implicit flag.
+
 ```yaml
 realtime:
   services:
@@ -325,8 +333,8 @@ realtime:
       args:
         apid: 1
         timeEncoding:
-          implicitPfield: false
-          pfield: 0x2f
+          implicitPField: false
+          pField: 0x2f
         handlers:
           - serviceType: 5
             class: org.yamcs.pus.Pus5Service
