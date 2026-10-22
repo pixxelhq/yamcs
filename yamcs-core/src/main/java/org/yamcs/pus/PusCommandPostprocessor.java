@@ -55,6 +55,9 @@ public class PusCommandPostprocessor extends AbstractCommandPostProcessor {
      */
     public static final String PUS11_INNER_APID_PARA_NAME = "pus11-inner-apid";
     public static final String PUS11_INNER_SEQCOUNT_PARA_NAME = "pus11-inner-seqcount";
+    /** Same as the PUS 11 keys above, for a {@code pus22OrbitAngle} command wrapped into a TC(22,4). */
+    public static final String PUS22_INNER_APID_PARA_NAME = "pus22-inner-apid";
+    public static final String PUS22_INNER_SEQCOUNT_PARA_NAME = "pus22-inner-seqcount";
 
     /**
      * Top-level PUS 11 keys of older Pixxel releases, now configured in the {@code pus11} block. Rejected so that an
@@ -579,7 +582,7 @@ public class PusCommandPostprocessor extends AbstractCommandPostProcessor {
 
         if (tcoService == null) {
             // no time correlation: encode the release time against the configured timeEncoding.epoch
-            offset += timeEncoder.encode(shiftToEpoch(scheduleTime), scheduleTcPacket, offset);
+            offset += timeEncoder.encode(getPus11WrapperLayout().shiftToEpoch(scheduleTime), scheduleTcPacket, offset);
         } else {
             long obt = tcoService.getObt(scheduleTime);
             if (obt == Long.MIN_VALUE) {
@@ -670,6 +673,14 @@ public class PusCommandPostprocessor extends AbstractCommandPostProcessor {
         System.arraycopy(binary, 0, scheduleTcPacket, offset, binary.length);
 
         int seqCount = seqFiller.fill(scheduleTcPacket); // write sequence count
+
+        // As in buildScheduledTc(): preserve the inner request ID, then point the verifier keys at the wrapper,
+        // whose ACKs are the only ones arriving inside the CheckWindow (Gap #5).
+        commandHistoryPublisher.publish(cmdId, PUS22_INNER_APID_PARA_NAME, CcsdsPacket.getAPID(binary));
+        commandHistoryPublisher.publish(cmdId, PUS22_INNER_SEQCOUNT_PARA_NAME, CcsdsPacket.getSequenceCount(binary));
+
+        commandHistoryPublisher.publish(cmdId, CCSDS_APID_PARA_NAME, apid);
+        commandHistoryPublisher.publish(cmdId, CCSDS_SEQCOUNT_PARA_NAME, seqCount);
 
         commandHistoryPublisher.publish(cmdId, "pus22Apid", apid);
         commandHistoryPublisher.publish(cmdId, "pus22CcsdsSeqCount", seqCount);
@@ -793,31 +804,17 @@ public class PusCommandPostprocessor extends AbstractCommandPostProcessor {
                 + (pus11Crc ? 2 : 0);
     }
 
-    private static boolean isScheduled(PreparedCommand pc) {
-        return pc.getAttribute(OPTION_SCHEDULE_TIME.getId()) != null;
+    /**
+     * The layout of the TC(11,4) wrappers this postprocessor builds, for components that parse them back from
+     * {@code pus11Binary}
+     */
+    public Pus11WrapperLayout getPus11WrapperLayout() {
+        return new Pus11WrapperLayout(pus11SubScheduleIdBytes, pus11GroupIdBytes, pus11Crc, timeEncoder, timeEpoch,
+                customEpoch, customEpochIncludeLeapSecond, tcoService);
     }
 
-    private long shiftToEpoch(long t) {
-        switch (timeEpoch) {
-        case GPS:
-            return TimeEncoding.toGpsTimeMillisec(t);
-        case J2000:
-            return TimeEncoding.toJ2000Millisec(t);
-        case TAI:
-            return TimeEncoding.toTaiMillisec(t);
-        case UNIX:
-            return TimeEncoding.toUnixMillisec(t);
-        case CUSTOM:
-            if (customEpochIncludeLeapSecond) {
-                return t - customEpoch;
-            } else {
-                return TimeEncoding.toUnixMillisec(t) - customEpoch;
-            }
-        case NONE:
-            return t;
-        default:
-            throw new IllegalStateException("Unknown epoch " + timeEpoch);
-        }
+    private static boolean isScheduled(PreparedCommand pc) {
+        return pc.getAttribute(OPTION_SCHEDULE_TIME.getId()) != null;
     }
 
     private static int getIntInRange(YConfiguration config, String key, int defaultValue, int min, int max) {

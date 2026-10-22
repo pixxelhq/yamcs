@@ -1,11 +1,6 @@
 package org.yamcs.pus;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.yamcs.utils.StringConverter.hexStringToArray;
 
 import java.util.Arrays;
@@ -164,8 +159,8 @@ public class PusCommandPostprocessorTest {
                 attr("pus11SubScheduleId", ValueHelper.newValue(3)),
                 attr("pus11GroupId", ValueHelper.newValue(7))));
 
-        assertTrue(!hist.attrs.containsKey("pus11-subschedule-id"));
-        assertTrue(!hist.attrs.containsKey("pus11-group-id"));
+        assertFalse(hist.attrs.containsKey("pus11-subschedule-id"));
+        assertFalse(hist.attrs.containsKey("pus11-group-id"));
     }
 
     @Test
@@ -265,10 +260,10 @@ public class PusCommandPostprocessorTest {
                 attr("pus22SubScheduleId", ValueHelper.newValue(3)),
                 attr("pus22GroupId", ValueHelper.newValue(7))));
 
-        assertTrue(!hist.attrs.containsKey("pus22-subschedule-id"));
-        assertTrue(!hist.attrs.containsKey("pus22-group-id"));
-        assertTrue(hist.attrs.get("pus22Apid") instanceof Integer);
-        assertTrue(hist.attrs.get("pus22CcsdsSeqCount") instanceof Integer);
+        assertFalse(hist.attrs.containsKey("pus22-subschedule-id"));
+        assertFalse(hist.attrs.containsKey("pus22-group-id"));
+        assertInstanceOf(Integer.class, hist.attrs.get("pus22Apid"));
+        assertInstanceOf(Integer.class, hist.attrs.get("pus22CcsdsSeqCount"));
     }
 
     // ---- Pixxel: wrapper fields, request ID republishing (Gap #5/#8), validation ----
@@ -376,6 +371,33 @@ public class PusCommandPostprocessorTest {
                 publisher.intValues.get(PusCommandPostprocessor.PUS11_INNER_APID_PARA_NAME));
         assertEquals(publisher.firstIntValues.get(PusCommandPostprocessor.CCSDS_SEQCOUNT_PARA_NAME),
                 publisher.intValues.get(PusCommandPostprocessor.PUS11_INNER_SEQCOUNT_PARA_NAME));
+    }
+
+    @Test
+    public void testPus22ScheduledCommandRepublishesWrapperRequestIdForVerifiers() {
+        var publisher = new RecordingCommandHistoryPublisher();
+        // pus22Apid (7) distinct from the inner command's APID (100), as for PUS 11
+        var config = YConfiguration.wrap(Map.of("pus22Apid", 7, "pus22", Map.of()));
+        var pp = newPostprocessor(config, publisher);
+
+        pp.process(pc(innerCommand(),
+                attr("pus22OrbitNumber", ValueHelper.newValue(5)),
+                attr("pus22OrbitAngle", ValueHelper.newValue(45.0))));
+
+        // Same contract as PUS 11 (Gap #5): only the TC(22,4) wrapper's ACKs arrive inside the verifiers'
+        // CheckWindow, so ccsds-apid/ccsds-seqcount must carry the wrapper's request ID.
+        assertEquals(7, publisher.intValues.get(PusCommandPostprocessor.CCSDS_APID_PARA_NAME));
+        assertEquals(publisher.intValues.get("pus22Apid"),
+                publisher.intValues.get(PusCommandPostprocessor.CCSDS_APID_PARA_NAME));
+        assertEquals(publisher.intValues.get("pus22CcsdsSeqCount"),
+                publisher.intValues.get(PusCommandPostprocessor.CCSDS_SEQCOUNT_PARA_NAME));
+
+        // the inner command's own request ID is preserved under the pus22-inner-* keys
+        assertEquals(100, publisher.intValues.get(PusCommandPostprocessor.PUS22_INNER_APID_PARA_NAME));
+        assertEquals(publisher.firstIntValues.get(PusCommandPostprocessor.CCSDS_APID_PARA_NAME),
+                publisher.intValues.get(PusCommandPostprocessor.PUS22_INNER_APID_PARA_NAME));
+        assertEquals(publisher.firstIntValues.get(PusCommandPostprocessor.CCSDS_SEQCOUNT_PARA_NAME),
+                publisher.intValues.get(PusCommandPostprocessor.PUS22_INNER_SEQCOUNT_PARA_NAME));
     }
 
     @Test

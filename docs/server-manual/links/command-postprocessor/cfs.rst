@@ -44,3 +44,7 @@ seqCounterName (string)
     sequence across those links.
 
     If not specified, the counter is local to this link.
+
+    The name is global to the Yamcs server, not to the instance: links in different instances that
+    use the same ``seqCounterName`` share one counter. Use a name that is unique per target, and
+    the same name on every link to that target.
