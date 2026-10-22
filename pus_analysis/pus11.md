@@ -195,7 +195,7 @@ deletions (disabled function / sub-schedule / group, §6.11.4.6 NOTE 2) go unnot
 activity IDs go undetected: the `change-seq-count` link action or the 14-bit seqcount wrap can reuse
 an inner `(source, apid, seq)` that is still on board, making TC[11,5/7/9/12] ambiguous (§6.11.4.2.b).
 
-**Fix**: planned in `.claude/time-tag-queue-plan.md` (branch `feat/time_tag_command_queue`). Include
+**Fix**: planned in `../.claude/plans/time-tag-queue-plan.md` (branch `feat/time_tag_command_queue`). Include
 duplicate-ID detection at insert time. **Effort**: Large.
 
 > **TODO — open design question, table key for `pus11_schedule` (plan §8.4).** The plan's current

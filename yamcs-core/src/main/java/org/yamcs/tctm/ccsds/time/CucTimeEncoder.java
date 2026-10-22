@@ -105,6 +105,14 @@ public class CucTimeEncoder implements TimeEncoder {
         return (offset - offset0);
     }
 
+    public int getBasicTimeBytes() {
+        return basicTimeBytes;
+    }
+
+    public int getFractionalTimeBytes() {
+        return fractionalTimeBytes;
+    }
+
     @Override
     public String toString() {
         return "CucTimeEncoder [basicTimeBytes=" + basicTimeBytes
