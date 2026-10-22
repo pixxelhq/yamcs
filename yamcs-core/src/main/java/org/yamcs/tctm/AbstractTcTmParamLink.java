@@ -211,6 +211,11 @@ public abstract class AbstractTcTmParamLink extends AbstractLink
         commandHistoryPublisher.publishAck(commandId, AcknowledgeSent_KEY, getCurrentTime(), AckStatus.OK);
     }
 
+    /** the postprocessor turning commands into binary, null until {@link #init} */
+    public CommandPostprocessor getCommandPostprocessor() {
+        return cmdPostProcessor;
+    }
+
     @Override
     public void setCommandHistoryPublisher(CommandHistoryPublisher commandHistoryListener) {
         this.commandHistoryPublisher = commandHistoryListener;
