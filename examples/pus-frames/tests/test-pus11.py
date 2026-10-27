@@ -5,7 +5,8 @@ Manual test for the PUS 11 time-based scheduling with scheduling groups.
 Scenario:
   1. enable the time-based schedule execution function (TC[11,1]); the simulator boots with it
      disabled and drops every activity at its release time otherwise
-  2. create scheduling group 5 (enabled)
+  2. create scheduling groups 1 (the TC link default) and 5, enabled, with TC[11,22] if missing
+     (pus11_setup.py), checked with TM[11,27]
   3. schedule a command into sub-schedule 1 / group 5 a few seconds in the future
   4. enable sub-schedule 1 (a sub-schedule auto-created by an insert starts disabled)
   5. disable group 5 -> the activity is withheld: no TM[1,x] for it at the release time
@@ -23,12 +24,16 @@ shows "coefficients"), otherwise the release time cannot be converted to on-boar
 Exits non-zero if an expectation fails.
 """
 
+import os
 import sys
 import threading
 import time
 from datetime import datetime, timedelta, timezone
 
 from yamcs.client import YamcsClient
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pus11_setup import BASE_GROUP, GroupStatus, ensure_groups  # noqa: E402
 
 GROUP_ID = 5
 SUB_SCHEDULE_ID = 1
@@ -127,11 +132,7 @@ if __name__ == "__main__":
     print("Enabling the time-based schedule execution function")
     issue(cmd_conn, "/PUS11/ENABLE_SCHEDULER")
 
-    print("Creating scheduling group", GROUP_ID, "(NOK if it already exists, that is fine)")
-    cmd_conn.issue(
-        "/PUS11/CREATE_GROUPS",
-        args={"num_groups": 1, "groups": [{"group_id": GROUP_ID, "status": "enabled"}]},
-    ).await_complete(timeout=15)
+    ensure_groups(cmd_conn, GroupStatus(processor), {BASE_GROUP: "enabled", GROUP_ID: "enabled"})
 
     # --- withheld run: group disabled before the release time ---
     seq, t = schedule_command(cmd_conn, DELAY)

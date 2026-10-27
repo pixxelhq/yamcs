@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.yamcs.logging.Log;
 import org.yamcs.protobuf.Commanding.CommandId;
@@ -17,6 +18,11 @@ import org.yamcs.utils.TimeEncoding;
  * <p>
  * Release times are kept as ground time, converted once when the TC(11,4) is parsed. Time drift and re-correlation
  * are not followed.
+ * <p>
+ * The last reported enable status of the sub-schedules (TM(11,19)) and of the groups (TM(11,27)) is kept, and the live
+ * entries whose sub-schedule or group is reported disabled are flagged with a {@link ScheduleEntry#getDropReason() drop
+ * reason}: on board, a disabled activity is deleted without being executed when its release time comes (ECSS-E-ST-70-41C
+ * §6.11.4.6). A sub-schedule or group not in the last report is unknown, and not flagged.
  * <p>
  * Thread safe.
  */
@@ -51,6 +57,7 @@ public class Pus11Schedule {
         final CommandId cmdId;
         final boolean duplicate;
         volatile EntryState state = EntryState.PENDING;
+        volatile String dropReason;
 
         ScheduleEntry(RequestId inner, RequestId wrapper, long releaseTime, Long subScheduleId, Long groupId,
                 CommandId cmdId, boolean duplicate) {
@@ -117,6 +124,15 @@ public class Pus11Schedule {
             return state;
         }
 
+        /**
+         * Why the entry will be dropped at its release time instead of being executed (its sub-schedule or group is
+         * reported disabled), or null if it is not known to be disabled. Kept as it was when the entry stopped being
+         * live.
+         */
+        public String getDropReason() {
+            return dropReason;
+        }
+
         @Override
         public String toString() {
             return cmdId.getCommandName() + " " + inner + " " + state;
@@ -126,6 +142,9 @@ public class Pus11Schedule {
     final List<ScheduleEntry> entries = new ArrayList<>();
     final Map<RequestId, ScheduleEntry> byRequestId = new HashMap<>();
     final Map<CommandId, List<ScheduleEntry>> byCmdId = new HashMap<>();
+    // last reported enable status, by sub-schedule id and by group id
+    Map<Long, Boolean> subScheduleStatus = Map.of();
+    Map<Long, Boolean> groupStatus = Map.of();
 
     /**
      * Adds the activities of a TC(11,4) as {@link EntryState#PENDING} entries
@@ -143,6 +162,7 @@ public class Pus11Schedule {
             }
             var e = new ScheduleEntry(inner, wrapper, a.releaseTime(), req.subScheduleId(), a.groupId(), cmdId,
                     duplicate);
+            e.dropReason = dropReason(e);
             entries.add(e);
             byRequestId.put(inner, e);
             added.add(e);
@@ -202,6 +222,52 @@ public class Pus11Schedule {
             }
         }
         return gone;
+    }
+
+    /**
+     * Replaces the enable status of the sub-schedules with the one of a TM(11,19) report, which lists all the
+     * sub-schedules on board.
+     *
+     * @return the live entries whose drop reason changed
+     */
+    public synchronized List<ScheduleEntry> subScheduleStatus(Map<Long, Boolean> status) {
+        subScheduleStatus = Map.copyOf(status);
+        return updateDropReasons();
+    }
+
+    /**
+     * Replaces the enable status of the groups with the one of a TM(11,27) report, which lists all the groups on board.
+     *
+     * @return the live entries whose drop reason changed
+     */
+    public synchronized List<ScheduleEntry> groupStatus(Map<Long, Boolean> status) {
+        groupStatus = Map.copyOf(status);
+        return updateDropReasons();
+    }
+
+    private List<ScheduleEntry> updateDropReasons() {
+        List<ScheduleEntry> changed = new ArrayList<>();
+        for (var e : entries) {
+            if (!isLive(e)) {
+                continue;
+            }
+            String reason = dropReason(e);
+            if (!Objects.equals(reason, e.dropReason)) {
+                e.dropReason = reason;
+                changed.add(e);
+            }
+        }
+        return changed;
+    }
+
+    private String dropReason(ScheduleEntry e) {
+        if (e.subScheduleId != null && Boolean.FALSE.equals(subScheduleStatus.get(e.subScheduleId))) {
+            return "sub-schedule " + e.subScheduleId + " is disabled";
+        }
+        if (e.groupId != null && Boolean.FALSE.equals(groupStatus.get(e.groupId))) {
+            return "group " + e.groupId + " is disabled";
+        }
+        return null;
     }
 
     /** the most recently inserted entry with this inner request ID, or null */

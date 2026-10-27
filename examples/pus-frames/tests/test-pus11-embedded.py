@@ -9,7 +9,7 @@ appends its CRC. The embedded packets are obtained with a dry run, so they have 
 sequence count.
 
 Scenario:
-  1. create scheduling group 1 and enable sub-schedule 1
+  1. create scheduling group 1 with TC[11,22] if missing (pus11_setup.py) and enable sub-schedule 1
   2. obtain the binary of SWITCH_VOLTAGE_OFF / SWITCH_VOLTAGE_ON with a dry run
   3. insert both as two activities of one TC[11,4], released 6 and 10 seconds from now
   4. print the sequence counts assigned to the embedded TCs and the binary sent
@@ -20,12 +20,17 @@ Check the simulator log: each scheduled command is printed with its sequence cou
 Run the example first:  ./run-example.sh pus-frames
 """
 
+import os
+import sys
 import time
 from datetime import datetime, timedelta, timezone
 
 from yamcs.client import YamcsClient
 
-GROUP_ID = 1
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pus11_setup import BASE_GROUP, GroupStatus, ensure_groups  # noqa: E402
+
+GROUP_ID = BASE_GROUP
 SUB_SCHEDULE_ID = 1
 
 
@@ -44,11 +49,8 @@ if __name__ == "__main__":
     processor = client.get_processor("pus-frames", "realtime")
     cmd_conn = processor.create_command_connection()
 
-    print("Creating scheduling group", GROUP_ID, "and enabling sub-schedule", SUB_SCHEDULE_ID)
-    cmd_conn.issue(
-        "/PUS11/CREATE_GROUPS",
-        args={"num_groups": 1, "groups": [{"group_id": GROUP_ID, "status": "enabled"}]},
-    )
+    ensure_groups(cmd_conn, GroupStatus(processor), {GROUP_ID: "enabled"})
+    print("Enabling sub-schedule", SUB_SCHEDULE_ID)
     cmd_conn.issue(
         "/PUS11/ENABLE_SCHEDULE",
         args={"num_schedules": 1, "schedules": [SUB_SCHEDULE_ID]},

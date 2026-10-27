@@ -4,8 +4,9 @@ Plan for `feat/time_tag_command_queue` (= `../../pus_analysis/pus11.md` Gap #8, 
 Gap #5). Scope: a live ground view of what is *currently* in the spacecraft's ST[11] schedule, plus
 search by release time (§8). Refreshed 2026-10-19 against `pixxel/master` `9a5f8648a` (branch
 fast-forwarded from `f7820b796`); §4 caveats resolved 2026-09-24 (multi-sat = one instance per
-satellite). Open questions re-checked against the code 2026-10-19 (§5): Q1, Q2, Q6 resolved, Q3 not blocking (ID width = uint8, 2026-10-22), Q4 + Q5 deferred; nothing in
-§3/§8 is implemented yet.
+satellite). Open questions re-checked against the code 2026-10-19 (§5): Q1, Q2, Q6 resolved, Q3 not blocking (ID width = uint8, 2026-10-22), Q4 + Q5 deferred.
+Branch rebased 2026-10-27 onto `pixxel/master` `16f296b34` (see "What changed on 2026-10-27"). §6 steps 0
+1 and 2 are implemented; step 0b, steps 3–6 and §8 are not.
 
 **Primary assumption (2026-10-19):** the aim is a **native ground-only implementation** of this
 feature in Yamcs. The ground design follows ECSS-E-ST-70-41C and the mission's needs; it is
@@ -26,6 +27,29 @@ IDs, `db7466fe0` packed field widths, `0c604ad09` PUS22):
 - PUS22 position-based scheduling added — out of scope, see §1.7.
 - `9a5f8648a`: PUS22 wrapper now publishes inner-ID keys and overwrites `ccsds-*` with the wrapper
   ID, same as PUS11 (§1.7).
+
+**What changed on 2026-10-27** (rebase onto `16f296b34` = PR #239, the upstream merge `ab81ffaa9`:
+`ddb39fa5b` argument locations, `0555ee94f` embedded-TC ancillary data, `acc47bb07` embedded TCs in
+PUS 11/19). Only the manual-insert path is affected; the `pus11ScheduleAt` path and its cmdhist
+keys (§1.2) are unchanged.
+- Manual `/PUS11/INSERT_ACTIVITIES` now uses `/PUS/EmbeddedTcType` (annotated `Yamcs:EmbeddedTc`)
+  for each activity's `tc`. `PusCommandPostprocessor.processEmbeddedTcs()` fills each embedded
+  packet's length and **seq count** (from the link's `seqFiller`) and appends its CRC when
+  `embeddedTcCrc` is set (`pus-frames` sets it).
+- Each embedded seq count goes to cmdhist as `ccsds-seqcount:activities[<i>].tc`. Only the seq count
+  is published: the inner APID and the source ID are in the operator-supplied packet bytes.
+- No `pus11Binary`, `pus11-inner-*` or `pus11ScheduleAt` for manual inserts. The final TC[11,4]
+  (embedded seq counts filled in) is in cmdhist `binary` (`PreparedCommand.CNAME_BINARY`).
+- Effect on §3 input 4: parse `binary` instead of re-deriving inner IDs, and cross-check each
+  activity's seq count against `ccsds-seqcount:activities[<i>].tc` (§6 step 5).
+- Test-bed fixes from §1.8 (`pus-frames` request-ID widths, `test-pus11.py` inner seq count, PMON
+  events) landed in `1dea17572`.
+
+**Requirement change (2026-10-27): no time sync/drift handling.** The tracker assumes the on-board
+clock and the ground time correlation are good. Each release time is converted to ground time
+**once, at insert**, and kept as ground time; the tracker does not follow re-correlation, does not
+watch TCO freshness or on-board clock resets, and evaluates filters and shifts in ground time (ms),
+not raw on-board ticks. Time sync/drift is out of scope for this feature (§7).
 
 Code references use method names, not line numbers.
 
@@ -63,7 +87,7 @@ Command history per scheduled command:
 | `pus11ScheduleAt` | release time (ground time) |
 
 **No longer in cmdhist:** `pus11-source-id` and defaulted sub-schedule/group IDs. So the tracker
-**must parse `pus11Binary`** to get `sourceId`, `subScheduleId`, `groupId` and `releaseObt`. The
+**must parse `pus11Binary`** to get `sourceId`, `subScheduleId`, `groupId` and the release time. The
 parse needs the link's field widths. Expose them from `PusCommandPostprocessor` (getters, or a small
 shared `Pus11WrapperLayout` record built in `init()`) rather than re-reading the YAML.
 
@@ -90,7 +114,7 @@ Release ACKs may be dumped in bulk at AOS, out of order, or lost. So: key on the
   NOTE 2: no notification. → three silent-drop paths; TC[11,2] is not a pause.
 - **§6.11.1.2** — release verification reports go to the request's `source_id`, "if any".
 - **§6.11.4.5.g.2** — insert rejected if release time < now + *time margin* (mission value, Q4).
-- **§6.11.11** — subservice must expose activity count + execution function status (drift detector).
+- **§6.11.11** — subservice must expose activity count + execution function status (count check).
 - Delete/shift TCs ACK like any TC; the ACK confirms acceptance, not *which* activities matched.
 
 Simulator (`simulator/.../pus/Pus11Service.java`) as porting source / test bed:
@@ -133,14 +157,22 @@ keys generic (time *or* position) — no other change needed now.
 
 ### 1.8 Test-bed defects (found 2026-10-19)
 
-- **`examples/pus-frames` MDB mis-decodes TM[11,13].** Its `pus11.xml` `SUMMARY_REPORT` declares
-  `source`/`apid`/`seq` as `/dt/uint16`, but the simulator emits bit-packed `u16/u11/u14` (§1.6).
-  `examples/pus` uses `/dt/pus_report_apid` / `/dt/pus_report_seqcount` correctly. `pus-frames`
-  also has no `INSERT_ACTIVITIES` MetaCommand. Fix both before using `pus-frames` (the TCO test
-  bed, §4.4) for §6 step 3.
-- **`examples/pus-frames/tests/test-pus11.py` `schedule_command()`** returns
-  `command.attributes["ccsds-seqcount"]`, which is now the **wrapper** seq (§1.2), then passes it
-  to `DELETE_ACTIVITIES_BY_ID`. It should read `pus11-inner-seqcount`. Not yet confirmed by a run.
+- **Fixed 2026-10-27 (`1dea17572`): `examples/pus-frames` MDB mis-decoded TM[11,13].** Its
+  `pus11.xml` request IDs (TM `RequestIdType`, TC `RequestIdType`, `SUMMARY_REPORT`) were
+  `/dt/uint16`; now `/dt/pus_report_apid` / `/dt/pus_report_seqcount` (u11/u14), as in
+  `examples/pus`. `INSERT_ACTIVITIES` arrived with the upstream merge (embedded-TC form). PMON
+  events 10–15 copied from `examples/pus` (`pus5.xml`, `events.json`).
+- **`examples/pus` cannot schedule at all.** Its TC link sets `tcoService: tco0`, but nothing feeds that TCO
+  samples, so every `pus11ScheduleAt` fails with "Time corelation coefficients not available". Use
+  `examples/pus-frames` (real TCO) for PUS 11 work. (Found 2026-10-22.)
+- **Fixed 2026-10-27 (`1dea17572`): `test-pus11.py`** used the wrapper `ccsds-seqcount`; it now
+  reads `pus11-inner-seqcount`, sends TC[11,1] first and asserts withheld/released. Passes.
+- **`examples/pus-frames` run setup (found 2026-10-22).** `dataDir: /storage/yamcs-data` is not
+  writable on macOS: start with `./run-example.sh pus-frames --data-dir yamcs-data`. The TC link
+  default group 1 must be created before any `pus11ScheduleAt` (else "scheduling group 1 does not
+  exist", NOK). The simulator boots with schedule execution disabled, so released activities are
+  dropped until TC[11,1]. In yamcs-client, `await_acknowledgment("CommandComplete")` never returns;
+  use `await_complete()`. Full procedure: `.claude/testing/time-tag-queue-manual-test.md`.
 
 ---
 
@@ -175,7 +207,7 @@ enum EntryState { PENDING, SCHEDULED, RELEASED, DELETED, PRESUMED_GONE, UNKNOWN 
 
 class ScheduleEntry {
     RequestId inner, wrapper;
-    long releaseTime, releaseObt;
+    long releaseTime; // ground time, converted once at insert (no re-correlation)
     Long subscheduleId, groupId; // null when the field is not configured on the link; up to 8 bytes wide
     String commandName;
     CommandId cmdId;
@@ -200,14 +232,19 @@ Index: `ConcurrentSkipListMap<Long, List<ScheduleEntry>>` by release time + `Map
 3. **Release ACKs** — see §1.3/§1.4.
 4. **TC stream** — parse TC[11,4] binary for manual `/PUS11/INSERT_ACTIVITIES` (`N > 1`); parse
    deletes/shifts; apply only after `CommandComplete = OK` (simulator and spec reject atomically).
+   Manual inserts carry no `pus11Binary`: parse cmdhist `binary` (embedded seq counts already filled
+   in by the postprocessor) and check each inner seq against `ccsds-seqcount:activities[<i>].tc`
+   (2026-10-27).
 5. **Sweep timer** — `PRESUMED_GONE`, never evict.
-6. **Drift detector** — **v1 = only the enable-status part.** The §6.11.11 count/execution-status
+6. **Enable-status check** — **v1 = only the enable-status part of §6.11.11.** The §6.11.11 count/execution-status
    checks are deferred (§5 Q5, §7). TM[11,19] / TM[11,27] give sub-schedule and group enable status. Flag
    `SCHEDULED` entries whose sub-schedule or group is disabled as "will be dropped at release"
    (§1.5 drop paths 2 and 3).
 
 **Release status in cmdhist**: publish under a distinct key (e.g. `pus11-release_Status`), not
-`CommandComplete` — that already means "insert accepted".
+`CommandComplete` — that already means "insert accepted". Built as the `pus11-release` ack:
+`SCHEDULED` "Release at …", `DISABLED` "Will be dropped at …: sub-schedule N / group N is disabled"
+(§6 step 2), `TIMEOUT` when presumed gone.
 
 **Output**: REST + web page (§8.4). Cheapest v1: an `ItemProvider` (mirror `CommandItemProvider`)
 so the Timeline view renders the queue.
@@ -251,64 +288,37 @@ Resolved 2026-09-24.
      spacecraft does not check TC seq continuity.
    - **Test:** send 3 TCs on one APID, restart the instance, send 1 more → its `ccsds-seqcount`
      is 3, not 0. Repeat with a TC[11,4] to check that the inner seq continues too.
-2. **Filter divergence.** A separate PUS-9 service keeps TCO synced (assumed). The ground therefore
-   evaluates filters and shifts **in raw OBT ticks**, never in ground time: the `releaseObt`
-   exactly as encoded in the TC[11,4] and the filter bounds exactly as encoded in the TC[11,6/8]
-   are both integers, so matching is exact. After this change TCO drift affects only the
-   *displayed* ground time.
-   **Fix detail (2026-10-19):**
-   - **Store** `releaseObt` as a raw tick count: CUC coarse and fine bytes packed into one `long`,
-     taken from the TC[11,4] binary. Never derive it from ground time.
-   - **Filter** (TC[11,6/8]): decode `start_time`/`end_time` from the TC binary as raw ticks.
-     Mirror the on-board bound rules exactly, inclusive on both ends: type 1 `start ≤ t ≤ end`,
-     type 2 `t ≥ start`, type 3 `t ≤ end`. Confirm these against the spacecraft SW ICD.
-   - **Shift offset** (TC[11,7/8/15]): today it is `int32` milliseconds (`time_offset_ms`). With
-     2 fine bytes, 1 ms = 65.536 ticks, so ms → ticks is not an integer and the ground's rounding
-     can differ from the on-board one by 1 tick. Read the offset from the TC binary as encoded
-     (never from the operator's input), then either:
-     a. **(Recommended)** the mission encodes the offset as a relative CUC in ticks. The ground
-        adds it as an integer, which is exact. The MDB and simulator change to match.
-     b. If the ICD keeps ms: apply the on-board rounding rule, taken from the ICD and set in the
-        `pus11.shiftRounding` config (`floor`|`half-up`). Treat any residual difference as drift.
+2. **Filter and shift evaluation — in ground time.** No time sync/drift handling (2026-10-27): the
+   ground evaluates TC[11,6/8] filters and TC[11,7/8/15] shifts against the stored ground release
+   time, in ms.
+   - **Filter bounds:** decode `start_time`/`end_time` from the TC binary with the same conversion
+     as the release time (§4.4). Mirror the on-board bound rules, inclusive on both ends: type 1
+     `start ≤ t ≤ end`, type 2 `t ≥ start`, type 3 `t ≤ end`. Confirm against the spacecraft SW ICD.
+   - **Shift offset:** `int32` ms (`time_offset_ms`), read from the TC binary as encoded, added to
+     the ground release time.
    - **Shift rejection:** on board, a shift is all-or-nothing. If any selected entry would land
      in the past, the whole TC is rejected (`COMPL_ERR_SCHEDULE_TIME_IN_THE_PAST`). Apply the
      shift to the model only on `CommandComplete = OK`, never on send.
-   - **Safety net:** every TM[11,13] reconcile overwrites `releaseObt` with the on-board value,
-     so a 1-tick error lasts at most until the next reconcile. Log it as drift, not as an error.
-   - **Test bed (per the primary assumption):** the simulator stores `PusTime` in ms
-     (`shiftByMillis`, `millis + offset`), so it drops sub-ms ticks and compares at ms resolution.
-     Change it to keep raw CUC ticks; otherwise boundary tests cannot catch a 1-tick mismatch.
+   - **Safety net:** a filter bound within a tick of a release time can match differently on
+     board. Every TM[11,13] reconcile overwrites the release time with the on-board value, so
+     such a mismatch lasts at most until the next reconcile.
 3. **`source_id` = per satellite instance.** `pus11.sourceId` sits in each TC link's
    `commandPostprocessorArgs` inside that satellite's instance file (§4.6). If one satellite has
    several TC links, give them all the same value — and the same `pus11.subScheduleId.bytes` /
    `groupId.bytes`, since the parser needs one layout per instance. It is **no longer published**
    to cmdhist (was `pus11-source-id`) → read it from the TC[11,4] secondary header in
    `pus11Binary` (bytes 9–10), the same way as for manual `/PUS11/INSERT_ACTIVITIES`.
-4. **Time correlation.** How it syncs today: `PusPacketPreprocessor.processTimePacket()` reads
-   TM[9,2] (APID 0, no secondary header) → `TimeCorrelationService.addSample(obt, ert)`. This
-   happens only with `performTimeCorrelation: true` plus a `goodFrameStream` (ERT comes from VC-0
-   frames). Least squares over `numSamples` (default 3) gives `gradient`/`offset`, persisted in
-   table `tco_<name>` and reloaded at start. Coefficients reset when deviation > `validity`. They
-   can also be forced (`TimeCorrelationApi` → `forceCoefficients`). `../../examples/pus-frames`
-   (new, `bf11c53c8`) enables it (`performTimeCorrelation: true`, `tco0`) → the test bed for TCO
-   paths. `../../examples/pus` names `tcoService: tco0` but feeds no samples. `bf11c53c8` also
-   fixed `CucTimeDecoder.decode()` to consume all fine-time bytes (it stopped after 2, which
-   desynced the stream from `decodeRaw()`/`encode()`). `yamcs-core` `Pus9Service` is an on-board
-   **emulator** (emits TM[9,2] from the ground clock), not the sync.
-   **Uplink side:** the postprocessor now takes `tcoService`. When set, `buildScheduledTc` writes
+4. **Release time conversion — once, at insert.** With `tcoService` set, `buildScheduledTc` writes
    `tco.getObt(scheduleTime)` via `encodeRaw` (fails the command if there are no coefficients);
-   otherwise it writes ground time shifted to `timeEncoding.epoch`. The tracker must decode
-   `releaseObt` from the binary with the **same** mode: raw OBT → `tco.getTime(obt)`; epoch mode →
-   inverse of `shiftToEpoch`. What the tracker uses:
-   - current OBT: `tco.getObt(timeService.getMissionTime())`, for the sweep in OBT.
-   - freshness: `tco.getStatus().getCoefficientsTime()`, plus the last entry of `getSamplesList()`.
-     Show "TCO stale" when it is older than N passes.
-   - display: `tco.getTime(releaseObt)` at render time, so the ground time follows
-     re-correlation.
-   - `getObt()` returns `Long.MIN_VALUE` when there are no coefficients: skip the sweep and the
-     predicted-time display (inserts already fail in `buildScheduledTc`).
-   - On-board clock reset (coefficients jump, or `tco.reset()`): mark the model stale and force a
-     reconcile. `TimeCorrelationService` has no listener, so poll `getStatus()` on the sweep timer.
+   otherwise it writes ground time shifted to `timeEncoding.epoch`. The tracker decodes the release
+   time from the binary with the **same** mode (raw OBT → `tco.getTime(obt)`; epoch mode → inverse
+   of `shiftToEpoch`), once when the entry is created, and stores the ground time. Out of scope
+   (2026-10-27): following re-correlation, TCO freshness ("TCO stale"), on-board clock resets.
+   - No coefficients at insert (only possible for a manual `/PUS11/INSERT_ACTIVITIES`): the
+     release time is unknown; the sweep skips the entry until a reconcile supplies it.
+   - TM[11,13] release times (§6 step 3) are converted with the same mode.
+   - Test bed: `examples/pus-frames` runs real time correlation (`performTimeCorrelation: true`,
+     `tco0`); `examples/pus` names `tcoService: tco0` but feeds no samples (§1.8).
 5. **Uplink loss** — handled by `PENDING` → `SCHEDULED` only on `CommandComplete = OK`.
 6. **Multi-spacecraft = one Yamcs instance per satellite** (decided 2026-09-24). Each satellite
    has its own `yamcs.<sat>.yaml`, listed under `instances:` in `yamcs.yaml`. All instances share
@@ -403,23 +413,49 @@ Resolved 2026-09-24.
 
 ## 6. Build order
 
-0. Expose the TC[11,4] wrapper layout (widths, `tcoService`, epoch) from `PusCommandPostprocessor`
+0. **Done 2026-10-22** (`Pus11WrapperLayout`, `Pus11WrapperParser`, 20 tests).
+   Expose the TC[11,4] wrapper layout (widths, `tcoService`, epoch) from `PusCommandPostprocessor`
    + `Pus11WrapperParser` for `pus11Binary`. ~½ day. Run the parser tests at 1-byte **and**
    2-byte sub-schedule/group widths (§5 Q3), so a later width change is config only.
    0b. Re-seed `CcsdsSeqCountFiller` from cmdhist on restart (§4.1). ~½ day incl. restart test.
    Independent of the tracker; can ship first.
 1. Model + cmdhist input (`PENDING` → `SCHEDULED` on `CommandComplete`) + sweep. ~1 day
+   **Done 2026-10-22:** `Pus11Schedule` (model) + `Pus11ScheduleTracker` (service; reads `pus11Binary` and
+   `CommandComplete` from `cmdhist_realtime`, publishes the `pus11-release` ack: SCHEDULED, then TIMEOUT when
+   presumed gone). Layout from the TC link's postprocessor (`tcLink`, or the only PUS 11 link). Release time
+   converted to ground time once at insert (§4.4). Wired in `examples/pus-frames`.
+   Manual test: `examples/pus-frames/tests/test-pus11-tracker.py` (rejected insert → DELETED, no ack;
+   accepted → SCHEDULED → TIMEOUT). Passed 2026-10-27; procedure in `.claude/testing/time-tag-queue-manual-test.md`.
+   Not yet: skip-list index by release time, `pus11_schedule` persistence (§8), manual N > 1 inserts.
 2. Sub-schedule/group "will be dropped" flag from TM[11,19]/TM[11,27]. ~2 h. Test: TC[11,4]
    into a new sub-schedule never enabled → flagged, then `PRESUMED_GONE` after release (§5 Q3).
-   Simulator: create group 0 at boot. (Execution-disabled banner + count drift: deferred, §5 Q5.)
+   Simulator: create group 0 at boot. (Execution-disabled banner + count check: deferred, §5 Q5.)
+   **Done 2026-10-27:** `Pus11Schedule.subScheduleStatus()` / `groupStatus()` keep the last report
+   (a full snapshot each) and set `ScheduleEntry.getDropReason()` on live entries; an ID missing from
+   the report is unknown, not flagged. The tracker subscribes on the `processor` (default `realtime`)
+   to `subScheduleStatus` / `groupStatus` (parameter, idMember, statusMember; defaults
+   `/PUS11/status_report` and `/PUS11/group_status_report`) and publishes `pus11-release` =
+   `DISABLED` / back to `SCHEDULED`. Status = "enabled"/"disabled" label, else numeric ≠ 0.
+   Tests: 7 in `Pus11ScheduleTest`, 6 in `Pus11ScheduleTrackerTest`; manual
+   `examples/pus-frames/tests/test-pus11-dropflag.py` passed 2026-10-27.
+   **Simulator group 0 at boot: replaced** (2026-10-27). It broke `Pus11ServiceTest`, went against
+   the simulator's ECSS "no auto-creation" rule, and did not help `pus-frames` (default group 1).
+   Instead the test suite creates its base groups with TC[11,22]:
+   `examples/pus-frames/tests/pus11_setup.py` `ensure_groups()` (create if missing, set status,
+   check with TM[11,27]), one group-ID range per test so they do not conflict. New
+   `test-pus11-groups.py` covers TC[11,22]/[11,23] end to end with the tracker; 10 new
+   `Pus11ServiceTest` cases cover create/delete/enable edge cases (atomic rejection, max groups,
+   no group at boot). Revisit if OBSW answers Q3 (3) with "a default group exists at boot". Follow-ups: the flag is only as fresh as the last report (nothing requests TM[11,19]/27
+   yet; could piggyback on the §5 Q1 AOS trigger), and TC[11,20/21/24/25] are not modelled from
+   the TC stream (§6 step 5 territory).
 3. TM[11,13] reconcile incl. bit-packed entries and multi-packet accumulation. ~1 day
    Decode test reports through the MDB, so a > 1-byte `group_id` (§5 Q3 gotcha) fails a test.
    Plus TM-gap `ReconcileTrigger` (§5 Q1) with a replayed-gap test. ~½ day
-   (on `pus-frames`, fix its MDB first — §1.8, ~30 min)
+   (`pus-frames` MDB fixed 2026-10-27, §1.8)
 4. Release-ACK correlation on `/PUS/pus-tc-ack-*`, keyed on gentime. ~½ day
 5. TC[11,3/5/6/7/8/15] modelling from the TC stream. ~2 days (all four filter types + packed
-   request IDs — long pole). Filters and shifts in raw ticks (§4.2). Plus ~½ day to switch the
-   simulator `PusTime` to ticks, with boundary tests at `start`/`end` ± 1 tick.
+   request IDs — long pole). Filters and shifts in ground time (§4.2), boundary tests at
+   `start`/`end` ± 1 ms.
 6. Timeline `ItemProvider`, then a dedicated page if too thin.
 
 Steps 0–3 are the minimum useful set. Upstream cmdhist keys are done, but renamed and reduced
@@ -434,13 +470,17 @@ Steps 0–3 are the minimum useful set. Upstream cmdhist keys are done, but rena
   `AWAITING_RECONCILE`) and force a reconcile after their release time. Keep the field from day one.
 - Predicting insert rejections from the time margin (Q4).
 - Group modelling beyond storing `groupId` (Q3).
-- **§6.11.11 drift detector (Q5).** Execution-disabled banner (scheduler disabled at boot and after
-  TC[11,3] → every release is silently dropped, §6.11.4.6) + activity-count drift check every HK
+- **§6.11.11 count check (Q5).** Execution-disabled banner (scheduler disabled at boot and after
+  TC[11,3] → every release is silently dropped, §6.11.4.6) + activity-count check every HK
   cycle. When picked up: add the HK packet to the simulator and example MDB first; read parameter
   names from tracker config (e.g. `executionStatusParam`, `activityCountParam`), never hard-code;
   compare against `SCHEDULED` entries only and flag only if the mismatch persists 2 HK cycles
   (`PENDING` and just-released entries lag); count 0 + status disabled = schedule wiped (reboot or
-  reset) → force a reconcile, not ordinary drift. ~2 h.
+  reset) → force a reconcile, not an ordinary mismatch. ~2 h.
+- **Time sync/drift** (out of scope, 2026-10-27): following re-correlation (display via
+  `tco.getTime` at render time), "TCO stale" from `tco.getStatus()`, on-board clock reset → force a
+  reconcile, filters/shifts in raw OBT ticks with a `pus11.shiftRounding` option, simulator
+  `PusTime` in ticks. Would need `releaseObt` stored next to the ground release time.
 
 ---
 
@@ -479,7 +519,7 @@ needs the column at `create table`, one per table, and leaks entries on `upsert_
 
 ### 8.4 Design
 
-**Columns**: `cmdName, releaseTime, releaseObt, sourceId, apid, seqCount, pusType, pusSubtype,
+**Columns**: `cmdName, releaseTime, sourceId, apid, seqCount, pusType, pusSubtype,
 subscheduleId, groupId (nullable LONG), state (PENDING|SCHEDULED|DELETED), innerBinary`. `(gentime, origin, seqNum)`
 links to cmdhist.
 
@@ -490,9 +530,7 @@ links to cmdhist.
 3. `Pus11TcParser` ported from `Pus11Service`: TC[11,4], by-ID [11,5]/[11,7], by-filter
    [11,6]/[11,8], [11,15] shift-all, [11,3] reset. Sub-schedule/group widths from the link layout
    (§6 step 0); request IDs bit-packed `u16/u11/u14` via `BitBuffer` (port `PusPackedFields`).
-   Release time: `CucTimeDecoder.decodeRaw` → `TimeCorrelationService.getTime(obt)` when the
-   postprocessor has `tcoService`, else inverse epoch shift (extract `configureTimeEncoding` /
-   `shiftToEpoch` from the postprocessor into a shared helper).
+   Release time: converted to ground time once, via `Pus11WrapperLayout.toGroundTime` (§4.4).
 4. Insert → `PENDING`; `SCHEDULED` on `CommandComplete = OK`, deleted on `NOK`.
    Deletes/shifts/reset applied on their own `CommandComplete = OK`, against `SCHEDULED` rows with
    `releaseTime > TC gentime`.
