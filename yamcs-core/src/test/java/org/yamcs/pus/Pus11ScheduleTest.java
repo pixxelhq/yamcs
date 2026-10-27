@@ -3,6 +3,7 @@ package org.yamcs.pus;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -185,6 +186,83 @@ public class Pus11ScheduleTest {
 
         var e = schedule.insert(cmdId("C", 2), insert(43, 0L, act(0L, t0, 100, 11))).getFirst();
         assertFalse(e.isDuplicate());
+    }
+
+    // ---- enable status (plan §6 step 2) ----
+
+    @Test
+    public void testDisabledSubScheduleFlagsEntry() {
+        var cmdId = cmdId("C", 1);
+        var e = schedule.insert(cmdId, insert(42, 3L, act(7L, t0, 100, 11))).getFirst();
+        schedule.commandComplete(cmdId, true);
+        assertNull(e.getDropReason());
+
+        assertEquals(List.of(e), schedule.subScheduleStatus(Map.of(3L, false)));
+        assertEquals("sub-schedule 3 is disabled", e.getDropReason());
+        assertEquals(EntryState.SCHEDULED, e.getState(), "flagged, but still on board until its release");
+
+        assertEquals(List.of(), schedule.subScheduleStatus(Map.of(3L, false)), "no change, nothing returned");
+
+        assertEquals(List.of(e), schedule.subScheduleStatus(Map.of(3L, true)));
+        assertNull(e.getDropReason());
+    }
+
+    @Test
+    public void testDisabledGroupFlagsEntry() {
+        var e = schedule.insert(cmdId("C", 1), insert(42, 3L, act(7L, t0, 100, 11))).getFirst();
+
+        assertEquals(List.of(e), schedule.groupStatus(Map.of(7L, false, 8L, true)));
+        assertEquals("group 7 is disabled", e.getDropReason());
+    }
+
+    @Test
+    public void testSubScheduleReasonWinsOverGroup() {
+        var e = schedule.insert(cmdId("C", 1), insert(42, 3L, act(7L, t0, 100, 11))).getFirst();
+        schedule.groupStatus(Map.of(7L, false));
+        schedule.subScheduleStatus(Map.of(3L, false));
+        assertEquals("sub-schedule 3 is disabled", e.getDropReason());
+
+        schedule.subScheduleStatus(Map.of(3L, true));
+        assertEquals("group 7 is disabled", e.getDropReason());
+    }
+
+    @Test
+    public void testIdNotInReportIsNotFlagged() {
+        var e = schedule.insert(cmdId("C", 1), insert(42, 3L, act(7L, t0, 100, 11))).getFirst();
+
+        assertEquals(List.of(), schedule.subScheduleStatus(Map.of(4L, false)));
+        assertEquals(List.of(), schedule.groupStatus(Map.of(8L, false)));
+        assertNull(e.getDropReason());
+    }
+
+    @Test
+    public void testEntryWithoutIdsIsNeverFlagged() {
+        var e = schedule.insert(cmdId("C", 1), insert(42, null, act(null, t0, 100, 11))).getFirst();
+        schedule.subScheduleStatus(Map.of(0L, false));
+        schedule.groupStatus(Map.of(0L, false));
+        assertNull(e.getDropReason());
+    }
+
+    @Test
+    public void testInsertAfterReportIsFlaggedAtOnce() {
+        schedule.groupStatus(Map.of(7L, false));
+
+        var e = schedule.insert(cmdId("C", 1), insert(42, 3L, act(7L, t0, 100, 11))).getFirst();
+
+        assertEquals("group 7 is disabled", e.getDropReason());
+    }
+
+    @Test
+    public void testEntryNoLongerLiveKeepsItsReason() {
+        var cmdId = cmdId("C", 1);
+        var e = schedule.insert(cmdId, insert(42, 3L, act(7L, t0, 100, 11))).getFirst();
+        schedule.commandComplete(cmdId, true);
+        schedule.groupStatus(Map.of(7L, false));
+        schedule.sweep(t0 + GRACE + 1, GRACE);
+        assertEquals(EntryState.PRESUMED_GONE, e.getState());
+
+        assertEquals(List.of(), schedule.groupStatus(Map.of(7L, true)));
+        assertEquals("group 7 is disabled", e.getDropReason(), "the status at its release time is kept");
     }
 
     // ---- helpers ----

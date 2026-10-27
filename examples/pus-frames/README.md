@@ -54,7 +54,15 @@ shows `coefficients`, about 30 s after start), try the PUS 11 tests. They need
 ```
 python3 examples/pus-frames/tests/test-pus11.py
 python3 examples/pus-frames/tests/test-pus11-tracker.py
+python3 examples/pus-frames/tests/test-pus11-dropflag.py
+python3 examples/pus-frames/tests/test-pus11-groups.py
 ```
+
+The simulator creates no scheduling group at boot (ECSS-E-ST-70-41C §6.11.6), and rejects inserts
+into a group that does not exist. Each test creates the groups it needs with TC[11,22]
+(`/PUS11/CREATE_GROUPS`) if they are missing and checks them with TM[11,27], through
+`tests/pus11_setup.py`. Group 1 is the TC link default; the other tests use their own group IDs
+(listed in `pus11_setup.py`), so the tests can run in any order and again on one simulator.
 
 `test-pus11.py` enables the execution function (TC[11,1]), then checks that an activity in a
 disabled scheduling group is withheld and one in an enabled group is listed in the detail report
@@ -62,9 +70,17 @@ and released (a TM[1,x] for its request ID arrives); it exits non-zero on a mism
 `test-pus11-tracker.py` checks the `pus11-release` acknowledgment (rejected insert, `SCHEDULED`,
 then `TIMEOUT`) and exits non-zero on a mismatch; it takes about 90 s. The tracker logs each
 transition (`PENDING`, `SCHEDULED`, `DELETED`, `PRESUMED_GONE`) in the Yamcs log.
+`test-pus11-dropflag.py` checks that `pus11-release` turns `DISABLED` ("Will be dropped at …") once
+a TM[11,19] or TM[11,27] reports the command's sub-schedule or group disabled, and back to
+`SCHEDULED` once it is reported enabled; it takes about 2 minutes.
+`test-pus11-groups.py` checks TC[11,22] end to end: groups created enabled or disabled, a create
+naming an existing group rejected as a whole, inserts rejected until the group is created,
+TC[11,23] rejected while a group has activities, then the test groups deleted again.
 
 The simulator is started with `--exit-with-parent`, so it stops when Yamcs is killed (even with
-`kill -9`) instead of keeping its UDP ports.
+`kill -9`) instead of keeping its UDP ports. `tests/check-sim-exit-with-parent.sh` checks this: run it
+from the repository root with the example running; it kills Yamcs and expects the simulator to exit
+within 30 s.
 
 The TC packets embedded in commands are demonstrated by:
 - `test-pus11-embedded.py`: a TC[11,4] built by hand (`/PUS11/INSERT_ACTIVITIES`) with a list of

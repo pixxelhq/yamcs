@@ -9,7 +9,9 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 import org.junit.jupiter.api.AfterEach;
@@ -136,7 +138,139 @@ public class Pus11ServiceTest {
         assertEquals(AbstractPusService.START_ERR_GROUP_HAS_ACTIVITIES, ackCode(lastAck(NACK_START)));
     }
 
+    // ---- TC[11,22] create groups ----
+
+    @Test
+    void createdGroupsAreReportedWithTheirStatus() {
+        svc.executeTc(createGroupsTc(new int[] { 7, 8 }, new int[] { 1, 0 }));
+        assertNotNull(lastAck(ACK_COMPLETION));
+
+        assertEquals(Map.of(7, 1, 8, 0), reportedGroups());
+    }
+
+    @Test
+    void noGroupBeforeTheFirstCreate() {
+        // ECSS 6.11.6: groups exist only after a TC[11,22]; the simulator creates none at boot
+        assertEquals(Map.of(), reportedGroups());
+    }
+
+    @Test
+    void createWithAnExistingGroupIsRejectedAsAWhole() {
+        svc.executeTc(createGroupsTc(new int[] { 1 }, new int[] { 1 }));
+        sim.tm.clear();
+
+        svc.executeTc(createGroupsTc(new int[] { 10, 1 }, new int[] { 1, 0 }));
+
+        assertEquals(AbstractPusService.START_ERR_GROUP_EXISTS, ackCode(lastAck(NACK_START)));
+        assertEquals(Map.of(1, 1), reportedGroups(), "group 10 not created, group 1 unchanged");
+    }
+
+    @Test
+    void maxGroupsRejected() {
+        for (int i = 0; i < Pus11Service.MAX_GROUPS; i++) {
+            svc.executeTc(createGroupsTc(new int[] { i }, new int[] { 1 }));
+        }
+        assertNull(lastAck(NACK_START));
+
+        svc.executeTc(createGroupsTc(new int[] { Pus11Service.MAX_GROUPS }, new int[] { 1 }));
+        assertEquals(AbstractPusService.START_ERR_MAX_GROUPS_REACHED, ackCode(lastAck(NACK_START)));
+        assertEquals(Pus11Service.MAX_GROUPS, reportedGroups().size());
+    }
+
+    @Test
+    void createBeyondMaxGroupsInOneRequestIsRejectedAsAWhole() {
+        int n = Pus11Service.MAX_GROUPS + 1;
+        int[] ids = new int[n];
+        int[] statuses = new int[n];
+        for (int i = 0; i < n; i++) {
+            ids[i] = i;
+            statuses[i] = 1;
+        }
+
+        svc.executeTc(createGroupsTc(ids, statuses));
+
+        assertEquals(AbstractPusService.START_ERR_MAX_GROUPS_REACHED, ackCode(lastAck(NACK_START)));
+        assertEquals(Map.of(), reportedGroups());
+    }
+
+    @Test
+    void insertAcceptedOnceTheGroupIsCreated() {
+        svc.executeTc(insertTc(1, 8, releaseInMillis(3_600_000)));
+        assertEquals(AbstractPusService.START_ERR_UNKNOWN_GROUP, ackCode(lastAck(NACK_START)));
+        sim.tm.clear();
+
+        svc.executeTc(createGroupsTc(new int[] { 8 }, new int[] { 1 }));
+        svc.executeTc(insertTc(1, 8, releaseInMillis(3_600_000)));
+
+        assertNull(lastAck(NACK_START));
+        assertTrue(svc.commands.stream().anyMatch(c -> c.group == 8));
+    }
+
+    @Test
+    void insertIntoADeletedGroupIsRejected() {
+        svc.executeTc(createGroupsTc(new int[] { 9 }, new int[] { 1 }));
+        svc.executeTc(deleteGroupsTc(new int[] { 9 }));
+        assertNull(lastAck(NACK_START));
+
+        svc.executeTc(insertTc(1, 9, releaseInMillis(3_600_000)));
+
+        assertEquals(AbstractPusService.START_ERR_UNKNOWN_GROUP, ackCode(lastAck(NACK_START)));
+    }
+
+    @Test
+    void createdDisabledGroupIsEnabledByTc24() throws Exception {
+        svc.executeTc(createGroupsTc(new int[] { 4 }, new int[] { 0 }));
+        svc.executeTc(simpleTc(24, new byte[] { 1, 4 }));
+
+        assertEquals(Map.of(4, 1), reportedGroups());
+        svc.executeTc(insertTc(1, 4, releaseInMillis(400)));
+        svc.executeTc(simpleTc(20, new byte[] { 1, 1 })); // enable sub-schedule 1
+        Thread.sleep(900);
+        assertEquals(1, sim.released.size());
+    }
+
+    @Test
+    void enableOrDisableUnknownGroupIsRejected() {
+        svc.executeTc(simpleTc(24, new byte[] { 1, 11 }));
+        assertEquals(AbstractPusService.START_ERR_UNKNOWN_GROUP, ackCode(lastAck(NACK_START)));
+        sim.tm.clear();
+
+        svc.executeTc(simpleTc(25, new byte[] { 1, 11 }));
+        assertEquals(AbstractPusService.START_ERR_UNKNOWN_GROUP, ackCode(lastAck(NACK_START)));
+    }
+
+    @Test
+    void deleteAllKeepsTheGroupsWithActivities() {
+        svc.executeTc(createGroupsTc(new int[] { 2, 3 }, new int[] { 1, 1 }));
+        svc.executeTc(insertTc(1, 3, releaseInMillis(3_600_000)));
+
+        svc.executeTc(deleteGroupsTc(new int[0]));
+
+        assertNull(lastAck(NACK_START));
+        assertEquals(Map.of(3, 1), reportedGroups());
+    }
+
     // ---- helpers ----
+
+    /** sends a TC[11,26] and decodes the TM[11,27]: group id -> status (1 enabled, 0 disabled) */
+    private Map<Integer, Integer> reportedGroups() {
+        sim.tm.clear();
+        svc.executeTc(simpleTc(26, new byte[0]));
+        byte[] report = null;
+        for (byte[] p : sim.tm) {
+            if (u8(p, 7) == 11 && u8(p, 8) == 27) {
+                report = p;
+            }
+        }
+        assertNotNull(report);
+        int off = 21; // PusTmPacket.DATA_OFFSET
+        int n = ByteArrayUtils.decodeInt(report, off);
+        Map<Integer, Integer> groups = new HashMap<>();
+        for (int i = 0; i < n; i++) {
+            groups.put(u8(report, off + 4 + 2 * i), u8(report, off + 5 + 2 * i));
+        }
+        return groups;
+    }
 
     private byte[] releaseInMillis(int millis) {
         ByteBuffer bb = ByteBuffer.allocate(sim.timeEncoding.getEncodedLength());

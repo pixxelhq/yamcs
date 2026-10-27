@@ -18,12 +18,21 @@ import org.yamcs.cmdhistory.CommandHistoryPublisher.AckStatus;
 import org.yamcs.cmdhistory.StreamCommandHistoryPublisher;
 import org.yamcs.commanding.PreparedCommand;
 import org.yamcs.events.EventProducerFactory;
+import org.yamcs.parameter.AggregateValue;
+import org.yamcs.parameter.ArrayValue;
+import org.yamcs.parameter.EnumeratedValue;
+import org.yamcs.parameter.ParameterValue;
+import org.yamcs.parameter.Value;
 import org.yamcs.protobuf.Commanding.CommandHistoryAttribute;
 import org.yamcs.protobuf.Commanding.CommandId;
+import org.yamcs.protobuf.Yamcs.Value.Type;
 import org.yamcs.pus.Pus11Schedule.EntryState;
 import org.yamcs.pus.Pus11Schedule.RequestId;
 import org.yamcs.utils.TimeEncoding;
 import org.yamcs.utils.ValueHelper;
+import org.yamcs.utils.ValueUtility;
+import org.yamcs.xtce.Parameter;
+import org.yamcs.xtce.util.AggregateMemberNames;
 import org.yamcs.yarch.Tuple;
 import org.yamcs.yarch.YarchTestCase;
 
@@ -173,6 +182,130 @@ public class Pus11ScheduleTrackerTest extends YarchTestCase {
         publisher.addCommand(pc);
         assertNotNull(pp.process(pc));
         return cmdId;
+    }
+
+    // ---- enable status (plan §6 step 2) ----
+
+    @Test
+    public void testDisabledSubScheduleThenEnabled() {
+        var cmdId = send(1, true);
+        complete(cmdId, AckStatus.OK);
+        assertEquals("SCHEDULED", lastValue(RELEASE_STATUS));
+
+        tracker.updateItems(0, List.of(subScheduleReport(0, "disabled", 1, "enabled")));
+        assertEquals("DISABLED", lastValue(RELEASE_STATUS));
+        assertEquals("Will be dropped at " + TimeEncoding.toString(scheduleAt) + ": sub-schedule 0 is disabled",
+                lastValue(RELEASE_MESSAGE));
+
+        tracker.updateItems(0, List.of(subScheduleReport(0, "enabled")));
+        assertEquals("SCHEDULED", lastValue(RELEASE_STATUS));
+        assertTrue(((String) lastValue(RELEASE_MESSAGE)).startsWith("Release at "));
+    }
+
+    @Test
+    public void testPendingInsertIntoDisabledGroupIsDisabledOnComplete() {
+        var cmdId = send(1, true);
+        tracker.updateItems(0, List.of(groupReport(0, "disabled")));
+        assertNull(lastValue(RELEASE_STATUS), "nothing published while the insert is unconfirmed");
+
+        complete(cmdId, AckStatus.OK);
+
+        assertEquals("DISABLED", lastValue(RELEASE_STATUS));
+        assertTrue(((String) lastValue(RELEASE_MESSAGE)).endsWith(": group 0 is disabled"));
+    }
+
+    @Test
+    public void testUnchangedStatusPublishesNothing() {
+        var cmdId = send(1, true);
+        complete(cmdId, AckStatus.OK);
+        int n = cmdhist.size();
+
+        tracker.updateItems(0, List.of(groupReport(0, "enabled")));
+
+        assertEquals(n, cmdhist.size());
+    }
+
+    @Test
+    public void testOtherParametersAreIgnored() {
+        var cmdId = send(1, true);
+        complete(cmdId, AckStatus.OK);
+        var p = new Parameter("other");
+        p.setQualifiedName("/PUS11/other");
+        var pv = new ParameterValue(p);
+        pv.setEngValue(ValueUtility.getUint32Value(0));
+
+        tracker.updateItems(0, List.of(pv));
+
+        assertEquals("SCHEDULED", lastValue(RELEASE_STATUS));
+    }
+
+    @Test
+    public void testParseNumericAndBooleanStatus() {
+        var report = Pus11ScheduleTracker.DEFAULT_GROUP_STATUS;
+        var array = statusArray(report, new Value[] { ValueUtility.getUint32Value(0), ValueUtility.getUint32Value(1),
+                ValueUtility.getBooleanValue(false) });
+        assertEquals(Map.of(0L, false, 1L, true, 2L, false), Pus11ScheduleTracker.parseStatusReport(array, report));
+    }
+
+    @Test
+    public void testParseRejectsWrongStructure() {
+        var report = Pus11ScheduleTracker.DEFAULT_GROUP_STATUS;
+        assertThrows(IllegalArgumentException.class,
+                () -> Pus11ScheduleTracker.parseStatusReport(ValueUtility.getUint32Value(1), report));
+        var wrongMembers = statusArray(Pus11ScheduleTracker.DEFAULT_SUBSCHEDULE_STATUS,
+                new Value[] { new EnumeratedValue(1, "enabled") });
+        assertThrows(IllegalArgumentException.class,
+                () -> Pus11ScheduleTracker.parseStatusReport(wrongMembers, report));
+        var unknownLabel = statusArray(report, new Value[] { ValueUtility.getStringValue("paused") });
+        assertThrows(IllegalArgumentException.class,
+                () -> Pus11ScheduleTracker.parseStatusReport(unknownLabel, report));
+    }
+
+    /** decoded TM(11,19): id, label, id, label... */
+    private static ParameterValue subScheduleReport(Object... idsAndLabels) {
+        return statusReport(Pus11ScheduleTracker.DEFAULT_SUBSCHEDULE_STATUS, idsAndLabels);
+    }
+
+    /** decoded TM(11,27): id, label, id, label... */
+    private static ParameterValue groupReport(Object... idsAndLabels) {
+        return statusReport(Pus11ScheduleTracker.DEFAULT_GROUP_STATUS, idsAndLabels);
+    }
+
+    private static ParameterValue statusReport(Pus11ScheduleTracker.StatusReport report, Object... idsAndLabels) {
+        var status = new Value[idsAndLabels.length / 2];
+        var ids = new int[status.length];
+        for (int i = 0; i < status.length; i++) {
+            ids[i] = (Integer) idsAndLabels[2 * i];
+            String label = (String) idsAndLabels[2 * i + 1];
+            status[i] = new EnumeratedValue(label.equals("enabled") ? 1 : 0, label);
+        }
+        String name = report.parameter();
+        var p = new Parameter(name.substring(name.lastIndexOf('/') + 1));
+        p.setQualifiedName(name);
+        var pv = new ParameterValue(p);
+        pv.setEngValue(statusArray(report, status, ids));
+        return pv;
+    }
+
+    /** ids 0, 1, 2... */
+    private static ArrayValue statusArray(Pus11ScheduleTracker.StatusReport report, Value[] status) {
+        var ids = new int[status.length];
+        for (int i = 0; i < ids.length; i++) {
+            ids[i] = i;
+        }
+        return statusArray(report, status, ids);
+    }
+
+    private static ArrayValue statusArray(Pus11ScheduleTracker.StatusReport report, Value[] status, int[] ids) {
+        var names = AggregateMemberNames.get(new String[] { report.idMember(), report.statusMember() });
+        var array = new ArrayValue(new int[] { status.length }, Type.AGGREGATE);
+        for (int i = 0; i < status.length; i++) {
+            var element = new AggregateValue(names);
+            element.setMemberValue(report.idMember(), ValueUtility.getUint32Value(ids[i]));
+            element.setMemberValue(report.statusMember(), status[i]);
+            array.setElementValue(i, element);
+        }
+        return array;
     }
 
     private void complete(CommandId cmdId, AckStatus status) {
