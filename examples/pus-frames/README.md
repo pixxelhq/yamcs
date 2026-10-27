@@ -28,18 +28,43 @@ The `PusCommandPostprocessor` also uses `tco0` here: when a command is scheduled
 `pus11ScheduleAt` option, the TC[11,4] release time is converted from UTC to on-board time using
 the correlation.
 
+The `Pus11ScheduleTracker` service keeps a ground model of the on-board PUS 11 schedule from the
+commands scheduled with `pus11ScheduleAt`, and publishes a `pus11-release` acknowledgment on each
+of them: `SCHEDULED` once the TC[11,4] completes, `TIMEOUT` when no release is confirmed within
+`releaseGrace` (60 s here) of the release time. The model is in memory only: it starts empty after
+a restart.
+
 ## Running
 
 ```
 ./run-example.sh pus-frames
 ```
 
-Then, once a correlation has been established (watch the events / the `tco0` status), try the PUS
-11 scheduling test:
+`yamcs.yaml` sets `dataDir: /storage/yamcs-data`. Where `/storage` is not writable (e.g. macOS),
+override it; the path is relative to `examples/pus-frames/target/yamcs` and must not contain spaces:
+
+```
+./run-example.sh pus-frames --data-dir yamcs-data
+```
+
+Then, once a correlation has been established (`curl localhost:8090/api/tco/pus-frames/tco0/status`
+shows `coefficients`, about 30 s after start), try the PUS 11 tests. They need
+`pip install yamcs-client`.
 
 ```
 python3 examples/pus-frames/tests/test-pus11.py
+python3 examples/pus-frames/tests/test-pus11-tracker.py
 ```
+
+`test-pus11.py` enables the execution function (TC[11,1]), then checks that an activity in a
+disabled scheduling group is withheld and one in an enabled group is listed in the detail report
+and released (a TM[1,x] for its request ID arrives); it exits non-zero on a mismatch.
+`test-pus11-tracker.py` checks the `pus11-release` acknowledgment (rejected insert, `SCHEDULED`,
+then `TIMEOUT`) and exits non-zero on a mismatch; it takes about 90 s. The tracker logs each
+transition (`PENDING`, `SCHEDULED`, `DELETED`, `PRESUMED_GONE`) in the Yamcs log.
+
+The simulator is started with `--exit-with-parent`, so it stops when Yamcs is killed (even with
+`kill -9`) instead of keeping its UDP ports.
 
 The TC packets embedded in commands are demonstrated by:
 - `test-pus11-embedded.py`: a TC[11,4] built by hand (`/PUS11/INSERT_ACTIVITIES`) with a list of
@@ -59,3 +84,11 @@ python3 examples/pus-frames/tests/test-pus19-embedded.py
 - This example demonstrates ST[11] (time-based scheduling). The [`pus`](../pus) example
   demonstrates ST[22] (position-based scheduling) instead 
 - The simulator sends TM frames at 10 Hz; if it has no data it sends idle frames.
+- The simulator rejects a TC[11,4] into a scheduling group that does not exist. The TC link
+  default group is 1: create it first (`/PUS11/CREATE_GROUPS`), as both test scripts do.
+- The simulator starts with the time-based schedule execution function disabled, so released
+  activities are dropped ("the time-based schedule execution function is disabled") until
+  TC[11,1] enables it (`/PUS11/ENABLE_SCHEDULER`, sent by `test-pus11.py`).
+- An on-board activity is identified by the request ID of the embedded command, not of the
+  TC[11,4] wrapper. Use the `pus11-inner-seqcount` command attribute (not `ccsds-seqcount`) in
+  delete, time-shift and report-by-ID requests.

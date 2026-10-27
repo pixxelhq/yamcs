@@ -23,6 +23,15 @@
 			<IntegerParameterType signed="false" name="uint14">
 				<IntegerDataEncoding encoding="unsigned" sizeInBits="14" />
 			</IntegerParameterType>
+			<!-- APID and sequence-count fields carried in PUS request identifiers (service data, not the
+			     CCSDS primary header). Packed to protocol widths, as the simulator encodes them. Keep the
+			     command-side pus_report_* argument types below at the same widths. -->
+			<IntegerParameterType signed="false" name="pus_report_apid">
+				<IntegerDataEncoding encoding="unsigned" sizeInBits="11" />
+			</IntegerParameterType>
+			<IntegerParameterType signed="false" name="pus_report_seqcount">
+				<IntegerDataEncoding encoding="unsigned" sizeInBits="14" />
+			</IntegerParameterType>
 			<IntegerParameterType signed="false" name="uint16">
 				<IntegerDataEncoding encoding="unsigned" sizeInBits="16" />
 			</IntegerParameterType>
@@ -60,6 +69,13 @@
 			</IntegerArgumentType>
 			<IntegerArgumentType name="uint11" signed="false">
 				<IntegerDataEncoding encoding="unsigned" sizeInBits="11" />
+			</IntegerArgumentType>
+			<!-- Command-side counterparts of the pus_report_* parameter types above. -->
+			<IntegerArgumentType name="pus_report_apid" signed="false">
+				<IntegerDataEncoding encoding="unsigned" sizeInBits="11" />
+			</IntegerArgumentType>
+			<IntegerArgumentType name="pus_report_seqcount" signed="false">
+				<IntegerDataEncoding encoding="unsigned" sizeInBits="14" />
 			</IntegerArgumentType>
 			<IntegerArgumentType name="uint16" signed="false">
 				<IntegerDataEncoding encoding="unsigned" sizeInBits="16" />

@@ -3,24 +3,18 @@ package org.yamcs.pus;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.yamcs.YConfiguration;
 import org.yamcs.events.EventProducerFactory;
 import org.yamcs.protobuf.Commanding.CommandId;
 import org.yamcs.pus.Pus11Schedule.EntryState;
 import org.yamcs.pus.Pus11Schedule.RequestId;
 import org.yamcs.pus.Pus11WrapperParser.Activity;
 import org.yamcs.pus.Pus11WrapperParser.InsertRequest;
-import org.yamcs.tctm.AbstractPacketPreprocessor.TimeEpochs;
-import org.yamcs.tctm.ccsds.time.CucTimeEncoder;
-import org.yamcs.time.TimeCorrelationService;
 import org.yamcs.utils.ByteArrayUtils;
 import org.yamcs.utils.TimeEncoding;
-import org.yamcs.yarch.YarchDatabase;
 
 /**
  * Ground model of the on-board schedule (plan §6 step 1): PENDING on insert, SCHEDULED or dropped on CommandComplete,
@@ -28,9 +22,6 @@ import org.yamcs.yarch.YarchDatabase;
  */
 public class Pus11ScheduleTest {
     static final long GRACE = 60_000;
-    static final CucTimeEncoder ENC = new CucTimeEncoder(0x2f, false);
-    static final Pus11WrapperLayout LAYOUT = new Pus11WrapperLayout(1, 1, true, ENC, TimeEpochs.NONE, 0, false,
-            null);
     static long t0;
 
     Pus11Schedule schedule;
@@ -44,7 +35,7 @@ public class Pus11ScheduleTest {
 
     @BeforeEach
     void setUp() {
-        schedule = new Pus11Schedule(LAYOUT);
+        schedule = new Pus11Schedule();
     }
 
     @Test
@@ -60,8 +51,7 @@ public class Pus11ScheduleTest {
         assertEquals(new RequestId(9, 5, 42), e.getWrapper());
         assertEquals(3L, e.getSubScheduleId());
         assertEquals(7L, e.getGroupId());
-        assertEquals(obt(t0), e.getReleaseObt());
-        assertEquals(t0, schedule.releaseTime(e));
+        assertEquals(t0, e.getReleaseTime());
         assertEquals("/YSS/SIMULATOR/SWITCH_VOLTAGE_ON", e.getCommandName());
         assertEquals(cmdId, e.getCmdId());
         assertTrue(e.expectsReleaseAck());
@@ -158,17 +148,12 @@ public class Pus11ScheduleTest {
     }
 
     @Test
-    public void testSweepSkipsEntriesWithoutGroundTime() throws Exception {
-        // OBT release time, but the time correlation has no coefficients: the ground time is unknown
-        var tco = newTco("tco_sweep_no_coeffs");
-        var layout = new Pus11WrapperLayout(1, 1, true, ENC, TimeEpochs.NONE, 0, false, tco);
-        var s = new Pus11Schedule(layout);
-        s.insert(cmdId("C", 1), insert(42, 0L, new Activity(0L, 1000L << 24, TimeEncoding.INVALID_INSTANT,
-                innerTc(100, 11))));
+    public void testSweepSkipsEntriesWithoutReleaseTime() {
+        // OBT release time, but the time correlation had no coefficients at insert: the ground time is unknown
+        schedule.insert(cmdId("C", 1), insert(42, 0L, act(0L, TimeEncoding.INVALID_INSTANT, 100, 11)));
 
-        assertTrue(s.sweep(Long.MAX_VALUE / 2, GRACE).isEmpty());
-        assertEquals(EntryState.PENDING, s.getEntries().getFirst().getState());
-        tco.stopAsync().awaitTerminated();
+        assertTrue(schedule.sweep(Long.MAX_VALUE / 2, GRACE).isEmpty());
+        assertEquals(EntryState.PENDING, schedule.getEntries().getFirst().getState());
     }
 
     @Test
@@ -215,14 +200,7 @@ public class Pus11ScheduleTest {
     }
 
     static Activity act(Long groupId, long releaseTime, int apid, int seqCount) {
-        return new Activity(groupId, obt(releaseTime), releaseTime, innerTc(apid, seqCount));
-    }
-
-    /** the raw ticks the postprocessor would encode for {@code t} */
-    static long obt(long t) {
-        byte[] buf = new byte[16];
-        ENC.encode(t, buf, 0);
-        return LAYOUT.decodeObt(buf, 0);
+        return new Activity(groupId, releaseTime, innerTc(apid, seqCount));
     }
 
     static byte[] innerTc(int apid, int seqCount) {
@@ -232,18 +210,5 @@ public class Pus11ScheduleTest {
         ByteArrayUtils.encodeUnsignedShort(0xC000 | seqCount, b, 2);
         ByteArrayUtils.encodeUnsignedShort(b.length - 7, b, 4);
         return b;
-    }
-
-    static TimeCorrelationService newTco(String name) throws Exception {
-        String instance = "pus11-schedule-test";
-        var ydb = YarchDatabase.getInstance(instance);
-        String table = TimeCorrelationService.TABLE_NAME + name;
-        if (ydb.getTable(table) != null) {
-            ydb.dropTable(table);
-        }
-        var tco = new TimeCorrelationService();
-        tco.init(instance, name, YConfiguration.wrap(Map.of("numSamples", 2)));
-        tco.startAsync().awaitRunning();
-        return tco;
     }
 }
