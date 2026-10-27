@@ -37,7 +37,7 @@ public record Pus11WrapperLayout(int subScheduleIdBytes, int groupIdBytes, boole
 
     /**
      * Reads the release time field at {@code offset} as raw ticks: coarse and fine time packed into one long, exactly
-     * as encoded. Filters and shifts are evaluated on this value, never on ground time.
+     * as encoded.
      */
     public long decodeObt(byte[] buf, int offset) {
         int n = timeEncoder.getBasicTimeBytes() + timeEncoder.getFractionalTimeBytes();
@@ -50,7 +50,7 @@ public record Pus11WrapperLayout(int subScheduleIdBytes, int groupIdBytes, boole
     }
 
     /**
-     * Converts raw release ticks to ground time.
+     * Converts raw release ticks to ground time, with the time correlation as it is now.
      *
      * @return the Yamcs instant, or {@link TimeEncoding#INVALID_INSTANT} if the time correlation has no coefficients
      */

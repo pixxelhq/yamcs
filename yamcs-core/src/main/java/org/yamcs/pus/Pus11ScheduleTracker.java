@@ -104,7 +104,7 @@ public class Pus11ScheduleTracker extends AbstractYamcsService implements Stream
             var timeService = YamcsServer.getTimeService(yamcsInstance);
             clock = timeService::getMissionTime;
         }
-        schedule = new Pus11Schedule(layout);
+        schedule = new Pus11Schedule();
         parser = new Pus11WrapperParser(layout);
     }
 
@@ -213,9 +213,9 @@ public class Pus11ScheduleTracker extends AbstractYamcsService implements Stream
         }
     }
 
-    private String releaseTimeString(ScheduleEntry e) {
-        long t = schedule.releaseTime(e);
-        return t == TimeEncoding.INVALID_INSTANT ? "OBT " + e.getReleaseObt() + " (no time correlation)"
+    private static String releaseTimeString(ScheduleEntry e) {
+        long t = e.getReleaseTime();
+        return t == TimeEncoding.INVALID_INSTANT ? "unknown time (no time correlation at insert)"
                 : TimeEncoding.toString(t);
     }
 
