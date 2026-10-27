@@ -15,8 +15,8 @@ import org.yamcs.utils.TimeEncoding;
 /**
  * Ground model of the on-board PUS 11 time-based schedule: what the ground believes is currently queued on board.
  * <p>
- * Release times are kept as raw on-board ticks, exactly as encoded in the TC(11,4); the ground time is computed when
- * needed via the {@link Pus11WrapperLayout}, so that it follows re-correlation.
+ * Release times are kept as ground time, converted once when the TC(11,4) is parsed. Time drift and re-correlation
+ * are not followed.
  * <p>
  * Thread safe.
  */
@@ -45,18 +45,18 @@ public class Pus11Schedule {
     public static class ScheduleEntry {
         final RequestId inner;
         final RequestId wrapper;
-        final long releaseObt;
+        final long releaseTime;
         final Long subScheduleId;
         final Long groupId;
         final CommandId cmdId;
         final boolean duplicate;
         volatile EntryState state = EntryState.PENDING;
 
-        ScheduleEntry(RequestId inner, RequestId wrapper, long releaseObt, Long subScheduleId, Long groupId,
+        ScheduleEntry(RequestId inner, RequestId wrapper, long releaseTime, Long subScheduleId, Long groupId,
                 CommandId cmdId, boolean duplicate) {
             this.inner = inner;
             this.wrapper = wrapper;
-            this.releaseObt = releaseObt;
+            this.releaseTime = releaseTime;
             this.subScheduleId = subScheduleId;
             this.groupId = groupId;
             this.cmdId = cmdId;
@@ -73,9 +73,12 @@ public class Pus11Schedule {
             return wrapper;
         }
 
-        /** release time as raw on-board ticks */
-        public long getReleaseObt() {
-            return releaseObt;
+        /**
+         * release time as ground time, {@link TimeEncoding#INVALID_INSTANT} if there were no time correlation
+         * coefficients at insert
+         */
+        public long getReleaseTime() {
+            return releaseTime;
         }
 
         /** null if the link has no sub-schedule id field */
@@ -120,14 +123,9 @@ public class Pus11Schedule {
         }
     }
 
-    final Pus11WrapperLayout layout;
     final List<ScheduleEntry> entries = new ArrayList<>();
     final Map<RequestId, ScheduleEntry> byRequestId = new HashMap<>();
     final Map<CommandId, List<ScheduleEntry>> byCmdId = new HashMap<>();
-
-    public Pus11Schedule(Pus11WrapperLayout layout) {
-        this.layout = layout;
-    }
 
     /**
      * Adds the activities of a TC(11,4) as {@link EntryState#PENDING} entries
@@ -143,7 +141,7 @@ public class Pus11Schedule {
                 log.warn("{}: request ID {} is already in the schedule ({}); has the sequence count been reset?",
                         cmdId.getCommandName(), inner, old);
             }
-            var e = new ScheduleEntry(inner, wrapper, a.releaseObt(), req.subScheduleId(), a.groupId(), cmdId,
+            var e = new ScheduleEntry(inner, wrapper, a.releaseTime(), req.subScheduleId(), a.groupId(), cmdId,
                     duplicate);
             entries.add(e);
             byRequestId.put(inner, e);
@@ -186,8 +184,8 @@ public class Pus11Schedule {
 
     /**
      * Marks {@link EntryState#PRESUMED_GONE} the pending or scheduled entries whose release time is more than
-     * {@code grace} ms before {@code now}. The entries stay in the model. Entries whose ground time cannot be computed
-     * (no time correlation) are left alone.
+     * {@code grace} ms before {@code now}. The entries stay in the model. Entries without a release time (no time
+     * correlation at insert) are left alone.
      *
      * @return the entries that changed state
      */
@@ -197,21 +195,13 @@ public class Pus11Schedule {
             if (!isLive(e)) {
                 continue;
             }
-            long t = releaseTime(e);
+            long t = e.releaseTime;
             if (t != TimeEncoding.INVALID_INSTANT && t + grace < now) {
                 e.state = EntryState.PRESUMED_GONE;
                 gone.add(e);
             }
         }
         return gone;
-    }
-
-    /**
-     * @return the release time as ground time, {@link TimeEncoding#INVALID_INSTANT} if there are no time correlation
-     *         coefficients
-     */
-    public long releaseTime(ScheduleEntry e) {
-        return layout.toGroundTime(e.releaseObt);
     }
 
     /** the most recently inserted entry with this inner request ID, or null */
@@ -222,7 +212,7 @@ public class Pus11Schedule {
     /** snapshot of all the entries, sorted by release time */
     public synchronized List<ScheduleEntry> getEntries() {
         var l = new ArrayList<>(entries);
-        l.sort(Comparator.comparingLong(ScheduleEntry::getReleaseObt));
+        l.sort(Comparator.comparingLong(ScheduleEntry::getReleaseTime));
         return l;
     }
 

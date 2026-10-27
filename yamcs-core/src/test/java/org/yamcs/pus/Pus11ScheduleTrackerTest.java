@@ -92,7 +92,7 @@ public class Pus11ScheduleTrackerTest extends YarchTestCase {
         assertEquals(new RequestId(9, 5, (Integer) lastValue("pus11CcsdsSeqCount")), e.getWrapper());
         assertEquals(0L, e.getSubScheduleId());
         assertEquals(0L, e.getGroupId());
-        assertEquals(scheduleAt, tracker.getSchedule().releaseTime(e));
+        assertEquals(scheduleAt, e.getReleaseTime());
         assertEquals(cmdId, e.getCmdId());
         assertNull(lastValue(RELEASE_STATUS), "nothing published while the insert is unconfirmed");
 
