@@ -2,6 +2,7 @@ import { ConfigService, NamedObjectId, ParameterSubscription, ParameterValue, Sa
 import { BehaviorSubject, Subscription } from 'rxjs';
 import { NamedParameterType } from './NamedParameterType';
 import { DyValueRange, PlotBuffer, PlotData } from './PlotBuffer';
+import { getCategoricalValues } from './categorical';
 import { CustomBarsValue, DySample, DySeries } from './dygraphs';
 
 /**
@@ -190,7 +191,15 @@ export class DyDataSource {
   private processRealtimeDelivery(pvals: ParameterValue[]) {
     for (const pval of pvals) {
       let dyValue: CustomBarsValue = null;
-      const value = utils.convertValueToNumber(pval.engValue);
+      const id = this.idMapping[pval.numericId];
+      let value = utils.convertValueToNumber(pval.engValue);
+      // Drop enum ordinals that aren't in the MDB enumeration table (label
+      // "UNDEF"), matching the server-side Downsampler. Otherwise an unmapped
+      // ordinal plots as a spurious out-of-range value.
+      if (value !== null && pval.engValue.type === 'ENUMERATED'
+        && this.isUnmappedEnumOrdinal(id.name, value)) {
+        value = null;
+      }
       if (value !== null) {
         if (pval.acquisitionStatus === 'EXPIRED') {
           // We get the last received timestamp.
@@ -201,7 +210,6 @@ export class DyDataSource {
           dyValue = [value, value, value];
         }
       }
-      const id = this.idMapping[pval.numericId];
       this.latestRealtimeValues.set(id.name, dyValue);
     }
 
@@ -214,6 +222,12 @@ export class DyDataSource {
 
     const sample: any = [t, ...dyValues];
     this.plotBuffer.addRealtimeValue(sample);
+  }
+
+  private isUnmappedEnumOrdinal(qualifiedName: string, ordinal: number) {
+    const parameter = this.parameters$.value.find(p => p.qualifiedName === qualifiedName);
+    const values = getCategoricalValues(parameter?.type);
+    return !!values && !values.some(v => v.value === ordinal);
   }
 
   disconnect() {

@@ -45,3 +45,81 @@
 .separator {
   border-right: 1px solid rgba(0, 0, 0, 0.12);
 }
+
+.plot-container {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Each plot takes an equal share of the height (one plot in overlay layout) */
+.plot-view {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 80px;
+}
+
+.plot-view + .plot-view {
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.plot-view app-parameter-plot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: block;
+}
+
+.zoom-actions {
+  z-index: 60;
+}
+
+.enum-key-overlay {
+  position: absolute;
+  top: 36px;
+  right: 12px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(100% - 60px);
+  overflow: auto;
+}
+
+.enum-key {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.enum-key caption {
+  caption-side: top;
+  text-align: left;
+  padding: 2px 6px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-bottom: none;
+}
+
+.enum-key .swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.enum-key td {
+  padding: 1px 6px;
+}
+
+.enum-key .enum-code {
+  text-align: right;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+}

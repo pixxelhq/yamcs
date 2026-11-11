@@ -27,6 +27,20 @@ export class ParameterLegendComponent {
   @Input()
   closable = false;
 
+  /**
+   * Label of the series that cannot be closed. When unset, the first series
+   * cannot be closed.
+   */
+  @Input()
+  lockedLabel?: string;
+
+  isClosable(label: string, index: number) {
+    if (!this.closable) {
+      return false;
+    }
+    return this.lockedLabel !== undefined ? label !== this.lockedLabel : index !== 0;
+  }
+
   @Output()
   select = new EventEmitter<string>();
 

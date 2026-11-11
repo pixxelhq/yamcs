@@ -9,6 +9,7 @@ import { TimestampTrackerComponent } from '../timestamp-tracker/timestamp-tracke
 import CrosshairPlugin from './CrosshairPlugin';
 import { DyDataSource } from './DyDataSource';
 import GridPlugin from './GridPlugin';
+import { getCategoricalValues } from './categorical';
 import { NamedParameterType } from './NamedParameterType';
 import { DyLegendData, TimestampTrackerData, analyzeStaticValueRanges } from './dygraphs';
 import { ParameterLegendComponent } from './parameter-legend/parameter-legend.component';
@@ -64,6 +65,13 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
   @Input()
   crosshair: 'horizontal' | 'vertical' | 'both' | 'none' = 'vertical';
 
+  /**
+   * Label of a series that may not be removed via the legend. When unset, the
+   * first series is the one that cannot be removed.
+   */
+  @Input()
+  lockedSeries?: string;
+
   axisBackgroundColor = '#fafafa';
   axisLineColor = '#e1e1e1';
   gridLineColor = '#f2f2f2';
@@ -75,6 +83,19 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
 
   @Output()
   onManualRangeChange = new EventEmitter<void>();
+
+  /**
+   * Emits the new X range after a user pan or zoom, so that other plots can
+   * follow (stacked layout).
+   */
+  @Output()
+  xRangeChange = new EventEmitter<[Date, Date]>();
+
+  @Output()
+  seriesRemove = new EventEmitter<string>();
+
+  @Output()
+  seriesModify = new EventEmitter<ParameterSeriesComponent>();
 
   @ContentChildren(ParameterSeriesComponent)
   seriesComponents: QueryList<ParameterSeriesComponent>;
@@ -89,6 +110,16 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
 
   // Flag to prevent from reloading while the user is busy with a pan or zoom operation
   private disableDataReload = false;
+
+  // Ordinal→label table merged over all enum/boolean series (last write wins
+  // on a collision). Empty when no categorical series is plotted.
+  private labelByOrdinal = new Map<number, string>();
+
+  // True if every series is categorical, in which case the Y-axis only shows
+  // ticks at enumeration ordinals.
+  private allCategorical = false;
+
+  private destroyed = false;
 
   legendData$ = new BehaviorSubject<DyLegendData | null>(null);
   timestampTrackerData$ = new BehaviorSubject<TimestampTrackerData | null>(null);
@@ -126,6 +157,15 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
       if (data.valueRange[0] !== null && data.valueRange[1] !== null) {
         dyOptions.axes = {
           y: { valueRange: data.valueRange }
+        };
+      } else if (this.allCategorical) {
+        // Show every state of the enumeration, not just the ones in the data
+        const ordinals = [...this.labelByOrdinal.keys()];
+        const lo = Math.min(...ordinals);
+        const hi = Math.max(...ordinals);
+        const pad = Math.max(0.5, (hi - lo) * 0.05);
+        dyOptions.axes = {
+          y: { valueRange: [lo - pad, hi + pad] }
         };
       } else {
         const valueRange = analyzeStaticValueRanges(this.parameters[0]).valueRange;
@@ -169,15 +209,8 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
   }
 
   private initDygraphs(containingDiv: HTMLDivElement) {
-    const seriesByLabel: { [key: string]: any; } = {};
-
+    const seriesByLabel = this.buildSeriesOptions();
     const configs = this.parameters.map(p => this.parameterConfig.get(p.qualifiedName)!);
-    configs.forEach(config => {
-      seriesByLabel[config.label || config.parameter] = {
-        color: config.color,
-        strokeWidth: config.strokeWidth,
-      };
-    });
 
     const primaryParameter = this.parameters[0];
     const primaryConfig = configs[0];
@@ -208,7 +241,7 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
           axisLineWidth: this.xAxisLineWidth || 0.0000001, // Dygraphs does not handle 0 correctly
         },
         y: {
-          axisLabelWidth: 50,
+          ...this.buildCategoricalAxisOptions(),
           drawAxis: primaryConfig.axis,
           drawGrid: primaryConfig.grid,
           axisLineWidth: primaryConfig.axisLineWidth || 0.0000001, // Dygraphs does not handle 0 correctly
@@ -235,6 +268,7 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
           }
         },
         mouseup: (event: any, g: any, context: any) => {
+          const moved = context.isPanning || context.isZooming;
           if (context.isPanning) {
             (Dygraph as any).endPan(event, g, context);
           } else if (context.isZooming) {
@@ -248,6 +282,9 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
           const yAxisRange = g.yAxisRanges()[0];
           this.dataSource.updateWindow(start, stop, yAxisRange);
           this.onManualRangeChange.emit();
+          if (moved) {
+            this.xRangeChange.emit([start, stop]);
+          }
 
           this.disableDataReload = false;
         },
@@ -280,6 +317,7 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
 
             const yAxisRange = g.yAxisRanges()[0];
             this.dataSource.updateWindow(start, stop, yAxisRange);
+            this.xRangeChange.emit([start, stop]);
           }
           this.disableDataReload = false;
         },
@@ -403,7 +441,7 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
             const rtValue = this.dataSource.latestRealtimeValues.get(trace.label);
             if (rtValue) {
               trace.y = rtValue[1];
-              trace.yHTML = String(rtValue[1]);
+              trace.yHTML = this.formatValue(rtValue[1]);
             }
           }
         }
@@ -455,6 +493,7 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
     this.parameterConfig.delete(qualifiedName);
 
     this.updateDygraphSeries();
+    this.seriesRemove.emit(qualifiedName);
   }
 
   modifyParameter(label: string) {
@@ -471,31 +510,105 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
         config.color = result.color;
         config.strokeWidth = result.thickness;
         this.updateDygraphSeries();
+        this.seriesModify.emit(config);
       }
     });
   }
 
   private updateDygraphSeries() {
-    const seriesByLabel: { [key: string]: any; } = {};
-
+    const seriesByLabel = this.buildSeriesOptions();
     const configs = this.parameters.map(p => this.parameterConfig.get(p.qualifiedName)!);
-    configs.forEach(config => {
-      seriesByLabel[config.label || config.parameter] = {
-        color: config.color,
-        strokeWidth: config.strokeWidth,
-      };
-    });
 
     const dyOptions: { [key: string]: any; } = {
       labels: ['Generation Time', ...configs.map(s => s.label || s.parameter)],
       series: seriesByLabel,
+      axes: {
+        y: this.buildCategoricalAxisOptions(),
+      },
     };
 
     // TODO when removing a series we get legend-related errors on hovering (before data is set)
     // Visually it works though.
     this.dataSource.reloadVisibleRange().then((() => {
-      this.dygraph.updateOptions(dyOptions, true /* block redraw */);
+      if (!this.destroyed) {
+        this.dygraph.updateOptions(dyOptions, true /* block redraw */);
+      }
     }));
+  }
+
+  /**
+   * Per-series Dygraphs options. Also refreshes the categorical label table,
+   * so it must run whenever the set of parameters changes.
+   */
+  private buildSeriesOptions() {
+    const seriesByLabel: { [key: string]: any; } = {};
+    this.labelByOrdinal.clear();
+    this.allCategorical = this.parameters.length > 0;
+
+    for (const parameter of this.parameters) {
+      const config = this.parameterConfig.get(parameter.qualifiedName)!;
+      const categoricalValues = getCategoricalValues(parameter.type);
+      for (const cv of categoricalValues ?? []) {
+        this.labelByOrdinal.set(cv.value, cv.label);
+      }
+      this.allCategorical &&= !!categoricalValues;
+
+      seriesByLabel[config.label || config.parameter] = {
+        color: config.color,
+        strokeWidth: config.strokeWidth,
+        // States hold until the next change, so don't interpolate between them
+        stepPlot: !!categoricalValues,
+      };
+    }
+    return seriesByLabel;
+  }
+
+  /**
+   * Y-axis options so that enum and boolean series render labels instead of
+   * raw ordinals. Every callback falls back to the Dygraphs default when the
+   * value has no label, so the options can stay installed for numeric plots.
+   */
+  private buildCategoricalAxisOptions() {
+    // Approximate width of the longest label at an 11px font
+    let longest = 0;
+    for (const label of this.labelByOrdinal.values()) {
+      longest = Math.max(longest, label.length);
+    }
+    const axisLabelWidth = Math.min(120, Math.max(50, longest * 7 + 8));
+
+    return {
+      axisLabelWidth,
+      ticker: (min: number, max: number, pixels: number, opts: any, g: any, vals: any) => {
+        if (!this.allCategorical) {
+          return (Dygraph as any).numericTicks(min, max, pixels, opts, g, vals);
+        }
+        // One tick per state, thinned out if they don't fit
+        const ordinals = [...this.labelByOrdinal.keys()]
+          .filter(v => v >= min && v <= max)
+          .sort((a, b) => a - b);
+        const maxTicks = Math.max(1, Math.floor(pixels / 14));
+        const step = Math.ceil(ordinals.length / maxTicks);
+        return ordinals
+          .filter((_, i) => i % step === 0)
+          .map(v => ({ v, label: this.labelByOrdinal.get(v) }));
+      },
+      axisLabelFormatter: (value: number, granularity: any, opts: any, g: any) => {
+        return this.labelFor(value)
+          ?? g.attrs_.axes.y.axisLabelFormatter(value, granularity, opts, g);
+      },
+      valueFormatter: (value: number, opts: any, seriesName: string, g: any, row: number, col: number) => {
+        return this.labelFor(value)
+          ?? g.attrs_.axes.y.valueFormatter(value, opts, seriesName, g, row, col);
+      },
+    };
+  }
+
+  private labelFor(value: number) {
+    return Number.isInteger(value) ? this.labelByOrdinal.get(value) : undefined;
+  }
+
+  private formatValue(value: number) {
+    return this.labelFor(value) ?? String(value);
   }
 
   private applyTheme() {
@@ -547,6 +660,7 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
     const stop = new Date(xAxisRange[1]);
     this.dataSource.updateWindow(start, stop, [null, null]);
     this.onManualRangeChange.emit();
+    this.xRangeChange.emit([start, stop]);
   }
 
   updateWindowOnly(start: Date, stop: Date) {
@@ -581,6 +695,7 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.destroyed = true;
     this.dygraph?.destroy();
   }
 }
