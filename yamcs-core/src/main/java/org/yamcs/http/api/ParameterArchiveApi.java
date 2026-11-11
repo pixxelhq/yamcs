@@ -2,7 +2,9 @@ package org.yamcs.http.api;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -63,6 +65,10 @@ import org.yamcs.utils.MutableLong;
 import org.yamcs.utils.SortedIntArray;
 import org.yamcs.utils.TimeEncoding;
 import org.yamcs.utils.ValueUtility;
+import org.yamcs.xtce.BooleanParameterType;
+import org.yamcs.xtce.EnumeratedParameterType;
+import org.yamcs.xtce.ParameterType;
+import org.yamcs.xtce.ValueEnumeration;
 import org.yamcs.mdb.Mdb;
 
 import com.google.protobuf.Empty;
@@ -188,6 +194,24 @@ public class ParameterArchiveApi extends AbstractParameterArchiveApi<Context> {
         Downsampler sampler = new Downsampler(start, stop, sampleCount);
         sampler.setUseRawValue(useRawValue);
         sampler.setGapTime(request.hasGapTime() ? request.getGapTime() : 120000);
+
+        // Enum and boolean (engineering) parameters are categorical: switch the sampler to last-value-per-bucket, so
+        // that a bucket spanning two states reports a state that actually occurred instead of an average between them.
+        // Enums additionally need the label->ordinal table, because the columnar retrieval path delivers String labels
+        // where the plot needs numeric ordinals. Booleans arrive as BOOLEAN values on both paths and need no table.
+        // Raw values of an enum or boolean parameter are plain integers and need none of this.
+        if (!useRawValue && pid.getPath() == null) {
+            ParameterType ptype = pid.getParameter().getParameterType();
+            if (ptype instanceof EnumeratedParameterType enumType) {
+                Map<String, Integer> labelToOrdinal = new HashMap<>();
+                for (ValueEnumeration ve : enumType.getValueEnumerationList()) {
+                    labelToOrdinal.put(ve.getLabel(), (int) ve.getValue());
+                }
+                sampler.enableCategoricalMode(labelToOrdinal);
+            } else if (ptype instanceof BooleanParameterType) {
+                sampler.enableCategoricalMode(null);
+            }
+        }
 
         ParameterArchive parchive = getParameterArchive(ysi);
 

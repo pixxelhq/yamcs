@@ -54,86 +54,131 @@
         <ya-text-action (click)="loadLatest('P1M')" [active]="range === 'P1M'">
           30 days
         </ya-text-action>
+        <span class="separator"></span>
+        <ya-text-action
+          (click)="setLayout('overlay')"
+          [active]="chartLayout() === 'overlay'"
+          matTooltip="All parameters in one plot, sharing a Y-axis">
+          Overlay
+        </ya-text-action>
+        <ya-text-action
+          (click)="setLayout('split')"
+          [active]="chartLayout() === 'split'"
+          matTooltip="One plot per parameter, each with its own Y-axis">
+          Stacked
+        </ya-text-action>
       </div>
     }
   </div>
   <div class="plot-container">
-    <app-parameter-plot
-      #plot
-      [xGrid]="true"
-      [xAxisHeight]="24"
-      duration=""
-      [dataSource]="dataSource"
-      [stop]="missionTime"
-      [removableSeries]="true"
-      (onVisibleRange)="onVisibleRange($event)"
-      (onManualRangeChange)="onManualRangeChange()">
-      <app-parameter-series [parameter]="parameter.qualifiedName" [grid]="true" />
-    </app-parameter-plot>
+    @for (view of views(); track view.id) {
+      <div class="plot-view">
+        <app-parameter-plot
+          [xGrid]="true"
+          [xAxisHeight]="24"
+          duration=""
+          [dataSource]="view.dataSource"
+          [stop]="missionTime"
+          [removableSeries]="true"
+          [lockedSeries]="parameter.qualifiedName"
+          (onVisibleRange)="onVisibleRange($event)"
+          (onManualRangeChange)="onManualRangeChange()"
+          (xRangeChange)="onXRangeChange(view, $event)"
+          (seriesRemove)="onSeriesRemove($event)"
+          (seriesModify)="onSeriesModify($event)">
+          @for (trace of view.traces; track trace.parameter.qualifiedName) {
+            <app-parameter-series
+              [parameter]="trace.parameter.qualifiedName"
+              [color]="trace.color"
+              [strokeWidth]="trace.strokeWidth"
+              [grid]="true" />
+          }
+        </app-parameter-plot>
+        @if (view.dataSource.data$ | async; as data) {
+          @if (!(view.dataSource.loading$ | async)) {
+            @if (data.samples.length === 0) {
+              <div class="no-data-message">
+                @if (range$ | async; as range) {
+                  <span class="mat-caption" style="color: #777">
+                    There is no data for this chart in
+                    @switch (range) {
+                      @case ("PT1M") {
+                        <span>the last minute</span>
+                      }
+                      @case ("PT5M") {
+                        <span>the last 5 minutes</span>
+                      }
+                      @case ("PT15M") {
+                        <span>the last 15 minutes</span>
+                      }
+                      @case ("PT30M") {
+                        <span>the last 30 minutes</span>
+                      }
+                      @case ("PT1H") {
+                        <span>the last hour</span>
+                      }
+                      @case ("PT6H") {
+                        <span>the last 6 hours</span>
+                      }
+                      @case ("PT12H") {
+                        <span>the last 12 hours</span>
+                      }
+                      @case ("P1D") {
+                        <span>the last 24 hours</span>
+                      }
+                      @case ("P2D") {
+                        <span>the last 2 days</span>
+                      }
+                      @case ("P1W") {
+                        <span>the last week</span>
+                      }
+                      @case ("P2W") {
+                        <span>the last 2 weeks</span>
+                      }
+                      @case ("P1M") {
+                        <span>the last month</span>
+                      }
+                      @default {
+                        <span>the selected range</span>
+                      }
+                    }
+                  </span>
+                }
+              </div>
+            }
+          }
+        }
+      </div>
+    }
     <div class="zoom-actions">
       <div class="zoom-actions-inner elevation-z1">
-        <button mat-button (click)="plot.zoomIn()">
+        <button mat-button (click)="zoomIn()">
           <mat-icon>add</mat-icon>
         </button>
         <span class="separator"></span>
-        <button mat-button (click)="plot.zoomOut()">
+        <button mat-button (click)="zoomOut()">
           <mat-icon>remove</mat-icon>
         </button>
       </div>
     </div>
-    @if (dataSource.data$ | async; as data) {
-      @if (!(dataSource.loading$ | async)) {
-        @if (data.samples.length === 0) {
-          <div class="no-data-message">
-            @if (range$ | async; as range) {
-              <span class="mat-caption" style="color: #777">
-                There is no data for this chart in
-                @switch (range) {
-                  @case ("PT1M") {
-                    <span>the last minute</span>
-                  }
-                  @case ("PT5M") {
-                    <span>the last 5 minutes</span>
-                  }
-                  @case ("PT15M") {
-                    <span>the last 15 minutes</span>
-                  }
-                  @case ("PT30M") {
-                    <span>the last 30 minutes</span>
-                  }
-                  @case ("PT1H") {
-                    <span>the last hour</span>
-                  }
-                  @case ("PT6H") {
-                    <span>the last 6 hours</span>
-                  }
-                  @case ("PT12H") {
-                    <span>the last 12 hours</span>
-                  }
-                  @case ("P1D") {
-                    <span>the last 24 hours</span>
-                  }
-                  @case ("P2D") {
-                    <span>the last 2 days</span>
-                  }
-                  @case ("P1W") {
-                    <span>the last week</span>
-                  }
-                  @case ("P2W") {
-                    <span>the last 2 weeks</span>
-                  }
-                  @case ("P1M") {
-                    <span>the last month</span>
-                  }
-                  @default {
-                    <span>the selected range</span>
-                  }
-                }
-              </span>
+    @if (enumKeys().length) {
+      <!-- Ordinal/label key for every enum or boolean trace -->
+      <div class="enum-key-overlay">
+        @for (key of enumKeys(); track key.name) {
+          <table class="enum-key">
+            <caption>
+              <span class="swatch" [style.background]="key.color"></span>
+              {{ key.name }}
+            </caption>
+            @for (ev of key.values; track ev.value) {
+              <tr>
+                <td class="enum-code">{{ ev.value }}</td>
+                <td class="enum-label">{{ ev.label }}</td>
+              </tr>
             }
-          </div>
+          </table>
         }
-      }
+      </div>
     }
   </div>
 }

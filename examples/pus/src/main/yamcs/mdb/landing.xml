@@ -133,8 +133,52 @@
 					</StaticAlarmRanges>
 				</DefaultAlarm>
 			</FloatParameterType>
+			<!-- Chart test parameters, driven by PusSimulator.fillEnumTest() (HK id 5) and
+			     PusSimulator.fillChartTest() (HK id 6), one report per second each. -->
+			<EnumeratedParameterType name="EnumTestStateType">
+				<IntegerDataEncoding sizeInBits="8" encoding="unsigned" />
+				<EnumerationList>
+					<Enumeration value="0" label="OFF" />
+					<Enumeration value="1" label="ON" />
+					<Enumeration value="2" label="STANDBY" />
+					<Enumeration value="3" label="SAFE" />
+					<Enumeration value="4" label="FAULT" />
+				</EnumerationList>
+			</EnumeratedParameterType>
+			<EnumeratedParameterType name="EnumTestSparseType">
+				<IntegerDataEncoding sizeInBits="8" encoding="unsigned" />
+				<EnumerationList>
+					<Enumeration value="0" label="IDLE" />
+					<Enumeration value="3" label="ARMED" />
+					<Enumeration value="7" label="ACTIVE" />
+					<Enumeration value="25" label="DEGRADED" />
+					<Enumeration value="100" label="CRITICAL" />
+					<Enumeration value="200" label="LOST" />
+				</EnumerationList>
+			</EnumeratedParameterType>
+			<EnumeratedParameterType name="EnumTestPartialType">
+				<IntegerDataEncoding sizeInBits="8" encoding="unsigned" />
+				<EnumerationList>
+					<Enumeration value="10" label="NOMINAL" />
+					<Enumeration value="20" label="WARNING" />
+					<Enumeration value="30" label="ALARM" />
+				</EnumerationList>
+			</EnumeratedParameterType>
+			<BooleanParameterType name="EnumTestFlagType" oneStringValue="TRUE" zeroStringValue="FALSE">
+				<IntegerDataEncoding sizeInBits="8" encoding="unsigned" />
+			</BooleanParameterType>
+			<IntegerParameterType name="ChartTestInt16Type" signed="true" sizeInBits="16">
+				<IntegerDataEncoding sizeInBits="16" encoding="twosComplement" />
+			</IntegerParameterType>
 		</ParameterTypeSet>
 		<ParameterSet>
+			<Parameter parameterTypeRef="EnumTestStateType" name="EnumTest_State" />
+			<Parameter parameterTypeRef="EnumTestSparseType" name="EnumTest_Sparse" />
+			<Parameter parameterTypeRef="EnumTestPartialType" name="EnumTest_Partial" />
+			<Parameter parameterTypeRef="EnumTestFlagType" name="EnumTest_Flag" />
+			<Parameter parameterTypeRef="/dt/float32" name="ChartTest_Sine" />
+			<Parameter parameterTypeRef="/dt/uint16" name="ChartTest_Sawtooth" />
+			<Parameter parameterTypeRef="ChartTestInt16Type" name="ChartTest_Triangle" />
 			<Parameter parameterTypeRef="/dt/float32" name="ElapsedTime" />
 			<Parameter parameterTypeRef="/dt/float32" name="Longitude" />
 			<Parameter parameterTypeRef="/dt/float32" name="Latitude" />
@@ -503,6 +547,43 @@
 					<RestrictionCriteria>
 						<ComparisonList>
 							<Comparison parameterRef="../PUS/hkid" value="4" />
+						</ComparisonList>
+					</RestrictionCriteria>
+				</BaseContainer>
+			</SequenceContainer>
+			<!-- Chart test containers: entries are sequential right after /PUS/hkid (uint32),
+			     in the order PusSimulator.fillEnumTest() / fillChartTest() write them. -->
+			<SequenceContainer name="EnumTest">
+				<AncillaryDataSet>
+					<AncillaryData name="Yamcs" mimeType="text/plain">UseAsArchivingPartition</AncillaryData>
+				</AncillaryDataSet>
+				<EntryList>
+					<ParameterRefEntry parameterRef="EnumTest_State" />
+					<ParameterRefEntry parameterRef="EnumTest_Sparse" />
+					<ParameterRefEntry parameterRef="EnumTest_Partial" />
+					<ParameterRefEntry parameterRef="EnumTest_Flag" />
+				</EntryList>
+				<BaseContainer containerRef="../PUS/hk25">
+					<RestrictionCriteria>
+						<ComparisonList>
+							<Comparison parameterRef="../PUS/hkid" value="5" />
+						</ComparisonList>
+					</RestrictionCriteria>
+				</BaseContainer>
+			</SequenceContainer>
+			<SequenceContainer name="ChartTest">
+				<AncillaryDataSet>
+					<AncillaryData name="Yamcs" mimeType="text/plain">UseAsArchivingPartition</AncillaryData>
+				</AncillaryDataSet>
+				<EntryList>
+					<ParameterRefEntry parameterRef="ChartTest_Sine" />
+					<ParameterRefEntry parameterRef="ChartTest_Sawtooth" />
+					<ParameterRefEntry parameterRef="ChartTest_Triangle" />
+				</EntryList>
+				<BaseContainer containerRef="../PUS/hk25">
+					<RestrictionCriteria>
+						<ComparisonList>
+							<Comparison parameterRef="../PUS/hkid" value="6" />
 						</ComparisonList>
 					</RestrictionCriteria>
 				</BaseContainer>

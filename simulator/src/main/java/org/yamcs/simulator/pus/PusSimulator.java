@@ -117,9 +117,66 @@ public class PusSimulator extends AbstractSimulator {
             buffer.putInt(4);
             epslvpduHandler.fillPacket(buffer.slice());
             transmitRealtimeTM(packet);
+
+            packet = new PusTmPacket(MAIN_APID, 4 + ENUM_TEST_DATA_SIZE, PUS_TYPE_HK, 25);
+            buffer = packet.getUserDataBuffer();
+            buffer.putInt(5);
+            fillEnumTest(buffer.slice());
+            transmitRealtimeTM(packet);
+
+            packet = new PusTmPacket(MAIN_APID, 4 + CHART_TEST_DATA_SIZE, PUS_TYPE_HK, 25);
+            buffer = packet.getUserDataBuffer();
+            buffer.putInt(6);
+            fillChartTest(buffer.slice());
+            transmitRealtimeTM(packet);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    // HK struct 5: enum/boolean chart test parameters (landing.xml "EnumTest" container).
+    static final int ENUM_TEST_DATA_SIZE = 4;
+    // Sparse, non-monotonic ordinals for EnumTest_Sparse (must match EnumTestSparseType in landing.xml).
+    private static final int[] ENUM_TEST_SPARSE_ORDINALS = { 0, 3, 7, 25, 100, 200 };
+    private int enumTestCounter = 0;
+
+    /**
+     * Fills HK struct 5, one report per second, cycling through the enum cases the parameter chart handles:
+     * <ul>
+     * <li>{@code EnumTest_State}: dense ordinals 0..4 (includes 0).</li>
+     * <li>{@code EnumTest_Sparse}: sparse, non-monotonic ordinals (0,3,7,25,100,200).</li>
+     * <li>{@code EnumTest_Partial}: NOMINAL/WARNING/ALARM (10/20/30), but every 4th sample emits ordinal 99,
+     * which is not in the MDB enumeration (unmapped-value handling).</li>
+     * <li>{@code EnumTest_Flag}: boolean, toggles every sample.</li>
+     * </ul>
+     */
+    private void fillEnumTest(ByteBuffer bb) {
+        int c = enumTestCounter++;
+        bb.put((byte) (c % 5));
+        bb.put((byte) ENUM_TEST_SPARSE_ORDINALS[c % ENUM_TEST_SPARSE_ORDINALS.length]);
+        bb.put((byte) (c % 4 == 3 ? 99 : 10 + 10 * (c % 3)));
+        bb.put((byte) (c % 2));
+    }
+
+    // HK struct 6: numeric chart test parameters (landing.xml "ChartTest" container).
+    static final int CHART_TEST_DATA_SIZE = 8;
+    private int chartTestCounter = 0;
+
+    /**
+     * Fills HK struct 6, one report per second, with numeric signals of very different scales so the overlay
+     * and stacked chart layouts can be compared against the enum/boolean parameters:
+     * <ul>
+     * <li>{@code ChartTest_Sine}: float32, amplitude 50, period 60 s.</li>
+     * <li>{@code ChartTest_Sawtooth}: uint16, ramps 0..990 in steps of 10, then wraps (period 100 s).</li>
+     * <li>{@code ChartTest_Triangle}: int16, triangle wave -500..500 (period 40 s), exercises negative values.</li>
+     * </ul>
+     */
+    private void fillChartTest(ByteBuffer bb) {
+        int c = chartTestCounter++;
+        bb.putFloat((float) (50 * Math.sin(2 * Math.PI * c / 60.0)));
+        bb.putShort((short) ((c % 100) * 10));
+        int t = c % 40;
+        bb.putShort((short) (t < 20 ? -500 + 50 * t : 500 - 50 * (t - 20)));
     }
 
     private void transmitRealtimeTM(PusTmPacket packet) {
