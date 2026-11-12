@@ -104,8 +104,19 @@ All the tests create the groups they need with TC[11,22] via
 `examples/pus-frames/tests/pus11_setup.py` (`ensure_groups`), so the order of the tests does not
 matter.
 
-Not covered (not built): restart persistence (the in-memory model starts empty), TM[11,13]
-reconcile, manual `/PUS11/INSERT_ACTIVITIES` with N > 1.
+Not covered (not built): TM[11,13] reconcile, manual `/PUS11/INSERT_ACTIVITIES` with N > 1.
+
+## 3b. Sequence counter survives restart (plan §6 step 0b, ~5 min)
+
+Passed 2026-11-12. Checks that `persistSeqCount: true` (pus-frames) keeps the TC sequence counter
+across a Yamcs restart.
+
+1. With the example running, send several TCs on one APID and note the last sequence count.
+2. Stop Yamcs (Ctrl-C) and start it again with `./run-example.sh pus-frames --data-dir yamcs-data`.
+3. Send one more TC on the same APID.
+
+Pass: its sequence count continues from step 1 (last + 1), not 0. A rename of the link restarts its
+counter at 0 (plan §4.1, expected).
 
 ## 4. Simulator exits with Yamcs (~15 s)
 

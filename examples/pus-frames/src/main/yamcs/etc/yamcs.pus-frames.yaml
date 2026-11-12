@@ -123,6 +123,8 @@ dataLinks:
         initialClcwWait: 10
         commandPostprocessorClassName: org.yamcs.pus.PusCommandPostprocessor
         commandPostprocessorArgs:
+            # keep the CCSDS sequence counters in the instance memento, so a restart continues them
+            persistSeqCount: true
             errorDetection:
                 type: CRC-16-CCIIT
             timeEncoding:

@@ -76,5 +76,13 @@ rebuild-sim: ## Clean + install simulator + examples/pus, skip tests
 	@$(MVN) $(SIM_PL) clean install $(SKIP_TESTS)
 
 .PHONY: run-sim
-run-sim: ## Run examples/pus (UI: http://localhost:8090, instance "pus")
-	@$(MVN) -pl examples/pus yamcs:run
+run-sim: ## Run examples/pus (UI: http://localhost:8090, instance "pus"); stops any older instance first
+	@pids=$$(lsof -ti tcp:8090 -sTCP:LISTEN 2>/dev/null); \
+	if [ -n "$$pids" ]; then \
+	  echo "Stopping older instance on :8090 (PID $$pids)"; \
+	  kill $$pids 2>/dev/null; \
+	  for i in 1 2 3 4 5; do sleep 1; lsof -ti tcp:8090 -sTCP:LISTEN >/dev/null 2>&1 || break; done; \
+	  pids=$$(lsof -ti tcp:8090 -sTCP:LISTEN 2>/dev/null); \
+	  if [ -n "$$pids" ]; then echo "Force-killing PID $$pids"; kill -9 $$pids 2>/dev/null; fi; \
+	fi; \
+	$(MVN) -pl examples/pus yamcs:run

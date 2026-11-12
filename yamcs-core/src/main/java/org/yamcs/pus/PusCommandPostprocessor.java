@@ -29,6 +29,8 @@ import org.yamcs.tctm.ErrorDetectionWordCalculator;
 import org.yamcs.tctm.Link;
 import org.yamcs.tctm.LinkAction;
 import org.yamcs.tctm.LinkActionProvider;
+import org.yamcs.tctm.MementoSeqCountStore;
+import org.yamcs.tctm.SeqCountStore;
 import org.yamcs.tctm.ccsds.time.CucTimeEncoder;
 import org.yamcs.time.TimeCorrelationService;
 import org.yamcs.utils.BitBuffer;
@@ -221,9 +223,7 @@ public class PusCommandPostprocessor extends AbstractCommandPostProcessor {
                         "Cannot find a time correlation service with name " + tcoServiceName);
             }
         }
-        if (config.containsKey("seqCounterName")) {
-            seqFiller = new CcsdsSeqCountFiller(config.getString("seqCounterName"));
-        }
+        seqFiller = createSeqFiller(yamcsInstance, config, link);
 
         if (config.containsKey("pus11")) {
             YConfiguration pus11Config = config.getConfig("pus11");
@@ -820,6 +820,30 @@ public class PusCommandPostprocessor extends AbstractCommandPostProcessor {
 
     private static boolean isScheduled(PreparedCommand pc) {
         return pc.getAttribute(OPTION_SCHEDULE_TIME.getId()) != null;
+    }
+
+    /**
+     * Builds the sequence count filler from {@code seqCounterName} and {@code persistSeqCount}.
+     * <p>
+     * With {@code persistSeqCount: true} the counters are kept in the instance memento, so a restart continues the
+     * sequence instead of restarting each APID at 0 while pre-restart commands are still in the on-board schedule.
+     */
+    static CcsdsSeqCountFiller createSeqFiller(String yamcsInstance, YConfiguration config, Link link) {
+        String counterName = config.getString("seqCounterName", null);
+        SeqCountStore store = null;
+        if (config.getBoolean("persistSeqCount", false)) {
+            if (yamcsInstance == null) {
+                throw new ConfigurationException("persistSeqCount requires a Yamcs instance");
+            }
+            if (counterName != null) {
+                store = MementoSeqCountStore.forCounter(yamcsInstance, counterName);
+            } else if (link != null) {
+                store = MementoSeqCountStore.forLink(yamcsInstance, link.getName());
+            } else {
+                throw new ConfigurationException("persistSeqCount requires seqCounterName or a link");
+            }
+        }
+        return counterName != null ? new CcsdsSeqCountFiller(counterName, store) : new CcsdsSeqCountFiller(store);
     }
 
     private static int getIntInRange(YConfiguration config, String key, int defaultValue, int min, int max) {
