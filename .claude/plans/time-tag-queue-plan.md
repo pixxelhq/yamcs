@@ -1,11 +1,11 @@
 # Ground-side mirror of the onboard PUS-11 time-tag queue
 
-Plan for `feat/time_tag_command_queue` (= `../../pus_analysis/pus11.md` Gap #8, plus the release half of
+Plan for `feat/time-tagged-commands` (= `../../pus_analysis/pus11.md` Gap #8, plus the release half of
 Gap #5). Scope: a live ground view of what is *currently* in the spacecraft's ST[11] schedule, plus
 search by release time (§8). Refreshed 2026-10-19 against `pixxel/master` `9a5f8648a` (branch
 fast-forwarded from `f7820b796`); §4 caveats resolved 2026-09-24 (multi-sat = one instance per
 satellite). Open questions re-checked against the code 2026-10-19 (§5): Q1, Q2, Q6 resolved, Q3 not blocking (ID width = uint8, 2026-10-22), Q4 + Q5 deferred.
-Branch rebased 2026-10-27 onto `pixxel/master` `16f296b34` (see "What changed on 2026-10-27"). §6 steps 0
+Branch rebased 2026-10-27 onto `pixxel/master` `16f296b34` (see "What changed on 2026-10-27"), then 2026-11-12 onto `4b46cebcb` (v5.14-0.5.1; see "Rebase repair 2026-11-12"). §6 steps 0
 1 and 2 are implemented; step 0b, steps 3–6 and §8 are not.
 
 **Primary assumption (2026-10-19):** the aim is a **native ground-only implementation** of this
@@ -43,7 +43,14 @@ keys (§1.2) are unchanged.
 - Effect on §3 input 4: parse `binary` instead of re-deriving inner IDs, and cross-check each
   activity's seq count against `ccsds-seqcount:activities[<i>].tc` (§6 step 5).
 - Test-bed fixes from §1.8 (`pus-frames` request-ID widths, `test-pus11.py` inner seq count, PMON
-  events) landed in `1dea17572`.
+  events) landed in `43551e7c0`.
+
+**Rebase repair 2026-11-12.** The rebase onto `54288f48b` flattened merge `a054c7528` and replayed a
+stale 2026-10-22 commit (`c5d41e197`), which reverted embedded-TC support and `isPus11Enabled()` in
+`PusCommandPostprocessor`, and the 2026-10-27 `releaseObt` removal in `Pus11WrapperParser`/`Layout`.
+HEAD did not compile. The 4 files were restored from the last good tip `6f93ef0d6`; `Pus11*Test`,
+`PusEmbeddedTcTest`, `PusCommandPostprocessorTest` pass (79 tests). Commit hashes before 2026-11-12
+were rewritten (`1dea17572` is now `43551e7c0`).
 
 **Requirement change (2026-10-27): no time sync/drift handling.** The tracker assumes the on-board
 clock and the ground time correlation are good. Each release time is converted to ground time
@@ -157,7 +164,7 @@ keys generic (time *or* position) — no other change needed now.
 
 ### 1.8 Test-bed defects (found 2026-10-19)
 
-- **Fixed 2026-10-27 (`1dea17572`): `examples/pus-frames` MDB mis-decoded TM[11,13].** Its
+- **Fixed 2026-10-27 (`43551e7c0`): `examples/pus-frames` MDB mis-decoded TM[11,13].** Its
   `pus11.xml` request IDs (TM `RequestIdType`, TC `RequestIdType`, `SUMMARY_REPORT`) were
   `/dt/uint16`; now `/dt/pus_report_apid` / `/dt/pus_report_seqcount` (u11/u14), as in
   `examples/pus`. `INSERT_ACTIVITIES` arrived with the upstream merge (embedded-TC form). PMON
@@ -165,7 +172,7 @@ keys generic (time *or* position) — no other change needed now.
 - **`examples/pus` cannot schedule at all.** Its TC link sets `tcoService: tco0`, but nothing feeds that TCO
   samples, so every `pus11ScheduleAt` fails with "Time corelation coefficients not available". Use
   `examples/pus-frames` (real TCO) for PUS 11 work. (Found 2026-10-22.)
-- **Fixed 2026-10-27 (`1dea17572`): `test-pus11.py`** used the wrapper `ccsds-seqcount`; it now
+- **Fixed 2026-10-27 (`43551e7c0`): `test-pus11.py`** used the wrapper `ccsds-seqcount`; it now
   reads `pus11-inner-seqcount`, sends TC[11,1] first and asserts withheld/released. Passes.
 - **`examples/pus-frames` run setup (found 2026-10-22).** `dataDir: /storage/yamcs-data` is not
   writable on macOS: start with `./run-example.sh pus-frames --data-dir yamcs-data`. The TC link
