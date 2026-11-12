@@ -8,7 +8,8 @@
         "serve"
       ],
       "cwd": "/Users/nikhil/GSS Workspace/yamcs-Pixxel-fork",
-      "type": "stdio"
+      "type": "stdio",
+      "alwaysLoad": true
     },
     "idea": {
       "url": "http://127.0.0.1:64342/stream",

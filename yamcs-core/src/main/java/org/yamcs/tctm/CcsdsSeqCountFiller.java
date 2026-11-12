@@ -13,17 +13,32 @@ import org.yamcs.utils.ByteArrayUtils;
  * A name can be supplied via {@link #CcsdsSeqCountFiller(String)} to create a named shared counter: all instances
  * constructed with the same name share the same counters. This is useful when multiple links must present a continuous
  * sequence to the target.
+ * <p>
+ * With a {@link SeqCountStore} the counters are seeded from the store when they are created, and every change is
+ * written to the store before the sequence count is returned, so they survive a restart.
  */
 public class CcsdsSeqCountFiller {
-    // Named shared counters - keyed by name then by APID
-    private static final Map<String, Map<Integer, Integer>> namedSeqCounts = new HashMap<>();
+    private static final int SEQ_MODULO = 1 << 14;
 
-    // Per-instance (or shared) APID → seq-count map
-    private final Map<Integer, Integer> seqCounts;
+    // Named shared counters - keyed by name then by APID
+    private static final Map<String, Counters> namedSeqCounts = new HashMap<>();
+
+    // Per-instance (or shared) counters
+    private final Counters counters;
 
     /** Creates an instance-local counter that is not shared with any other link. */
     public CcsdsSeqCountFiller() {
-        this.seqCounts = new HashMap<>();
+        this((SeqCountStore) null);
+    }
+
+    /**
+     * Creates an instance-local counter, seeded from and persisted to the given store.
+     *
+     * @param store
+     *            may be null, in which case the counters are kept in memory only
+     */
+    public CcsdsSeqCountFiller(SeqCountStore store) {
+        this.counters = new Counters(store);
     }
 
     /**
@@ -33,16 +48,32 @@ public class CcsdsSeqCountFiller {
      *            shared counter name; instances with the same name share the same per-APID counters
      */
     public CcsdsSeqCountFiller(String name) {
+        this(name, null);
+    }
+
+    /**
+     * Creates a named counter shared with all other instances that use the same name.
+     * <p>
+     * The store is only used by the first instance that creates the counter: it seeds the counter and persists all
+     * later changes, whichever instance makes them.
+     *
+     * @param name
+     *            shared counter name; instances with the same name share the same per-APID counters
+     * @param store
+     *            may be null, in which case the counters are kept in memory only
+     */
+    public CcsdsSeqCountFiller(String name, SeqCountStore store) {
         synchronized (namedSeqCounts) {
-            this.seqCounts = namedSeqCounts.computeIfAbsent(name, k -> new HashMap<>());
+            this.counters = namedSeqCounts.computeIfAbsent(name, k -> new Counters(store));
         }
     }
 
     private int getSeqCount(int apid) {
-        synchronized (seqCounts) {
-            int seqCount = seqCounts.getOrDefault(apid, 0);
-            var nextSeqCount = (seqCount + 1) % (1 << 14);
-            seqCounts.put(apid, nextSeqCount);
+        synchronized (counters) {
+            int seqCount = counters.map.getOrDefault(apid, 0);
+            var nextSeqCount = (seqCount + 1) % SEQ_MODULO;
+            counters.map.put(apid, nextSeqCount);
+            counters.persist();
             return seqCount;
         }
     }
@@ -67,8 +98,27 @@ public class CcsdsSeqCountFiller {
     }
 
     public void setSequence(int apid, int seqCount) {
-        synchronized (seqCounts) {
-            seqCounts.put(apid, seqCount);
+        synchronized (counters) {
+            counters.map.put(apid, seqCount);
+            counters.persist();
+        }
+    }
+
+    private static class Counters {
+        final Map<Integer, Integer> map = new HashMap<>();
+        final SeqCountStore store;
+
+        Counters(SeqCountStore store) {
+            this.store = store;
+            if (store != null) {
+                map.putAll(store.load());
+            }
+        }
+
+        void persist() {
+            if (store != null) {
+                store.save(new HashMap<>(map));
+            }
         }
     }
 }

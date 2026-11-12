@@ -274,27 +274,23 @@ Resolved 2026-09-24.
    than 16384 commands on one APID within the schedule horizon, which is unlikely.
    → Still key on `(RequestId, releaseTime)` and flag collisions at insert (a lookup in the existing
    `Map<RequestId, …>`, ~10 lines). Drop the "warn on seq reset" hook.
-   **Fix (in scope, 2026-10-19): re-seed the counter on restart from cmdhist.** Build step 0b (§6).
-   - **Where:** `CcsdsSeqCountFiller` gets an opt-in seed hook. `PusCommandPostprocessor.init()`
-     enables it with a new option `seqCountSeed: true` (default `false`, so ISS/CFS and existing
-     configs are unchanged).
-   - **When:** lazily, on the first `fill()` of each counter, not in `init()`. Link init can run
-     before `CommandHistoryRecorder` creates the `cmdhist` table. If the table is missing (fresh
-     instance), skip the seed and start at 0.
-   - **Query:** `SqlBuilder(CommandHistoryRecorder.TABLE_NAME)`, `gentime >= now − seqCountSeedLookback`
-     (default: the schedule horizon, e.g. 30 d), descending by gentime. For each APID take the
-     **most recent** seq, not the max: the counter wraps at 2^14. Seed = `(last + 1) mod 2^14`.
-   - **Read three column pairs:** `ccsds-apid/ccsds-seqcount` (plain TCs and wrappers),
-     `pus11-inner-apid/-seqcount`, and `pus22-inner-apid/-seqcount`. The wrapper overwrites
-     `ccsds-*` (§1.2), so the inner seq of a scheduled TC survives only in the `-inner-` keys.
-   - **Shared counters:** a named counter (`seqCounterName`) is seeded once, guarded by a `seeded`
-     flag kept with the map in `namedSeqCounts`. Only APIDs with no entry yet are seeded, so
-     `change-seq-count` and later fills are never overwritten.
-   - **Crash gap:** cmdhist is written asynchronously, so a hard crash can lose the last few seqs.
-     Add `seqCountSeedGap` (default `0`) to skip N seqs after the seed. Set it > 0 only if the
-     spacecraft does not check TC seq continuity.
-   - **Test:** send 3 TCs on one APID, restart the instance, send 1 more → its `ccsds-seqcount`
-     is 3, not 0. Repeat with a TC[11,4] to check that the inner seq continues too.
+   **Fix (in scope, 2026-10-19; redesigned and done 2026-11-12): persist the counter in `MementoDb`.**
+   Build step 0b (§6). The first design re-seeded from cmdhist; replaced because cmdhist is written
+   asynchronously (crash gap), needs a lookback query over three column pairs, and must run lazily
+   after `CommandHistoryRecorder`. SDLS already persists its IV seq this way.
+   - **Where:** `tctm/SeqCountStore` (interface: `load()` / `save(map)`, values = next seq per APID)
+     + `tctm/MementoSeqCountStore`. `CcsdsSeqCountFiller(store)` / `(name, store)` seeds from the store
+     when the counter is created and saves on every `fill()` and `setSequence()`, inside the counter
+     lock and before the packet leaves → no crash gap, and `change-seq-count` survives a restart.
+   - **Config:** `PusCommandPostprocessor` option `persistSeqCount: true` (default `false`; ISS/CFS
+     unchanged). `createSeqFiller()` builds the filler. Enabled in `examples/pus-frames`.
+   - **Keys:** `ccsds-seqcount/link/<linkName>`, or `ccsds-seqcount/named/<seqCounterName>` for a
+     shared counter (seeded once, by its first user). Renaming a link restarts its counter at 0.
+   - **Inner seqs:** no special handling. The inner TC of a TC[11,4] and the wrapper both go through
+     the same `seqFiller.fill()`, so the persisted counter already covers them.
+   - **Tests:** `CcsdsSeqCountFillerTest` (7, fake store), `PusSeqCountPersistenceTest` (yarch +
+     real memento: 3 TCs, "restart", next is 3). Manual: send 3 TCs in `pus-frames`, restart Yamcs,
+     send 1 more → `ccsds-seqcount` is 3; repeat with a TC[11,4].
 2. **Filter and shift evaluation — in ground time.** No time sync/drift handling (2026-10-27): the
    ground evaluates TC[11,6/8] filters and TC[11,7/8/15] shifts against the stored ground release
    time, in ms.
@@ -424,8 +420,8 @@ Resolved 2026-09-24.
    Expose the TC[11,4] wrapper layout (widths, `tcoService`, epoch) from `PusCommandPostprocessor`
    + `Pus11WrapperParser` for `pus11Binary`. ~½ day. Run the parser tests at 1-byte **and**
    2-byte sub-schedule/group widths (§5 Q3), so a later width change is config only.
-   0b. Re-seed `CcsdsSeqCountFiller` from cmdhist on restart (§4.1). ~½ day incl. restart test.
-   Independent of the tracker; can ship first.
+   0b. **Done 2026-11-12:** persist `CcsdsSeqCountFiller` in `MementoDb` (`persistSeqCount`, §4.1).
+   Manual restart test in `pus-frames` passed 2026-11-12 (counter continues after restart).
 1. Model + cmdhist input (`PENDING` → `SCHEDULED` on `CommandComplete`) + sweep. ~1 day
    **Done 2026-10-22:** `Pus11Schedule` (model) + `Pus11ScheduleTracker` (service; reads `pus11Binary` and
    `CommandComplete` from `cmdhist_realtime`, publishes the `pus11-release` ack: SCHEDULED, then TIMEOUT when

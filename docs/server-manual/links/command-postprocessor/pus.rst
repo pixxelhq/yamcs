@@ -41,6 +41,22 @@ seqCounterName (string)
         commandPostprocessorArgs:
             seqCounterName: sat1
 
+persistSeqCount (boolean)
+    If ``true``, the CCSDS sequence counters are stored in the instance memento and restored when
+    Yamcs restarts. Without it every APID restarts at 0, while commands sent before the restart can
+    still be in the on-board schedule: a new command can then get the same ``(APID, sequence count)``,
+    so the same PUS request ID, as one already on board.
+
+    The next sequence count is saved before each command is sent, including changes made with the
+    ``change-seq-count`` link action. The memento key is ``ccsds-seqcount/named/<seqCounterName>``
+    for a shared counter, otherwise ``ccsds-seqcount/link/<link name>``. Renaming the link therefore
+    restarts its counter at 0.
+
+    With ``seqCounterName``, set ``persistSeqCount`` the same on every link that shares the counter:
+    the first link that creates the counter decides whether it is persisted.
+
+    Default: ``false``
+
 errorDetection (map)
     If specified, a checksum is appended at the end of each command.
     Detailed below.
