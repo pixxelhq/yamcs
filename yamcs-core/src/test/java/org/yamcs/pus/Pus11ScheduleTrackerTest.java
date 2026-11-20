@@ -261,6 +261,133 @@ public class Pus11ScheduleTrackerTest extends YarchTestCase {
                 () -> Pus11ScheduleTracker.parseStatusReport(unknownLabel, report));
     }
 
+    /** the inner request ID of the activity of the most recent {@link #send} */
+    private RequestId innerOfLastInsert() {
+        int innerSeq = (Integer) lastValue("pus11-inner-seqcount");
+        return new RequestId(9, 100, innerSeq);
+    }
+
+    @Test
+    public void testReconcileConfirmsPendingAndFlagsMissingBeforeRelease() {
+        var cmdId = send(1, true);
+        var e = tracker.getSchedule().getEntries().getFirst();
+        var inner = innerOfLastInsert();
+        assertEquals(EntryState.PENDING, e.getState());
+
+        tracker.updateItems(0, summaryPacket(Pus11SummaryReport.STANDALONE,
+                element(0, 0, scheduleAt, inner)));
+        assertEquals(EntryState.SCHEDULED, e.getState());
+        assertEquals("SCHEDULED", lastValue(RELEASE_STATUS));
+        assertEquals(now, tracker.getLastReconcileTime());
+
+        // a later report without it, before its release time: silently dropped on board
+        now = scheduleAt - 1000;
+        tracker.updateItems(0, summaryPacket(Pus11SummaryReport.STANDALONE));
+        assertTrue(tracker.getSchedule().getEntries().isEmpty());
+        assertEquals("TIMEOUT", lastValue(RELEASE_STATUS));
+        assertEquals(cmdId, e.getCmdId());
+    }
+
+    @Test
+    public void testReconcileMarksReleasedAfterReleaseTime() {
+        var cmdId = send(1, true);
+        complete(cmdId, AckStatus.OK);
+        var e = tracker.getSchedule().getEntries().getFirst();
+
+        now = scheduleAt + 1000;
+        tracker.updateItems(0, summaryPacket(Pus11SummaryReport.STANDALONE));
+        assertEquals(EntryState.RELEASED, e.getState());
+        assertEquals(1, tracker.getSchedule().getEntries().size(), "released entries stay in the model");
+    }
+
+    @Test
+    public void testReconcileKeepsPendingWhenAbsent() {
+        send(1, true);
+        now = scheduleAt + 1000;
+        tracker.updateItems(0, summaryPacket(Pus11SummaryReport.STANDALONE));
+        // the TC(11,4) may still be on its way: absence is not evidence yet
+        assertEquals(EntryState.PENDING, tracker.getSchedule().getEntries().getFirst().getState());
+    }
+
+    @Test
+    public void testReconcileAddsUnknownAndRemovesItWhenGone() {
+        var unknown = new RequestId(9, 200, 5);
+        tracker.updateItems(0, summaryPacket(Pus11SummaryReport.STANDALONE, element(1, 2, scheduleAt, unknown)));
+        var e = tracker.getSchedule().getEntries().getFirst();
+        assertEquals(EntryState.UNKNOWN, e.getState());
+        assertNull(e.getCmdId());
+        assertEquals(unknown, e.getInner());
+        assertEquals(1L, e.getSubScheduleId());
+        assertEquals(2L, e.getGroupId());
+
+        tracker.updateItems(0, summaryPacket(Pus11SummaryReport.STANDALONE));
+        assertTrue(tracker.getSchedule().getEntries().isEmpty());
+    }
+
+    @Test
+    public void testReconcileOverwritesReleaseTimeWithOnBoardValue() {
+        send(1, true);
+        var inner = innerOfLastInsert();
+        tracker.updateItems(0, summaryPacket(Pus11SummaryReport.STANDALONE,
+                element(0, 0, scheduleAt + 5000, inner)));
+        assertEquals(scheduleAt + 5000, tracker.getSchedule().getEntries().getFirst().getReleaseTime());
+    }
+
+    @Test
+    public void testMultiPacketReportIsAppliedOnLastPacketOnly() {
+        send(1, true);
+        var inner = innerOfLastInsert();
+        var unknown = new RequestId(9, 200, 7);
+        tracker.updateItems(0, summaryPacket(Pus11SummaryReport.FIRST, element(0, 0, scheduleAt, inner)));
+        assertEquals(EntryState.PENDING, tracker.getSchedule().getEntries().getFirst().getState(),
+                "not reconciled before the last packet");
+
+        tracker.updateItems(0, summaryPacket(Pus11SummaryReport.LAST, element(0, 0, scheduleAt, unknown)));
+        assertEquals(EntryState.SCHEDULED, tracker.getSchedule().getEntries().getFirst().getState());
+        assertEquals(2, tracker.getSchedule().getEntries().size());
+    }
+
+    @Test
+    public void testSummaryPacketWithWrongMembersIsIgnored() {
+        send(1, true);
+        var bad = summaryPacket(Pus11SummaryReport.STANDALONE, element(0, 0, scheduleAt, innerOfLastInsert()));
+        // swap two members of the element
+        bad.set(1, bad.get(2));
+        tracker.updateItems(0, bad);
+        assertEquals(EntryState.PENDING, tracker.getSchedule().getEntries().getFirst().getState());
+        assertEquals(TimeEncoding.INVALID_INSTANT, tracker.getLastReconcileTime(), "not reconciled");
+    }
+
+    /** one element of TM(11,13): sub-schedule id, group id, ground release time, request ID */
+    private static Object[] element(int subSchedule, int group, long releaseTime, RequestId inner) {
+        return new Object[] { subSchedule, group, releaseTime, inner.sourceId(), inner.apid(), inner.seqCount() };
+    }
+
+    /** the parameters of one TM(11,13) packet, in packet order: n, the elements, then the sequence flags */
+    private static List<ParameterValue> summaryPacket(int grouping, Object[]... elements) {
+        var items = new ArrayList<ParameterValue>();
+        items.add(summaryParam("n", ValueUtility.getUint32Value(elements.length)));
+        for (var el : elements) {
+            items.add(summaryParam("schedule_id", ValueUtility.getUint32Value((Integer) el[0])));
+            items.add(summaryParam("group_id", ValueUtility.getUint32Value((Integer) el[1])));
+            items.add(summaryParam("release_time", ValueUtility.getTimestampValue((Long) el[2])));
+            items.add(summaryParam("source", ValueUtility.getUint32Value((Integer) el[3])));
+            items.add(summaryParam("apid", ValueUtility.getUint32Value((Integer) el[4])));
+            items.add(summaryParam("seq", ValueUtility.getUint32Value((Integer) el[5])));
+        }
+        items.add(summaryParam("grouping", ValueUtility.getUint32Value(grouping)));
+        return items;
+    }
+
+    private static ParameterValue summaryParam(String member, Value v) {
+        String name = Pus11ScheduleTracker.SUMMARY_PREFIX + member;
+        var p = new Parameter(member);
+        p.setQualifiedName(name);
+        var pv = new ParameterValue(p);
+        pv.setEngValue(v);
+        return pv;
+    }
+
     /** decoded TM(11,19): id, label, id, label... */
     private static ParameterValue subScheduleReport(Object... idsAndLabels) {
         return statusReport(Pus11ScheduleTracker.DEFAULT_SUBSCHEDULE_STATUS, idsAndLabels);

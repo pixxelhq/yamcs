@@ -6,7 +6,7 @@ search by release time (§8). Refreshed 2026-10-19 against `pixxel/master` `9a5f
 fast-forwarded from `f7820b796`); §4 caveats resolved 2026-09-24 (multi-sat = one instance per
 satellite). Open questions re-checked against the code 2026-10-19 (§5): Q1, Q2, Q6 resolved, Q3 not blocking (ID width = uint8, 2026-10-22), Q4 + Q5 deferred.
 Branch rebased 2026-10-27 onto `pixxel/master` `16f296b34` (see "What changed on 2026-10-27"), then 2026-11-12 onto `4b46cebcb` (v5.14-0.5.1; see "Rebase repair 2026-11-12"). §6 steps 0
-1 and 2 are implemented; step 0b, steps 3–6 and §8 are not.
+1, 2 and 3 are implemented (0b included; step 3 uncommitted); steps 4–6 and §8 are not.
 
 **Primary assumption (2026-10-19):** the aim is a **native ground-only implementation** of this
 feature in Yamcs. The ground design follows ECSS-E-ST-70-41C and the mission's needs; it is
@@ -147,6 +147,11 @@ packets per spec (simulator sends one).
 
 The same packed `u16/u11/u14` request ID applies to TC[11,5/7/9/12] arguments — the TC parser
 (§8.4 step 3) must use `BitBuffer`, not `ByteBuffer`.
+
+**Checked against ECSS-E-ST-70-41C §8.11.2.13, Figure 8-100 (2026-11-12):** the field order matches
+(sub-schedule ID, group ID, release time, source ID, APID, sequence count; N repeated, N unsigned). The
+standard gives types only, not widths. It says nothing about segmentation or CCSDS grouping flags across
+packets, so the `grouping` rule in §6 step 3 is a project assumption (see Blockers, B1).
 
 Status reports usable as inputs (§3 input 6): TM[11,19] sub-schedule status
 (`SUBSCHEDULE_STATUS_REPORT`, via TC[11,18]) and TM[11,27] group status (`GROUP_STATUS_REPORT`, via
@@ -358,7 +363,8 @@ Resolved 2026-09-24.
      and the UI age shows it.
    - **Later:** a gateway session event (`POST /missions/{m}/sessions {aos, los}` or
      `/GS/<station>/status`) becomes a second `ReconcileTrigger` without changing the tracker.
-   - **Still needs ops input:** max expected queue size, to size the TM[11,13] downlink per pass.
+   - **Still needs ops input:** max expected queue size, to size the TM[11,13] downlink per pass; and whether
+     the spacecraft splits a TM[11,13] over several packets with CCSDS grouping flags (assumed in §6 step 3).
 2. ~~**Parse TC[11,4] binary or cmdhist only?**~~ **Resolved 2026-10-19: binary.** cmdhist no
    longer carries source id or defaulted sub-schedule/group IDs (§1.2).
 3. **Groups and sub-schedules** — **Partly resolved 2026-10-20, width resolved 2026-10-22; not
@@ -451,18 +457,65 @@ Resolved 2026-09-24.
    no group at boot). Revisit if OBSW answers Q3 (3) with "a default group exists at boot". Follow-ups: the flag is only as fresh as the last report (nothing requests TM[11,19]/27
    yet; could piggyback on the §5 Q1 AOS trigger), and TC[11,20/21/24/25] are not modelled from
    the TC stream (§6 step 5 territory).
-3. TM[11,13] reconcile incl. bit-packed entries and multi-packet accumulation. ~1 day
-   Decode test reports through the MDB, so a > 1-byte `group_id` (§5 Q3 gotcha) fails a test.
-   Plus TM-gap `ReconcileTrigger` (§5 Q1) with a replayed-gap test. ~½ day
-   (`pus-frames` MDB fixed 2026-10-27, §1.8)
+3. **Done 2026-11-12:** TM[11,13] reconcile (`Pus11SummaryReport`, `Pus11Schedule.reconcile`, `Pus11ScheduleTracker`).
+   Entries are decoded by the MDB (`/PUS11/SUMMARY_REPORT/*`, plus `grouping`, the CCSDS sequence flags, added
+   2026-11-12). Multi-packet reports are accumulated by sequence flags (`Pus11SummaryReportTest`). TM-gap trigger:
+   `TmGapReconcileTrigger`, unit-tested with a fixed clock; the first packet after start also triggers.
+   Manual test: `examples/pus-frames/tests/test-pus11-reconcile.py` (silent drop → TIMEOUT "Not on board").
+   **Not done:** a unit test that decodes a > 1-byte `group_id` through the MDB (the manual run covers the
+   current 1-byte width only); the TM-gap trigger on a real pass (needs a 10 min silence); a multi-packet
+   report from the simulator (it sends one packet). Release time from the on-board value differs by 1 ms
+   from the ground value in the manual run (logged): tick rounding, not yet explained (§4.4).
 4. Release-ACK correlation on `/PUS/pus-tc-ack-*`, keyed on gentime. ~½ day
 5. TC[11,3/5/6/7/8/15] modelling from the TC stream. ~2 days (all four filter types + packed
    request IDs — long pole). Filters and shifts in ground time (§4.2), boundary tests at
    `start`/`end` ± 1 ms.
 6. Timeline `ItemProvider`, then a dedicated page if too thin.
 
+Status (2026-11-13): steps 0, 0b, 1, 2 and 3 are done (step 3 uncommitted). Step 3 has blockers B1–B3 and B7 (§6.1). Next: step 4
+(release-ACK correlation), unless B1 or B2 changes the design of step 3.
+
 Steps 0–3 are the minimum useful set. Upstream cmdhist keys are done, but renamed and reduced
 (§1.2).
+
+### 6.1 Blockers (as of 2026-11-12)
+
+| # | Blocker | Blocks | Owner | Status |
+|---|---|---|---|---|
+| B1 | Does the spacecraft split TM[11,13] over several packets, and does it set CCSDS grouping flags (first/continuation/last)? The standard (§8.11.2.13) is silent. Our reconcile assumes it. | Multi-packet reconcile, the `grouping` parameter (MDB) | OBSW / SW ICD | Open. The WIP ICD (`JTY_FSW_SpaceToGround_TM_TC_ICD_v2 - WIP.docx`) says TM grouping flags are used only "if grouping might be required in services like memory dump", and that Appendix 5 (PUS source data structures) is "to be added in the next release". Tests use a synthetic packet; the simulator sends one standalone packet. Full ICD summary: `jty-fsw-icd-summary.md` (§11 issues 1, 4) |
+| B2 | Widths and valid ranges of the request-ID fields (source ID 16, APID 11, sequence count 14 in the code). The standard gives only "enumerated"/"unsigned integer". Also the width of `n` (uint16 in MDB). | Decoding of TM[11,13] and TC[11,5/7/9/12] | Project decision; confirm with OBSW | Open. Hard-coded in MDB `dt.xml` and `PusPackedFields` |
+| B3 | 1 ms difference between the on-board release time (decoded from TM[11,13]) and the ground release time (from `tco.getObt` at insert). Logged as `on-board release time is N ms off`. Cause not known: tick rounding, or a conversion error (§4.4). | Trust in `retimed` entries; filter boundary tests (step 5) | Us; needs a run with a known OBT | Open |
+| B4 | Sub-schedule/group ID ranges, whether 0 is valid, whether a default group exists at boot, one fixed sub-schedule or one per operation (§5 Q3) | Test data; default group handling | OBSW (Gowtham) | Open |
+| B5 | Time margin value (§5 Q4) and the §6.11.11 HK parameter names (§5 Q5) | Insert rejection prediction; count check | OBSW | Open, deferred (§7) |
+| B6 | Max expected queue size per pass, to size the TM[11,13] downlink (§5 Q1) | Operations sizing | Ops | Open. WIP ICD: data field segmentation is supported, incomplete packets are not delivered, max user data length is about 248 bytes (so a large TM[11,13] must span packets). Use this for the size estimate |
+| B7 | WIP ICD internal conflicts (`jty-fsw-icd-summary.md` §11): (a) incomplete-packet policy: Appendix 3 says "Required", §7.1 says "Not required". Decides whether a lost packet drops a multi-packet TM[11,13]. (b) TM frame length: 1020 bytes (§4.1) vs 980 (Appendix 3). (c) TM time field: 8 bytes (§6.2) vs CUC 4+2 = 6 bytes (Appendix 4). (c) sets the release-time width in TM[11,13] (§1.6), so it affects the decode | Multi-packet reconcile (B1); TM[11,13] release-time decode (§1.6) | FSW ICD owner (Yogesh Modi, per the ICD sign-off table) | Open. Raised 2026-11-13 |
+
+Not blockers, but not yet done for step 3:
+- Unit test decoding a > 1-byte `group_id` through the MDB (§6 step 3). Covered only by the manual run at 1 byte.
+- TM-gap trigger on a real pass (needs 10 min of TM silence). Covered by unit tests with a fixed clock, and by the first-packet trigger at start.
+- Simulator multi-packet TM[11,13] (sends one packet).
+- Commit: step 3 changes are uncommitted on `feat/time-tagged-commands`. Files: MDB `examples/pus-frames/.../pus11.xml`,
+  `Pus11SummaryReport.java` (new), `TmGapReconcileTrigger.java` (new), `Pus11Schedule.java`,
+  `Pus11ScheduleTracker.java`, `Pus11SummaryReportTest.java` (new), `Pus11ScheduleTrackerTest.java`,
+  `examples/pus-frames/tests/test-pus11-reconcile.py` (new), `pus.rst` "Schedule tracker", the manual test doc, and this plan.
+
+**Step 3 verification (2026-11-12):** `Pus11ScheduleTrackerTest` 19, `Pus11SummaryReportTest` 6, `Pus11ScheduleTest` 20, all pass.
+Full `org.yamcs.pus.*Test` exit 0. `test-pus11-reconcile.py` passed twice. Log: "0 confirmed, 1 missing, 0 released, 1 retimed,
+0 unknown". The retimed entry is B3. Spec check (§8.11.2.13): field order matches, no widths or grouping rule in the standard.
+
+**Next steps (2026-11-13)**
+1. Send the B1 and B7 questions to the FSW ICD owner (Yogesh Modi, per the sign-off table). Ask: is TM[11,13] split with CCSDS grouping flags, what is the incomplete-packet policy, what is the TM time field width.
+2. Decide B2 (request-ID widths) with the project.
+3. Commit step 3 when the user asks. Branch: `feat/time-tagged-commands`.
+4. Docs: `pus.rst` "Schedule tracker" covers step 3. Add the B1/B7 caveats once answered. `packet-preprocessor/pus.rst` is still untouched.
+5. Then step 4 (release-ACK correlation).
+
+**Housekeeping**
+- Code-review-graph was built at `b4d3b6933`. Rebuild with `source .venv/bin/activate && code-review-graph build`.
+- `pus-frames` may still run on port 8090: `pkill -f pus-frames` when finished.
+- Untracked, not yet decided (commit or ignore): `.claude/task files/`, `tests/yamcs-data/`, `__pycache__` dirs under `examples/pus*/tests/`,
+  `.claude/settings.json.bak`, `.claude/.DS_Store`, `.claude/testing/.gitignore`, `yamcs-web/package-lock.json`,
+  `yamcs-web/src/main/webapp/proxy.dev.json`, `pus_analysis/pus.txt`, `pus_analysis/pus6_task.txt`.
 
 ---
 

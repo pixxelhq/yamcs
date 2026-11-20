@@ -157,6 +157,68 @@ Example:
             groupId: { bytes: 1, default: 1 }
 
 
+Schedule tracker
+^^^^^^^^^^^^^^^^
+
+The ``org.yamcs.pus.Pus11ScheduleTracker`` service keeps a ground model of the on-board time-based
+schedule, and reconciles it with the spacecraft. It is configured as a service of the instance:
+
+.. code-block:: yaml
+
+    services:
+      - class: org.yamcs.pus.Pus11ScheduleTracker
+        args:
+          releaseGrace: 300      # seconds after the release time before an unconfirmed entry is presumed gone
+          sweepInterval: 10      # seconds
+          tcLink: tc_realtime    # optional: the TC link whose TC(11,4) layout is used
+          processor: realtime    # processor that decodes the status and summary reports
+          reconcile:
+            enabled: true        # request the on-board schedule at each pass
+            aosGap: 600          # seconds without TM that mark the end of a pass
+            aosSettle: 30        # seconds after the first TM packet of a pass before the request
+            tmStream: tm_realtime
+
+``releaseGrace``, ``sweepInterval``, ``tcLink`` and ``processor`` are as described above; ``reconcile``
+defaults to the values shown. The TC(11,4) layout must come from a ``PusCommandPostprocessor`` with
+``pus11`` configured.
+
+The status of each scheduled command is published in the command history as the ``pus11-release``
+acknowledgment, separate from ``CommandComplete``:
+
+* ``SCHEDULED``: the command is on board, released at the time in the message;
+* ``DISABLED``: it will be dropped at its release time, because its sub-schedule or group is
+  reported disabled (TM(11,19) / TM(11,27));
+* ``TIMEOUT``: it is presumed gone (no release acknowledgment ``releaseGrace`` seconds after its
+  release time), or it was not on board at a reconcile before its release time.
+
+Reconcile: the tracker requests the complete on-board schedule with ``TC[11,17]``, and reads the
+``TM[11,13]`` summary report back. The report replaces the model's live entries:
+
+* an entry on board is confirmed (``SCHEDULED``), and takes the on-board release time;
+* an entry missing from the report before its release time is dropped (``TIMEOUT``);
+* an entry missing after its release time is marked released;
+* an activity on board that the ground did not insert is kept as unknown.
+
+A reconcile runs at the first TM packet after start, and at the first TM packet after more than
+``aosGap`` seconds without TM, once ``aosSettle`` seconds have passed. It is skipped, without an
+error, when no TC link is enabled. A report of several packets is applied once its last packet
+arrives: the CCSDS sequence flags of the ``TM[11,13]`` packets mark the first and last packet of a
+report, and an unfinished report is discarded when a new one starts.
+
+Limits:
+
+* the reconcile reads the ``/PUS11/SUMMARY_REPORT/*`` parameters of the MDB, including the packet's
+  ``grouping`` (CCSDS sequence flags, 2 bits at bit 16);
+* a packet lost in the middle of a multi-packet report is not detected, so that report is applied
+  as partial; whether the spacecraft splits reports this way is to be confirmed;
+* the release times of the ground model come from the time correlation at insert. The on-board
+  value can differ from it by a millisecond, which is logged when the release time is replaced;
+* manual ``INSERT_ACTIVITIES`` with more than one activity, and deletes or shifts by filter, are not
+  tracked between reconciles yet;
+* the status reports are as fresh as the last report received;
+* there is no API or web page for the model yet.
+
+
 .. _pus-embedded-tc:
 
 Embedded TC packets

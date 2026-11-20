@@ -8,6 +8,9 @@
 	</Header>
 	<TelemetryMetaData>
 		<ParameterTypeSet>
+			<IntegerParameterType name="SeqGroupingType" signed="false">
+				<IntegerDataEncoding sizeInBits="2"/>
+			</IntegerParameterType>
 			<IntegerParameterType name="ScheduleIdType" signed="false">
 				<IntegerDataEncoding sizeInBits="8"/>
 			</IntegerParameterType>
@@ -735,6 +738,8 @@
 					<Parameter parameterTypeRef="/dt/uint16" name="source"/>
 					<Parameter parameterTypeRef="/dt/pus_report_apid" name="apid"/>
 					<Parameter parameterTypeRef="/dt/pus_report_seqcount" name="seq"/>
+						<!-- CCSDS sequence flags of the packet: 0 continuation, 1 first, 2 last, 3 standalone -->
+						<Parameter parameterTypeRef="SeqGroupingType" name="grouping"/>
 			</ParameterSet>
 			<ContainerSet>
 				<SequenceContainer name="SUMMARY_REPORT_ELEMENT">
@@ -759,6 +764,12 @@
 							</Count>
 						</RepeatEntry>
 					</ContainerRefEntry>
+					<!-- explicit location: must not move the entries above, which follow each other -->
+					<ParameterRefEntry parameterRef="grouping">
+						<LocationInContainerInBits referenceLocation="containerStart">
+							<FixedValue>16</FixedValue>
+						</LocationInContainerInBits>
+					</ParameterRefEntry>
 				</EntryList>
 				<BaseContainer containerRef="pus11-tm">
 					<RestrictionCriteria>

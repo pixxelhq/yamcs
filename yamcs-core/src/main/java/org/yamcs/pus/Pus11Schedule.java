@@ -51,9 +51,11 @@ public class Pus11Schedule {
     public static class ScheduleEntry {
         final RequestId inner;
         final RequestId wrapper;
-        final long releaseTime;
+        // updated by a reconcile, which carries the on-board value
+        volatile long releaseTime;
         final Long subScheduleId;
         final Long groupId;
+        // null for an UNKNOWN entry: only on board, not inserted by the ground
         final CommandId cmdId;
         final boolean duplicate;
         volatile EntryState state = EntryState.PENDING;
@@ -75,7 +77,7 @@ public class Pus11Schedule {
             return inner;
         }
 
-        /** request ID of the TC(11,4) that inserted it */
+        /** request ID of the TC(11,4) that inserted it, null for an UNKNOWN entry */
         public RequestId getWrapper() {
             return wrapper;
         }
@@ -103,9 +105,10 @@ public class Pus11Schedule {
          * TC(11,4) for manual inserts
          */
         public String getCommandName() {
-            return cmdId.getCommandName();
+            return cmdId == null ? "unknown command" : cmdId.getCommandName();
         }
 
+        /** null for an UNKNOWN entry */
         public CommandId getCmdId() {
             return cmdId;
         }
@@ -135,7 +138,7 @@ public class Pus11Schedule {
 
         @Override
         public String toString() {
-            return cmdId.getCommandName() + " " + inner + " " + state;
+            return getCommandName() + " " + inner + " " + state;
         }
     }
 
@@ -268,6 +271,99 @@ public class Pus11Schedule {
             return "group " + e.groupId + " is disabled";
         }
         return null;
+    }
+
+    /**
+     * What a reconcile changed.
+     *
+     * @param confirmed
+     *            entries now {@link EntryState#SCHEDULED} that were not before (PENDING or PRESUMED_GONE)
+     * @param missing
+     *            live entries with a release time still ahead that are not on board: silently dropped. Removed from
+     *            the model as {@link EntryState#DELETED}
+     * @param released
+     *            live entries with a release time already passed that are not on board: released (or dropped). Marked
+     *            {@link EntryState#RELEASED}
+     * @param retimed
+     *            entries whose release time differs from the on-board one; they take the on-board value. A difference
+     *            means that the ground time conversion disagrees with the spacecraft
+     * @param unknown
+     *            entries newly seen on board with no ground command; {@link EntryState#UNKNOWN}. The UNKNOWN entries of
+     *            earlier reports that are still on board are kept without being listed again
+     */
+    public record Reconciliation(List<ScheduleEntry> confirmed, List<ScheduleEntry> missing,
+            List<ScheduleEntry> released, List<ScheduleEntry> retimed, List<ScheduleEntry> unknown) {
+    }
+
+    /**
+     * Replaces the live part of the model with a complete TM(11,13) report. The on-board release time overwrites the
+     * ground one. Entries without a release time are not judged absent.
+     *
+     * @param report
+     *            the complete on-board schedule
+     * @param now
+     *            the time of the report, ground time
+     */
+    public synchronized Reconciliation reconcile(List<Pus11SummaryReport.Entry> report, long now) {
+        Map<RequestId, Pus11SummaryReport.Entry> reported = new HashMap<>();
+        for (var r : report) {
+            reported.put(r.inner(), r);
+        }
+        List<ScheduleEntry> confirmed = new ArrayList<>();
+        List<ScheduleEntry> missing = new ArrayList<>();
+        List<ScheduleEntry> released = new ArrayList<>();
+        List<ScheduleEntry> retimed = new ArrayList<>();
+        List<ScheduleEntry> unknown = new ArrayList<>();
+
+        for (var e : List.copyOf(entries)) {
+            // PENDING: its TC(11,4) may still be on its way, so absence means nothing yet
+            if (e.state == EntryState.PENDING || e.state == EntryState.SCHEDULED
+                    || e.state == EntryState.PRESUMED_GONE) {
+                var r = reported.get(e.inner);
+                if (r != null) {
+                    if (r.releaseTime() != TimeEncoding.INVALID_INSTANT && r.releaseTime() != e.releaseTime) {
+                        if (e.releaseTime != TimeEncoding.INVALID_INSTANT) {
+                            log.warn("{} {}: on-board release time is {} ms off the ground one", e.cmdId == null
+                                    ? "unknown command" : e.cmdId.getCommandName(), e.inner,
+                                    r.releaseTime() - e.releaseTime);
+                            retimed.add(e);
+                        }
+                        e.releaseTime = r.releaseTime();
+                    }
+                    if (e.state != EntryState.SCHEDULED) {
+                        e.state = EntryState.SCHEDULED;
+                        confirmed.add(e);
+                    }
+                } else if (e.state != EntryState.PENDING && e.releaseTime != TimeEncoding.INVALID_INSTANT) {
+                    if (e.releaseTime <= now) {
+                        e.state = EntryState.RELEASED;
+                        released.add(e);
+                    } else {
+                        e.state = EntryState.DELETED;
+                        entries.remove(e);
+                        byRequestId.remove(e.inner, e);
+                        missing.add(e);
+                    }
+                }
+            } else if (e.state == EntryState.UNKNOWN && !reported.containsKey(e.inner)) {
+                entries.remove(e);
+                byRequestId.remove(e.inner, e);
+            }
+        }
+
+        for (var r : report) {
+            var existing = byRequestId.get(r.inner());
+            if (existing != null && (isLive(existing) || existing.state == EntryState.UNKNOWN)) {
+                continue;
+            }
+            var e = new ScheduleEntry(r.inner(), null, r.releaseTime(), r.subScheduleId(), r.groupId(), null, false);
+            e.state = EntryState.UNKNOWN;
+            e.dropReason = dropReason(e);
+            entries.add(e);
+            byRequestId.put(r.inner(), e);
+            unknown.add(e);
+        }
+        return new Reconciliation(confirmed, missing, released, retimed, unknown);
     }
 
     /** the most recently inserted entry with this inner request ID, or null */

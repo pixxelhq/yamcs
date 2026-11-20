@@ -104,7 +104,31 @@ All the tests create the groups they need with TC[11,22] via
 `examples/pus-frames/tests/pus11_setup.py` (`ensure_groups`), so the order of the tests does not
 matter.
 
-Not covered (not built): TM[11,13] reconcile, manual `/PUS11/INSERT_ACTIVITIES` with N > 1.
+Not covered (not built): manual `/PUS11/INSERT_ACTIVITIES` with N > 1, UNKNOWN entries, the TM-gap trigger on a real pass.
+
+## 3a. TM(11,13) reconcile (plan §6 step 3, ~1 min)
+
+Same running example. The reconcile replaces the model with the on-board schedule, read back from
+TM[11,13] after TC[11,17].
+
+```
+.claude/testing/venv/bin/python -I examples/pus-frames/tests/test-pus11-reconcile.py
+```
+
+Pass: ends with `PASS`. Scenario: schedule A, delete A on board with TC[11,5] (the tracker does not
+see it), schedule B, TC[11,17]. Expected Yamcs log (`Pus11ScheduleTracker`):
+
+| Step | Log | `pus11-release` ack |
+|---|---|---|
+| Schedule A, B | `PENDING`, then `SCHEDULED` | `SCHEDULED` |
+| TC[11,17] reply | `Reconciled with the on-board schedule of 1 activities: 0 confirmed, 1 missing, 0 released, 0 unknown` | A: `TIMEOUT` "Not on board at reconcile…"; B: unchanged |
+
+On the first run after a start, the TM-gap trigger also reconciles (`Pass started`, then
+`Requested the on-board schedule`). The reply then lists 0 activities. Without the example's
+schedule, expect no `Cannot read the on-board schedule` warning.
+
+Known: the on-board release time of B was 1 ms off the ground one (`on-board release time is 1 ms off
+the ground one`, logged by `Pus11Schedule`). Not explained yet; see plan §4.4.
 
 ## 3b. Sequence counter survives restart (plan §6 step 0b, ~5 min)
 
