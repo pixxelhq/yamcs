@@ -62,7 +62,7 @@ def schedule(cmd_conn, delay):
     command.await_complete(timeout=15)
     if not command.is_success():
         sys.exit(f"FAIL: insert not accepted: {command.error}")
-    seq = command.attributes["pus11-inner-seqcount"]
+    seq = command.attributes["ccsds-seqcount"]
     print(f"Scheduled SWITCH_VOLTAGE_OFF at {t_str} (inner seq count {seq})")
     return command, seq
 

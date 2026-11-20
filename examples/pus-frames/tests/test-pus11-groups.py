@@ -144,7 +144,7 @@ if __name__ == "__main__":
     delete_groups(cmd_conn, [DISABLED_GROUP], expect_success=False)
 
     print("8. TC[11,5] delete the activities, then TC[11,23] the groups")
-    seqs = [late.attributes["pus11-inner-seqcount"], disabled.attributes["pus11-inner-seqcount"]]
+    seqs = [late.attributes["ccsds-seqcount"], disabled.attributes["ccsds-seqcount"]]
     issue(cmd_conn, "/PUS11/DELETE_ACTIVITIES_BY_ID", {
         "num_requests": len(seqs),
         "requests": [{"source_id": 0, "apid": APID, "seqcount": s} for s in seqs],

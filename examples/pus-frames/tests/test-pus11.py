@@ -15,7 +15,7 @@ Scenario:
      for it arrives at the release time
 
 An on-board activity is identified by the request ID of the embedded command, not of the
-TC[11,4] wrapper: the postprocessor publishes it as the pus11-inner-seqcount attribute.
+TC[11,4] wrapper: the postprocessor publishes the original command's seq as the ccsds-seqcount attribute (the wrapper's is pus11CcsdsSeqCount).
 
 Run the example first:  ./run-example.sh pus-frames --data-dir yamcs-data
 and wait until the time correlation is established (curl localhost:8090/api/tco/pus-frames/tco0/status
@@ -110,7 +110,7 @@ def schedule_command(cmd_conn, delay_seconds):
     command.await_complete(timeout=15)
     if not command.is_success():
         sys.exit(f"FAIL: insert not accepted: {command.error}")
-    seq = command.attributes["pus11-inner-seqcount"]
+    seq = command.attributes["ccsds-seqcount"]
     print(f"Scheduled SWITCH_VOLTAGE_OFF at {t_str} (group {GROUP_ID}, sub-schedule {SUB_SCHEDULE_ID}),"
           f" inner seq count {seq}")
     return seq, t

@@ -95,8 +95,8 @@ public class Pus11ScheduleTrackerTest extends YarchTestCase {
 
         var e = tracker.getSchedule().getEntries().getFirst();
         assertEquals(EntryState.PENDING, e.getState());
-        // inner request ID as published by the postprocessor, source id from the wrapper
-        int innerSeq = (Integer) lastValue("pus11-inner-seqcount");
+        // inner request ID: ccsds-seqcount is the original command's seq; source id from the wrapper
+        int innerSeq = (Integer) lastValue("ccsds-seqcount");
         assertEquals(new RequestId(9, 100, innerSeq), e.getInner());
         assertEquals(new RequestId(9, 5, (Integer) lastValue("pus11CcsdsSeqCount")), e.getWrapper());
         assertEquals(0L, e.getSubScheduleId());
@@ -263,7 +263,7 @@ public class Pus11ScheduleTrackerTest extends YarchTestCase {
 
     /** the inner request ID of the activity of the most recent {@link #send} */
     private RequestId innerOfLastInsert() {
-        int innerSeq = (Integer) lastValue("pus11-inner-seqcount");
+        int innerSeq = (Integer) lastValue("ccsds-seqcount");
         return new RequestId(9, 100, innerSeq);
     }
 

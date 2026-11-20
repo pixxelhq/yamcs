@@ -25,8 +25,9 @@ IDs, `db7466fe0` packed field widths, `0c604ad09` PUS22):
 - Simulator implements groups (TC[11,22–26], TM[11,27]) → all three silent-drop paths testable (§1.5).
 - New `examples/pus-frames` with real time correlation (§4.4).
 - PUS22 position-based scheduling added — out of scope, see §1.7.
-- `9a5f8648a`: PUS22 wrapper now publishes inner-ID keys and overwrites `ccsds-*` with the wrapper
-  ID, same as PUS11 (§1.7).
+- Merge with `pixxel/master` (2026-11-20, option 1): `ccsds-*` stays on the original command and the
+  `pus11-inner-*` / `pus22-inner-*` keys are removed, following master `651a792c4`. The wrapper ID is only
+  in `pus11Apid`/`pus11CcsdsSeqCount` (PUS 11) and `pus22Apid`/`pus22CcsdsSeqCount` (PUS 22). See §1.2, §1.3.
 
 **What changed on 2026-10-27** (rebase onto `16f296b34` = PR #239, the upstream merge `ab81ffaa9`:
 `ddb39fa5b` argument locations, `0555ee94f` embedded-TC ancillary data, `acc47bb07` embedded TCs in
@@ -86,8 +87,8 @@ Command history per scheduled command:
 
 | Key | Value |
 |---|---|
-| `ccsds-apid`, `ccsds-seqcount` | **wrapper** request ID (overwritten after wrapping; read by `pus.xml` verifiers) |
-| `pus11-inner-apid`, `pus11-inner-seqcount` | **inner** request ID — the release/dequeue key |
+| `ccsds-apid`, `ccsds-seqcount` | **original (inner)** request ID of the command, as published by master. This is the release/dequeue key |
+| `pus11-inner-apid`, `pus11-inner-seqcount` | removed in the merge with `pixxel/master` (2026-11-20). Use `ccsds-*` |
 | `pus11Apid`, `pus11CcsdsSeqCount` | wrapper request ID (renamed from `pus11-apid`/`pus11-ccsds-seqcount`) |
 | `pus11SubScheduleId`, `pus11GroupId` | command-option attributes — **only if the operator set them**; the config default is not published |
 | `pus11Binary` | full TC[11,4] (renamed from `pus11-binary`) |
@@ -100,13 +101,13 @@ shared `Pus11WrapperLayout` record built in `init()`) rather than re-reading the
 
 ### 1.3 Two request IDs, two signals
 
-- **Wrapper** ACKs arrive within seconds → *insert accepted, now queued*. The `pus.xml` verifiers now
-  match these (Gap #5 part 1, fixed), so `CommandComplete = OK` means **insert accepted**, not
+- **Wrapper** ACKs arrive within seconds → *insert accepted, now queued*. The Scheduled algorithm verifier
+  in `pus.xml` matches these via `pus11Apid`/`pus11Seq` (Gap #5 part 1), so `CommandComplete = OK` means **insert accepted**, not
   "executed".
 - **Inner** ACKs arrive at release time (hours later) → *released and ran*. No verifier covers this;
   `CheckWindow` can only be relative to `commandRelease`/`lastVerifier`. The tracker must subscribe
   to the decoded `/PUS/pus-tc-ack-*` parameters directly and match `(tc-ack-apid, tc-ack-seq)`
-  against `pus11-inner-*`.
+  against `ccsds-apid`/`ccsds-seqcount` of the original command.
 
 ### 1.4 Intermittent link
 
@@ -162,9 +163,9 @@ TC[11,26]). Still missing: execution-function status and activity count (§6.11.
 `0c604ad09` adds `pus22OrbitNumber`/`pus22OrbitAngle` options that wrap a command into TC[22,4]
 (config `pus22:` block, own sub-schedule/group widths). It publishes `pus22Apid`,
 `pus22CcsdsSeqCount`, `pus22Binary`, and since `9a5f8648a` (`buildScheduledPositionTc`) also
-`pus22-inner-apid`/`pus22-inner-seqcount`, with `ccsds-apid`/`ccsds-seqcount` overwritten by the
-wrapper ID. So the Gap #5 verifier mismatch is fixed for PUS22 too, and the key layout matches
-PUS11. Not part of this tracker. If PUS22 tracking is wanted later, keep `ScheduleEntry` release
+no inner-ID keys. `ccsds-*` stay on the original command (reverted in the merge with `pixxel/master`,
+2026-11-20). The wrapper ID is only in `pus22Apid`/`pus22CcsdsSeqCount`. Wrapper ACKs are matched by the
+Scheduled verifier, as for PUS11. Not part of this tracker. If PUS22 tracking is wanted later, keep `ScheduleEntry` release
 keys generic (time *or* position) — no other change needed now.
 
 ### 1.8 Test-bed defects (found 2026-10-19)
@@ -178,7 +179,7 @@ keys generic (time *or* position) — no other change needed now.
   samples, so every `pus11ScheduleAt` fails with "Time corelation coefficients not available". Use
   `examples/pus-frames` (real TCO) for PUS 11 work. (Found 2026-10-22.)
 - **Fixed 2026-10-27 (`43551e7c0`): `test-pus11.py`** used the wrapper `ccsds-seqcount`; it now
-  reads `pus11-inner-seqcount`, sends TC[11,1] first and asserts withheld/released. Passes.
+  reads `ccsds-seqcount` (the original command's seq; `pus11-inner-seqcount` was removed in the merge), sends TC[11,1] first and asserts withheld/released. Passes.
 - **`examples/pus-frames` run setup (found 2026-10-22).** `dataDir: /storage/yamcs-data` is not
   writable on macOS: start with `./run-example.sh pus-frames --data-dir yamcs-data`. The TC link
   default group 1 must be created before any `pus11ScheduleAt` (else "scheduling group 1 does not
@@ -239,7 +240,7 @@ Index: `ConcurrentSkipListMap<Long, List<ScheduleEntry>>` by release time + `Map
    "last reconciled N min ago". **Not** link-status polling: under the planned ground-station
    gateway (`link-management-redesign-feasibility.md` Option A) each instance has one always-up
    gateway link, so link status never shows AOS.
-2. **cmdhist** — tuple with `pus11-inner-seqcount` → new `PENDING` entry, fields from parsing
+2. **cmdhist** — tuple with `ccsds-seqcount` → new `PENDING` entry, fields from parsing
    `pus11Binary` (§1.2); `CommandComplete = OK` → `SCHEDULED`; `NOK` → drop.
 3. **Release ACKs** — see §1.3/§1.4.
 4. **TC stream** — parse TC[11,4] binary for manual `/PUS11/INSERT_ACTIVITIES` (`N > 1`); parse
@@ -581,7 +582,7 @@ links to cmdhist.
 
 **`Pus11ScheduleRecorder`** (`yamcs-core/.../pus/`):
 1. Subscribe to CMD_HIST; cache first tuple per `CommandId`.
-2. `pus11ScheduleAt` set → inner ID from `pus11-inner-*`, everything else from `pus11Binary`
+2. `pus11ScheduleAt` set → inner ID from `ccsds-apid`/`ccsds-seqcount`, everything else from `pus11Binary`
    (§1.2); else PUS type 11 → parse `binary`.
 3. `Pus11TcParser` ported from `Pus11Service`: TC[11,4], by-ID [11,5]/[11,7], by-filter
    [11,6]/[11,8], [11,15] shift-all, [11,3] reset. Sub-schedule/group widths from the link layout

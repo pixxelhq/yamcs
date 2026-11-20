@@ -106,5 +106,5 @@ python3 examples/pus-frames/tests/test-pus19-embedded.py
   activities are dropped ("the time-based schedule execution function is disabled") until
   TC[11,1] enables it (`/PUS11/ENABLE_SCHEDULER`, sent by `test-pus11.py`).
 - An on-board activity is identified by the request ID of the embedded command, not of the
-  TC[11,4] wrapper. Use the `pus11-inner-seqcount` command attribute (not `ccsds-seqcount`) in
+  TC[11,4] wrapper. Use the `ccsds-seqcount` command attribute (the original command's seq, not `pus11CcsdsSeqCount`) in
   delete, time-shift and report-by-ID requests.
