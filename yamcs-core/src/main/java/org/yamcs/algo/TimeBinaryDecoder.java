@@ -1,10 +1,9 @@
 package org.yamcs.algo;
 
+import java.nio.ByteOrder;
 import java.util.Map;
 
-import org.yamcs.ConfigurationException;
 import org.yamcs.YConfiguration;
-import org.yamcs.YamcsServer;
 import org.yamcs.algorithms.AlgorithmExecutionContext;
 import org.yamcs.mdb.AbstractDataDecoder;
 import org.yamcs.mdb.ContainerProcessingContext;
@@ -26,6 +25,9 @@ import org.yamcs.xtce.DataEncoding;
  * <p>
  * Unlike the pure XTCE based decoder, this one can use a time correlation service to convert between an on-board time
  * and Yamcs time.
+ * CUC layout is configured with pField and pFieldCont, with no implicit flag.
+ * With TCO, the raw onboard counter is correlated directly; otherwise the CUC
+ * value is interpreted relative to the configured epoch.
  */
 public class TimeBinaryDecoder extends AbstractDataDecoder {
 
@@ -42,15 +44,20 @@ public class TimeBinaryDecoder extends AbstractDataDecoder {
     final AlgorithmExecutionContext ctx;
 
     public TimeBinaryDecoder(CustomAlgorithm alg, AlgorithmExecutionContext ctx, Map<String, Object> conf) {
+        this(alg, ctx, conf, TimeBinaryEncoder.findTcoService(ctx, YConfiguration.wrap(conf)));
+    }
+
+    TimeBinaryDecoder(CustomAlgorithm alg, AlgorithmExecutionContext ctx, Map<String, Object> conf,
+            TimeCorrelationService tcoService) {
         YConfiguration yc = YConfiguration.wrap(conf);
         this.ctx = ctx;
         TimeDecoderType type = yc.getEnum("type", TimeDecoderType.class, TimeDecoderType.CUC);
 
         timeDecoder = switch (type) {
             case CUC -> {
-                int implicitPField = yc.getInt("implicitPField", -1);
-                int implicitPFieldCont = yc.getInt("implicitPFieldCont", -1);
-                yield new CucTimeDecoder(implicitPField, implicitPFieldCont);
+                int pField = TimeBinaryEncoder.getPField(yc, "pField", "implicitPField", -1);
+                int pFieldCont = TimeBinaryEncoder.getPField(yc, "pFieldCont", "implicitPFieldCont", -1);
+                yield new CucTimeDecoder(pField, pFieldCont);
             }
             default -> {
                 throw new UnsupportedOperationException("unknown time decoder type " + type);
@@ -66,18 +73,7 @@ public class TimeBinaryDecoder extends AbstractDataDecoder {
             }
         }
 
-        if (yc.containsKey("tcoService")) {
-            String tcoServiceName = yc.getString("tcoService");
-            String yamcsInstance = ctx.getProcessorData().getYamcsInstance();
-            tcoService = YamcsServer.getServer().getInstance(yamcsInstance)
-                    .getService(TimeCorrelationService.class, tcoServiceName);
-            if (tcoService == null) {
-                throw new ConfigurationException(
-                        "Cannot find a time correlation service with name " + tcoServiceName);
-            }
-        } else {
-            tcoService = null;
-        }
+        this.tcoService = tcoService;
     }
 
     protected long shiftFromEpoch(long t) {
@@ -103,29 +99,28 @@ public class TimeBinaryDecoder extends AbstractDataDecoder {
 
     @Override
     public Value extractRaw(DataEncoding de, ContainerProcessingContext pcontext, BitBuffer buf) {
-        var suppl = new ByteSupplier() {
-            @Override
-            public byte getAsByte() {
-                return buf.getByte();
-            }
-        };
+        ByteOrder previousOrder = buf.getByteOrder();
+        buf.setByteOrder(ByteOrder.BIG_ENDIAN);
 
-        long obt;
-        if (timeEpoch == null || timeEpoch == TimeEpochs.NONE) {
-            obt = timeDecoder.decodeRaw(suppl);
-
+        // A CUC field can begin between octets in a packed telemetry record.
+        ByteSupplier suppl = () -> (byte) buf.getBits(Byte.SIZE);
+        try {
+            long obt;
             if (tcoService != null) {
-                long pGenTime = pcontext.getGenerationTime();
-                Instant hisTime = tcoService.getHistoricalTime(Instant.get(pGenTime), obt);
-                
-                // FIXME: How to handle this?
-                obt = (hisTime == Instant.INVALID_INSTANT) ? obt: hisTime.getMillis();
+                long raw = timeDecoder.decodeRaw(suppl);
+                Instant time = tcoService.getHistoricalTime(Instant.get(pcontext.getGenerationTime()), raw);
+                if (time == Instant.INVALID_INSTANT) {
+                    throw new IllegalStateException("Time correlation coefficients not available");
+                }
+                obt = time.getMillis();
+            } else if (timeEpoch == TimeEpochs.NONE) {
+                obt = timeDecoder.decodeRaw(suppl);
+            } else {
+                obt = shiftFromEpoch(timeDecoder.decode(suppl));
             }
-        } else {
-            obt = timeDecoder.decode(suppl);
-            obt = shiftFromEpoch(obt);
+            return ValueUtility.getTimestampValue(obt);
+        } finally {
+            buf.setByteOrder(previousOrder);
         }
-
-        return ValueUtility.getTimestampValue(obt);
     }
 }

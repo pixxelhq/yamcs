@@ -38,7 +38,7 @@ import org.yamcs.simulator.UdpTmFrameLink;
  * <li>ST[12] - on-board monitoring - parameter monitoring subservice</li>
  * <li>ST[13] - large packet transfer</li>
  * <li>ST[14] - real-time forwarding control</li>
- * <li>ST[15] - on-board storage and retrieval - core lifecycle only, see Pus15Service</li>
+ * <li>ST[15] - on-board storage and retrieval - storage, selection, copy and retrieval, see Pus15Service</li>
  * <li>ST[17] - test</li>
  * <li>ST[19] - event-action</li>
  * <li>ST[20] - on-board parameter management</li>
@@ -52,7 +52,7 @@ import org.yamcs.simulator.UdpTmFrameLink;
  * 
  */
 public class PusSimulator extends AbstractSimulator {
-    static final int MAIN_APID = 1;
+    static final int MAIN_APID = PusPacketConfig.DEFAULT.apid();
 
     static final int PUS_TYPE_ACK = 1;
     static final int PUS_TYPE_HK = 3;
@@ -74,6 +74,10 @@ public class PusSimulator extends AbstractSimulator {
     TcpTmTcLink tmLink;
     UdpTmFrameLink tmFrameLink;
     final PusTimeEncoding timeEncoding;
+    final PusTimeEncoding storageTimeEncoding;
+    final PusPacketConfig packetConfig;
+    final Pus11ScheduleConfig scheduleConfig;
+    final int apid;
 
     FlightDataHandler flightDataHandler;
     DHSHandler dhsHandler;
@@ -95,6 +99,8 @@ public class PusSimulator extends AbstractSimulator {
     Pus20Service pus20Service;
     Pus21Service pus21Service;
     Pus22Service pus22Service;
+    final Pus128Service pus128Service;
+    final Pus130Service pus130Service;
 
     protected BlockingQueue<PusTcPacket> pendingCommands = new ArrayBlockingQueue<>(100);
 
@@ -103,7 +109,25 @@ public class PusSimulator extends AbstractSimulator {
     }
 
     public PusSimulator(File dataDir, PusTimeEncoding timeEncoding) {
+        this(dataDir, timeEncoding, PusTimeEncoding.STORAGE);
+    }
+
+    public PusSimulator(File dataDir, PusTimeEncoding timeEncoding, PusTimeEncoding storageTimeEncoding) {
+        this(dataDir, timeEncoding, storageTimeEncoding, PusPacketConfig.DEFAULT, new Pus11ScheduleConfig(timeEncoding));
+    }
+
+    public PusSimulator(File dataDir, PusTimeEncoding timeEncoding, PusTimeEncoding storageTimeEncoding,
+            PusPacketConfig packetConfig, Pus11ScheduleConfig scheduleConfig) {
+        this(dataDir, timeEncoding, storageTimeEncoding, packetConfig, scheduleConfig, true);
+    }
+
+    public PusSimulator(File dataDir, PusTimeEncoding timeEncoding, PusTimeEncoding storageTimeEncoding,
+            PusPacketConfig packetConfig, Pus11ScheduleConfig scheduleConfig, boolean demoHousekeeping) {
         this.timeEncoding = timeEncoding;
+        this.storageTimeEncoding = storageTimeEncoding;
+        this.packetConfig = packetConfig;
+        this.scheduleConfig = scheduleConfig;
+        this.apid = packetConfig.apid();
         powerDataHandler = new PowerHandler();
         rcsHandler = new RCSHandler();
         epslvpduHandler = new EpsLvpduHandler();
@@ -112,7 +136,7 @@ public class PusSimulator extends AbstractSimulator {
         cfdpReceiver = new CfdpReceiver(this, dataDir);
         pus2Service = new Pus2Service(this);
         pus3Service = new Pus3Service(this, flightDataHandler, powerDataHandler,
-                dhsHandler, rcsHandler, epslvpduHandler);
+                dhsHandler, rcsHandler, epslvpduHandler, demoHousekeeping);
         pus5Service = new Pus5Service(this);
         pus9Service = new Pus9Service(this);
         pus11Service = new Pus11Service(this);
@@ -125,6 +149,8 @@ public class PusSimulator extends AbstractSimulator {
         pus20Service = new Pus20Service(this);
         pus21Service = new Pus21Service(this);
         pus22Service = new Pus22Service(this);
+        pus128Service = new Pus128Service(this);
+        pus130Service = new Pus130Service(this);
     }
 
     @Override
@@ -146,8 +172,10 @@ public class PusSimulator extends AbstractSimulator {
         packet.fillChecksum();
         // ST[15] storage is independent of ST[14] real-time forwarding: a packet can be stored
         // on-board even if it's not forwarded live, so the store hook runs unconditionally.
-        pus15Service.submitToStores(packet);
-        if (!pus14Service.shouldForward(packet)) {
+        if (pus130Service.allowStore(packet)) {
+            pus15Service.submitToStores(packet);
+        }
+        if (!pus130Service.allowForward(packet) || !pus14Service.shouldForward(packet)) {
             return; // blocked by ST[14] forwarding control configuration
         }
         sendPacket(packet);
@@ -159,11 +187,15 @@ public class PusSimulator extends AbstractSimulator {
      * ST[14]'s forwarding gate must not re-block a dump that ground explicitly requested.
      */
     void sendStoredPacket(byte[] rawPacket) {
+        sendStoredPacket(rawPacket, 0);
+    }
+
+    void sendStoredPacket(byte[] rawPacket, int virtualChannel) {
         if (tmLink != null) {
             tmLink.sendPacket(rawPacket);
         }
         if (tmFrameLink != null) {
-            tmFrameLink.queuePacket(0, rawPacket);
+            tmFrameLink.queuePacket(virtualChannel, rawPacket);
         }
     }
 
@@ -185,12 +217,7 @@ public class PusSimulator extends AbstractSimulator {
     @Override
     public void processTc(SimulatorCcsdsPacket tc) {
         if (tc instanceof PusTcPacket pustc) {
-            transmitRealtimeTM(ack(pustc, 1));
-            try {
-                pendingCommands.put(pustc);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            enqueueTc(pustc);
         } else {
             if (tc.getAPID() == CfdpCcsdsPacket.APID) {
                 byte b0 = tc.getUserDataBuffer().get();
@@ -206,6 +233,18 @@ public class PusSimulator extends AbstractSimulator {
                 cfdpReceiver.processCfdp(tc.getUserDataBuffer());
             }
         }
+    }
+
+    boolean enqueueTc(PusTcPacket tc) {
+        if (!tc.isValid()) {
+            log.warn("Discarding PUS TC with an invalid header, length or checksum");
+            return false;
+        }
+        if (!pendingCommands.offer(tc)) {
+            log.warn("Discarding PUS TC because the simulator command queue is full");
+            return false;
+        }
+        return true;
     }
 
     private void switchBatteryOn(PusTcPacket commandPacket) {
@@ -248,6 +287,7 @@ public class PusSimulator extends AbstractSimulator {
         PusTcPacket commandPacket;
         while ((commandPacket = pendingCommands.poll()) != null) {
             try {
+                transmitRealtimeTM(ack(commandPacket, PUS_SUBTYPE_ACK_ACCEPTANCE));
                 log.info("Received PUS TC : {} (now: {})", commandPacket, timeEncoding.now());
                 switch (commandPacket.getType()) {
                 case 2 -> pus2Service.executeTc(commandPacket);
@@ -264,6 +304,17 @@ public class PusSimulator extends AbstractSimulator {
                 case 20 -> pus20Service.executeTc(commandPacket);
                 case 21 -> pus21Service.executeTc(commandPacket);
                 case 22 -> pus22Service.executeTc(commandPacket);
+                case 128 -> pus128Service.executeTc(commandPacket);
+                case 130 -> pus130Service.executeTc(commandPacket);
+                case 131 -> {
+                    if (commandPacket.getSubtype() == 4) {
+                        transmitRealtimeTM(ack(commandPacket, PUS_SUBTYPE_ACK_START));
+                        transmitRealtimeTM(ack(commandPacket, PUS_SUBTYPE_ACK_COMPLETION));
+                    } else {
+                        transmitRealtimeTM(nack(commandPacket, PUS_SUBTYPE_NACK_START,
+                                AbstractPusService.START_ERR_INVALID_PUS_SUBTYPE));
+                    }
+                }
                 case 25 -> {
                     switch (commandPacket.getSubtype()) {
                     case 1 -> switchBatteryOn(commandPacket);
@@ -280,7 +331,36 @@ public class PusSimulator extends AbstractSimulator {
     }
 
     PusTmPacket newPacket(int type, int subtype, int userDataLength) {
-        return new PusTmPacket(MAIN_APID, userDataLength, type, subtype, timeEncoding);
+        return newPacketForApid(apid, type, subtype, userDataLength);
+    }
+
+    PusTmPacket newPacketForApid(int packetApid, int type, int subtype, int userDataLength) {
+        var packet = new PusTmPacket(packetApid, userDataLength, type, subtype, timeEncoding,
+                packetConfig.spareBytes(), packetConfig.tmCrc());
+        if (type == 11 || type == 15 || type == 130) {
+            packet.setPage(1, 1);
+        }
+        return packet;
+    }
+
+    public void configureMdbTelemetry(PusMdbTelemetry telemetry, int housekeepingPeriodMillis, int eventPeriodMillis) {
+        if (state() != State.NEW) {
+            throw new IllegalStateException("Configure PUS telemetry before starting the simulator");
+        }
+        if (housekeepingPeriodMillis < 1 || eventPeriodMillis < 1) {
+            throw new IllegalArgumentException("PUS telemetry periods must be positive");
+        }
+        int dataOffset = 13 + timeEncoding.getEncodedLength() + packetConfig.spareBytes();
+        if (telemetry.sourceDataOffset() != dataOffset) {
+            throw new IllegalArgumentException("The PUS MDB puts source data at byte " + telemetry.sourceDataOffset()
+                    + ", but the simulator packet profile uses byte " + dataOffset);
+        }
+        pus3Service.configureMdbReports(telemetry.housekeeping(), housekeepingPeriodMillis);
+        pus5Service.configureMdbEvents(telemetry.events(), eventPeriodMillis);
+    }
+
+    PusTcPacket embeddedTc(byte[] packet) {
+        return new PusTcPacket(packet, packetConfig.spareBytes(), packetConfig.embeddedTcCrc());
     }
 
     protected PusTmPacket ack(PusTcPacket commandPacket, int subtype) {
@@ -292,11 +372,11 @@ public class PusSimulator extends AbstractSimulator {
     }
 
     public PusTmPacket nack(PusTcPacket commandPacket, int subtype, int code) {
-        PusTmPacket ackPacket = newPacket(PUS_TYPE_ACK, subtype, 8);
+        PusTmPacket ackPacket = newPacket(PUS_TYPE_ACK, subtype, 5);
 
         ByteBuffer bb = ackPacket.getUserDataBuffer();
         bb.put(commandPacket.getBytes(), 0, 4);
-        bb.putInt(code);
+        bb.put((byte) code);
         return ackPacket;
     }
 

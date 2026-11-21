@@ -1,8 +1,11 @@
 package org.yamcs.simulator;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.beust.jcommander.Parameter;
+import com.beust.jcommander.converters.IParameterSplitter;
 import com.beust.jcommander.converters.PathConverter;
 
 public class SimulatorArgs {
@@ -40,6 +43,18 @@ public class SimulatorArgs {
     @Parameter(names = "--tc-frame-encoding", description = "TC frame UDP encoding: BCH, LDPC64, LDPC256 or RAW")
     public String tcFrameEncoding = "BCH";
 
+    @Parameter(names = "--tc-max-frame-length", description = "maximum accepted TC transfer frame length")
+    public int tcMaxFrameLength = TcVcFrameLink.MAX_FRAME_LENGTH;
+
+    @Parameter(names = "--tc-frame-error-detection", description = "TC frame error detection: CRC16 or NONE")
+    public String tcFrameErrorDetection = "CRC16";
+
+    @Parameter(names = "--tm-frame-error-detection", description = "TM frame error detection: CRC16 or NONE")
+    public String tmFrameErrorDetection = "CRC16";
+
+    @Parameter(names = "--tm-ocf-present", arity = 1, description = "include the TM frame operational control field")
+    public boolean tmOcfPresent = true;
+
     @Parameter(names = "--uslp-tc-frame-port", description = "the UDP port where the simulator listens for USLP frames (0 = disabled)")
     public int uslpTcFramePort = 0;
 
@@ -71,6 +86,15 @@ public class SimulatorArgs {
     @Parameter(names = "--no-tcp-tmtc", description = "disable TCP TM/TC/LOS packet links")
     public boolean noTcpTmtc;
 
+    @Parameter(names = "--pus-storage-time-pfield", description = "ST15 implicit CUC p-field")
+    public int pusStorageTimePfield = 0x2E;
+
+    @Parameter(names = "--pus-storage-time-pfield-cont", description = "ST15 CUC extension octet")
+    public int pusStorageTimePfieldCont = -1;
+
+    @Parameter(names = "--pus-storage-time-epoch", description = "ST15 CUC epoch")
+    public String pusStorageTimeEpoch = "UNIX";
+
     @Parameter(names = "--pus-time-type", description = "PUS time encoding type")
     public String pusTimeType = "CUC";
 
@@ -85,6 +109,52 @@ public class SimulatorArgs {
 
     @Parameter(names = "--pus-time-implicit-pfield", description = "do not emit the PUS CUC p-field on the wire")
     public boolean pusTimeImplicitPfield = false;
+
+    @Parameter(names = "--pus-apid")
+    public int pusApid = 1;
+
+    @Parameter(names = "--pus-spare-bytes")
+    public int pusSpareBytes = 4;
+
+    @Parameter(names = "--pus-telemetry-mdb", converter = PathConverter.class, splitter = MdbPathSplitter.class,
+            description = "XTCE file for PUS telemetry (repeat for multiple files)")
+    public List<Path> pusTelemetryMdbFiles = new ArrayList<>();
+
+    @Parameter(names = "--pus-housekeeping-period")
+    public int pusHousekeepingPeriod = 200;
+
+    @Parameter(names = "--pus-event-period")
+    public int pusEventPeriod = 1000;
+
+    @Parameter(names = "--pus-tm-packet-crc", arity = 1)
+    public boolean pusTmPacketCrc = true;
+
+    @Parameter(names = "--pus-tc-packet-crc", arity = 1)
+    public boolean pusTcPacketCrc = true;
+
+    @Parameter(names = "--pus-embedded-tc-crc", arity = 1)
+    public Boolean pusEmbeddedTcCrc;
+
+    @Parameter(names = "--pus11-wrapper-crc", arity = 1)
+    public Boolean pus11WrapperCrc;
+
+    @Parameter(names = "--pus22-wrapper-crc", arity = 1)
+    public Boolean pus22WrapperCrc;
+
+    @Parameter(names = "--pus11-tc-implicit-p-field", arity = 1)
+    public Boolean pus11TcImplicitPfield;
+
+    @Parameter(names = "--pus11-subschedule-bytes")
+    public int pus11SubScheduleBytes = 1;
+
+    @Parameter(names = "--pus11-subschedule-default")
+    public long pus11SubScheduleDefault;
+
+    @Parameter(names = "--pus11-group-bytes")
+    public int pus11GroupBytes = 1;
+
+    @Parameter(names = "--pus11-group-default")
+    public long pus11GroupDefault;
 
     @Parameter(names = "--los-dir", converter = PathConverter.class)
     public Path losDir = Path.of("losData");
@@ -103,4 +173,10 @@ public class SimulatorArgs {
 
     @Parameter(names = "--exit-with-parent", description = "Exit when the process that started the simulator exits")
     public boolean exitWithParent;
+    public static class MdbPathSplitter implements IParameterSplitter {
+        @Override
+        public List<String> split(String path) {
+            return List.of(path);
+        }
+    }
 }

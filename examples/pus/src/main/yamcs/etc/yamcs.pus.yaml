@@ -86,11 +86,12 @@ dataLinks:
     commandPostprocessorArgs:
         # keep the CCSDS sequence counters in the instance memento, so a restart continues them
         persistSeqCount: true
+        spareBytes: 4
         errorDetection:
             type: CRC-16-CCIIT
         timeEncoding:
-            implicitPfield: false
-            pfield: 0x2f
+            implicitPField: false
+            pField: 0x2f
         tcoService: tco0
         # APID of the on-board scheduler (defaults to the original command's APID if omitted)
         pus11Apid: 1
@@ -144,6 +145,12 @@ mdb:
     spec: "mdb/pus21.xml"
   - type: "xtce"
     spec: "mdb/pus22.xml"
+  - type: "xtce"
+    spec: "mdb/pus128.xml"
+  - type: "xtce"
+    spec: "mdb/pus130.xml"
+  - type: "xtce"
+    spec: "mdb/pus131.xml"
   - type: "xtce"
     spec: "mdb/landing.xml"
 

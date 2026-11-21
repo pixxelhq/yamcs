@@ -37,6 +37,10 @@ services:
   - class: org.yamcs.simulator.SimulatorCommander
     args:
       type: pus
+      pus:
+        pus11:
+          subScheduleId: {bytes: 1, default: 1}
+          groupId: {bytes: 1, default: 1}
       # The PUS simulator sends its telemetry as CCSDS TM transfer frames on UDP and listens for
       # TC frames (CLTUs) on UDP. There is no TCP tm/tc link in this example.
       frame:
@@ -125,11 +129,12 @@ dataLinks:
         commandPostprocessorArgs:
             # keep the CCSDS sequence counters in the instance memento, so a restart continues them
             persistSeqCount: true
+            spareBytes: 4
             errorDetection:
                 type: CRC-16-CCIIT
             timeEncoding:
-                implicitPfield: false
-                pfield: 0x2f
+                implicitPField: false
+                pField: 0x2f
             # with correlation established, the TC[11,4] release time is converted to on-board time
             tcoService: tco0
             # APID of the on-board scheduler, required to schedule commands with pus11ScheduleAt
