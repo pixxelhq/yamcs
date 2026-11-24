@@ -213,6 +213,67 @@ public class Pus11WrapperParserTest {
     }
 
     @Test
+    public void testRoundTripWithSpareBytes() {
+        // the 4 spare bytes after the source id must not be read as the sub-schedule id and N
+        var cfg = withSpareBytes(config(1, 1, explicitPfield(0x2f, "NONE"), true, 0x0102));
+        var pp = newPostprocessor(cfg);
+        byte[] inner = newPostprocessor(cfg).process(pc(innerCommand(100)));
+        byte[] wrapped = pp.process(pc(innerCommand(100), scheduleAt(scheduleAt),
+                attr("pus11SubScheduleId", ValueHelper.newValue(3)),
+                attr("pus11GroupId", ValueHelper.newValue(7))));
+        assertArrayEquals(new byte[] { 0, 0, 0, 0 }, Arrays.copyOfRange(wrapped, 11, 15));
+
+        var req = new Pus11WrapperParser(pp.getPus11WrapperLayout()).parse(wrapped);
+
+        assertEquals(0x0102, req.sourceId());
+        assertEquals(3L, req.subScheduleId());
+        assertEquals(1, req.activities().size());
+        var act = req.activities().getFirst();
+        assertEquals(7L, act.groupId());
+        assertEquals(scheduleAt, act.releaseTime());
+        assertArrayEquals(inner, act.tc());
+    }
+
+    @Test
+    public void testManualInsertWithSpareBytes() {
+        var te = Map.<String, Object> of("implicitPfield", true, "pfield", 0x2e, "epoch", "GPS");
+        var pp = newPostprocessor(withSpareBytes(config(1, 1, te, false, 0)));
+        var layout = pp.getPus11WrapperLayout();
+        long t1 = TimeEncoding.parse("2026-10-23T00:00:00Z");
+        long t2 = TimeEncoding.parse("2026-10-23T00:00:01.500Z");
+        byte[] a = innerCommandWithLength(100, 7, 16);
+        byte[] b = innerCommandWithLength(200, 8, 20);
+        byte[] wrapped = handBuiltInsertMillis(layout, new CucTimeEncoder(0x2e, true),
+                new long[] { layout.shiftToEpoch(t1), layout.shiftToEpoch(t2) }, a, b);
+
+        var req = new Pus11WrapperParser(layout).parse(wrapped);
+
+        assertEquals(9, req.sourceId());
+        assertEquals(3L, req.subScheduleId());
+        assertEquals(2, req.activities().size());
+        assertEquals(t1, req.activities().getFirst().releaseTime());
+        assertEquals(t2, req.activities().get(1).releaseTime());
+        assertArrayEquals(a, req.activities().getFirst().tc());
+        assertArrayEquals(b, req.activities().get(1).tc());
+    }
+
+    @Test
+    public void testSpareBytesCountTowardsTruncation() {
+        // a wrapper ending right after the source id and the spare bytes has no room for N
+        var layout = newPostprocessor(withSpareBytes(config(0, 0, explicitPfield(0x2f, "NONE"), false, 0)))
+                .getPus11WrapperLayout();
+        byte[] tc = new byte[15];
+        tc[0] = 0x18;
+        tc[1] = 5;
+        tc[6] = 0x2D;
+        tc[7] = 11;
+        tc[8] = 4;
+        ByteArrayUtils.encodeUnsignedShort(tc.length - 7, tc, 4);
+
+        assertThrows(IllegalArgumentException.class, () -> new Pus11WrapperParser(layout).parse(tc));
+    }
+
+    @Test
     public void testRejectsOtherServices() {
         var pp = newPostprocessor(config(1, 1, explicitPfield(0x2f, "NONE"), true, 0));
         byte[] wrapped = pp.process(pc(innerCommand(100), scheduleAt(scheduleAt)));
@@ -241,10 +302,15 @@ public class Pus11WrapperParserTest {
     public void testLayoutMirrorsConfig() {
         var layout = newPostprocessor(config(2, 1, explicitPfield(0x2f, "GPS"), true, 0)).getPus11WrapperLayout();
 
+        assertEquals(0, layout.spareBytes());
         assertEquals(2, layout.subScheduleIdBytes());
         assertEquals(1, layout.groupIdBytes());
         assertTrue(layout.crc());
         assertNull(layout.tcoService());
+
+        var spare = newPostprocessor(withSpareBytes(config(2, 1, explicitPfield(0x2f, "GPS"), true, 0)))
+                .getPus11WrapperLayout();
+        assertEquals(4, spare.spareBytes());
     }
 
     // ---- helpers ----
@@ -271,6 +337,12 @@ public class Pus11WrapperParserTest {
         if (crc) {
             m.put("errorDetection", Map.of("type", "CRC-16-CCIIT"));
         }
+        return YConfiguration.wrap(m);
+    }
+
+    private static YConfiguration withSpareBytes(YConfiguration config) {
+        Map<String, Object> m = new HashMap<>(config.getRoot());
+        m.put("spareBytes", 4);
         return YConfiguration.wrap(m);
     }
 
@@ -342,7 +414,7 @@ public class Pus11WrapperParserTest {
         buf[o++] = 11;
         buf[o++] = 4;
         ByteArrayUtils.encodeUnsignedShort(9, buf, o);
-        o += 2;
+        o += 2 + layout.spareBytes();
         o += PusCommandPostprocessor.encodeUnsigned(3, buf, o, layout.subScheduleIdBytes());
         buf[o++] = (byte) tcs.length;
         for (int i = 0; i < tcs.length; i++) {

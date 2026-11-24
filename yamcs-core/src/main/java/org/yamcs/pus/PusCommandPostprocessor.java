@@ -808,7 +808,7 @@ public class PusCommandPostprocessor extends AbstractCommandPostProcessor {
      * {@code pus11Binary}
      */
     public Pus11WrapperLayout getPus11WrapperLayout() {
-        return new Pus11WrapperLayout(pus11SubScheduleIdBytes, pus11GroupIdBytes, pus11Crc, timeEncoder, timeEpoch,
+        return new Pus11WrapperLayout(spareBytes, pus11SubScheduleIdBytes, pus11GroupIdBytes, pus11Crc, timeEncoder, timeEpoch,
                 customEpoch, customEpochIncludeLeapSecond, tcoService);
     }
 

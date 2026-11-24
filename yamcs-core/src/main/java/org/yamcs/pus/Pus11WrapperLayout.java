@@ -12,6 +12,9 @@ import org.yamcs.utils.TimeEncoding;
  * The release time is encoded either as raw on-board time obtained from {@code tcoService}, or, without time
  * correlation, as ground time shifted to {@code epoch}.
  *
+ * @param spareBytes
+ *            number of spare bytes between the source id and the sub-schedule id, 0 or 4 ({@code spareBytes} of the
+ *            postprocessor)
  * @param subScheduleIdBytes
  *            width of the sub-schedule id field, 0 if the field is not present
  * @param groupIdBytes
@@ -24,7 +27,7 @@ import org.yamcs.utils.TimeEncoding;
  * @param tcoService
  *            null if the release time is not encoded as on-board time
  */
-public record Pus11WrapperLayout(int subScheduleIdBytes, int groupIdBytes, boolean crc, CucTimeEncoder timeEncoder,
+public record Pus11WrapperLayout(int spareBytes, int subScheduleIdBytes, int groupIdBytes, boolean crc, CucTimeEncoder timeEncoder,
         TimeEpochs epoch, long customEpoch, boolean customEpochIncludeLeapSecond,
         TimeCorrelationService tcoService) {
 

@@ -12,7 +12,7 @@ import org.yamcs.utils.ByteArrayUtils;
  * single-activity wrappers built by {@link PusCommandPostprocessor} and for manual inserts with N activities, as long as
  * they follow the link's {@link Pus11WrapperLayout}.
  * <p>
- * Layout: {@code hdr(6) | pus(3) | sourceId(2) | subScheduleId(0..8) | N(1) | N x [groupId(0..8) | releaseTime |
+ * Layout: {@code hdr(6) | pus(3) | sourceId(2) | spare(0 or 4) | subScheduleId(0..8) | N(1) | N x [groupId(0..8) | releaseTime |
  * TC] | CRC?}
  */
 public class Pus11WrapperParser {
@@ -70,9 +70,9 @@ public class Pus11WrapperParser {
             end -= 2;
         }
         int o = SOURCE_ID_OFFSET;
-        require(o + 2 + layout.subScheduleIdBytes() + 1, end);
+        require(o + 2 + layout.spareBytes() + layout.subScheduleIdBytes() + 1, end);
         int sourceId = ByteArrayUtils.decodeUnsignedShort(tc, o);
-        o += 2;
+        o += 2 + layout.spareBytes();
         Long subScheduleId = decodeId(tc, o, layout.subScheduleIdBytes());
         o += layout.subScheduleIdBytes();
         int n = tc[o++] & 0xFF;

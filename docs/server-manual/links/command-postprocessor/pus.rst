@@ -81,6 +81,12 @@ pus11Crc (boolean)
     If true, a checksum is appended to the generated ``TC[11,4]`` commands. Requires
     ``errorDetection``. Default: ``true`` if ``errorDetection`` is configured, ``false`` otherwise.
 
+spareBytes (integer)
+    Number of zero spare bytes written after the source id of the generated ``TC[11,4]`` and
+    ``TC[22,4]`` commands, before the sub-schedule id. ``0`` or ``4``. The schedule tracker reads
+    ``TC[11,4]`` commands with the same layout, so a manual ``INSERT_ACTIVITIES`` sent on this link
+    must carry the same spare bytes. Default: ``0``.
+
 pus11Apid (integer)
     APID (0-2047) of the generated ``TC[11,4]`` commands, i.e. the on-board application process
     hosting the scheduling subservice. If omitted, the original command's APID is used.
