@@ -1,6 +1,6 @@
 # Link Management End to End: Yamcs fork + ff-mcs (FireflyMCS) + wds-backend
 
-_Analysis date: 2026-10-07; rechecked 2026-11-23. Repos: `yamcs-Pixxel-fork` (`pixxel/5.10.x` @ `9fbfc03a2`, tag `5.10.12-Pixxel-9.5.2-1`; the 12 commits since `09f566339` touch none of the link code), `ff-mcs` (`ff/prod/base` @ `3d63e00` and `ffly/prod/base` @ `1836b93`, both deployed on different VMs), `wds-backend` (`main` @ `98d732b` for the FF deployment and `main-us` @ `26b46b1` for the FFLY deployment, on VM `production-us-primary`, confirmed 2026-11-23. This is a deliberate per-deployment split that mirrors `ff/prod/base` and `ffly/prod/base`; the two branches differ only in `app/config.py`), `gss-fos-backend` (`develop` @ `e2cdbab`), `gss-commons` (`main` @ `8791d7c`). Yamcs line numbers below are from the fork head._
+_Analysis date: 2026-10-07; rechecked 2026-11-23; §6 updated 2026-11-24 with the ISTRAC station ICDs. Repos: `yamcs-Pixxel-fork` (`pixxel/5.10.x` @ `9fbfc03a2`, tag `5.10.12-Pixxel-9.5.2-1`; the 12 commits since `09f566339` touch none of the link code), `ff-mcs` (`ff/prod/base` @ `3d63e00` and `ffly/prod/base` @ `1836b93`, both deployed on different VMs), `wds-backend` (`main` @ `98d732b` for the FF deployment and `main-us` @ `26b46b1` for the FFLY deployment, on VM `production-us-primary`, confirmed 2026-11-23. This is a deliberate per-deployment split that mirrors `ff/prod/base` and `ffly/prod/base`; the two branches differ only in `app/config.py`), `gss-fos-backend` (`develop` @ `e2cdbab`), `gss-commons` (`main` @ `8791d7c`). Yamcs line numbers below are from the fork head._
 
 ## Contents
 _Companion plan: [link-management-redesign-feasibility.md](link-management-redesign-feasibility.md). Keep this list in sync when headings change._
@@ -316,8 +316,9 @@ To confirm any of the above in a running ff-mcs:
 Scope: the pass-driven controller that turns links (or station sessions) on and off for the **new mission**. The current deployment is not changed. The controller works with either data plane in feasibility plan §3:
 - **Option A (recommended): gateway.** The controller calls gateway sessions (`POST /missions/{m}/sessions`). See feasibility §3.1.
 - **Option B: links inside Yamcs.** The controller calls `GET /api/links/{inst}`, `:enable` and `:disable` on `pixxel/master`.
+- **Option D (added 2026-11-24): one RTD-API link per kind inside Yamcs.** The controller tells the TM and TC links which ISTRAC `<station>` topics to use for the pass. See feasibility §3 and "ISTRAC station ICDs".
 
-Where the controller runs (WDS with new-mission config, a new service, or inside the gateway) is open: feasibility §6 Q4.
+Where the controller runs is answered for jTYU (2026-11-24): the **Pass Mgmt module inside ESW**, which receives the Master Scheduler comm windows and owns AOS and LOS (feasibility §6.5, Q4; `gss-jtyu-prd` UMACS decision D-35).
 
 ### 6.1 Problems the redesign removes
 | Current behaviour | Effect | New-mission requirement |
@@ -332,18 +333,19 @@ Where the controller runs (WDS with new-mission config, a new service, or inside
 
 ### 6.2 Configuration (one source of truth)
 - The satellite → {primary instance, secondary instance} mapping is per-deployment config (data), never a code branch. Today FF and FFLY need separate WDS and ff-mcs branches for this (§3b issue 3).
-- The station list has one source: the gateway station registry (Option A) or the instance's own link list from `GET /api/links/{inst}` (Option B). The controller never keeps its own copy. At startup it refuses to run a satellite if a station is incomplete (Option B: fewer than 4 links `_Tm/_Tc/_Cfdp/_Monitoring`) or if a pass references an unknown station. This removes the hand-kept `ANTENNAS` list.
+- The station list has one source: the gateway station registry (Option A), the instance's own link list from `GET /api/links/{inst}` (Option B), or, for RTD-API stations (Option D), a station registry mapping each pass-detail station name to its RTD-API topic name (ST-D-11; the name form is an assumption). The controller never keeps its own copy. At startup it refuses to run a satellite if a station is incomplete (Option B: fewer than 4 links `_Tm/_Tc/_Cfdp/_Monitoring`) or if a pass references an unknown station. This removes the hand-kept `ANTENNAS` list.
 - LeafSpace is a normal station with its own profile (feasibility §5.2), not a `_LeafSpace` pseudo-antenna.
 - Secrets live in the environment or a secret store from day one (today they sit in `config.py`: A6 "reported" item 6).
 
 ### 6.3 Reconciler (level-triggered, no ON/OFF timers)
 Replaces the current `LINK_MANAGEMENT_ON/OFF` timer pattern. Every 10–30 s, per satellite:
-1. Read the scheduled windows covering `now` (with the margin below). For jTYU these are the comm windows from ISRO's Master Scheduler, plus the commercial LEOP passes, whose source is still open (feasibility plan §6 Q10). The controller merges all sources into one window list per satellite. For an MPS-driven mission, use BOOKED passes only (`status = 'BOOKED'`).
+1. Read the scheduled windows covering `now` (with the margin below). For jTYU these are the comm windows from ISRO's Master Scheduler, which arrive before AOS through Pass Mgmt and name the station (D-25, D-35, ST-D-11), plus the commercial LEOP passes, whose source is still open (feasibility plan §6 Q10). The controller merges all sources into one window list per satellite. For an MPS-driven mission, use BOOKED passes only (`status = 'BOOKED'`).
 2. Compute desired state per instance (primary and secondary):
    - TM and Monitoring links: enabled for antennas with an active pass; disabled otherwise.
    - TC and CFDP: enabled only on primary, and only for at most one antenna. If more than one antenna is active, the pass that reached AOS first keeps TC until its LOS. TC never switches mid-pass. Raise an alert on the overlap.
    - Secondary TC and CFDP: always disabled by the reconciler. They are enabled only by an operator's manual failover action.
-3. Read actual state and change only what differs: open or close gateway sessions (Option A), or call `:enable` / `:disable` on the links (Option B).
+3. Read actual state and change only what differs: open or close gateway sessions (Option A), call `:enable` / `:disable` on the links (Option B), or set the active station topics on the RTD-API links (Option D).
+   - **RTD-API stations: opening TC is a handshake, not a switch.** Send a TC session init to the pass station's STC and keep TC blocked until the success ack. After a failed ack, only a new init may be sent; no ack within the timeout means the station is unreachable (alert) (ST-D-31 to ST-D-33). Whether a session can open at `aos-60`, and how it closes, waits for ST-Q-47 (feasibility §6 Q13).
 4. Record the result per satellite. Repeated failures raise an alert, not a silent COMPLETED.
 
 Margins: config values, defaulting to `aos-60` / `los+30`. Links open 60 s before AOS so the station connections are up at AOS, and close 30 s after LOS to catch tail frames. This replaces the current `aos+1` / `los+1`. The window is per antenna, so back-to-back passes on one antenna simply overlap, and the desired-state computation handles that.
@@ -351,6 +353,7 @@ Margins: config values, defaulting to `aos-60` / `los+30`. Links open 60 s befor
 ### 6.4 Verification and visibility
 - After each change, re-read the state. Expected: `OK` for enabled links or connected sessions; anything still `UNAVAIL` past a timeout raises an alert.
 - Yamcs has no link events (gap 1 in §5). Under Option A, per-station status comes from the gateway as parameters (feasibility §4 point 5). Under Option B, the controller polls the 1 s link state.
+- RTD-API stations (Options A and D) give extra signals to use: TC session ack status and error codes, transmit-ack timeouts ("not received by station", "radiation not confirmed") and DUMMY TM blocks during a data break (ST-D-23, ST-D-32, ST-D-36). An MQTT connection that is up says nothing about the station, so these, not the connection state, show whether the station is working.
 - Expose desired vs actual state per instance on the controller's monitoring endpoint.
 
 ### 6.5 Downstream tasks
@@ -360,7 +363,7 @@ REBUILD, TELEMETRY_UPLOAD, DOWNLINK_FILE_UPLOAD and IMAGE_TABLE_UPLOAD are curre
 1. Build the station registry, the instance mapping and the startup validation (6.2). Test them against a staging deployment.
 2. Run the reconciler dry-run (desired vs actual logged, nothing changed) against simulated passes. Optional: also feed it real BOOKED passes from the current MPS, read-only, to compare its decisions with what the FF/FFLY timers did.
 3. Turn on TM and Monitoring control.
-4. Turn on TC after an end-to-end uplink test with each station profile.
+4. Turn on TC after an end-to-end uplink test with each station profile. For RTD-API, test against Pixxel's RTD-API simulator first (ST-D-14), then an ISTRAC test server if one is provided (ST-Q-13).
 
 ### 6.7 Decisions (all answered 2026-11-23)
 1. **Margins:** configurable, with a default of `aos-60` / `los+30` (6.3).
