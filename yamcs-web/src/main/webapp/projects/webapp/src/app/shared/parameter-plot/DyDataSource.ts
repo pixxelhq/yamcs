@@ -226,7 +226,7 @@ export class DyDataSource {
 
   private isUnmappedEnumOrdinal(qualifiedName: string, ordinal: number) {
     const parameter = this.parameters$.value.find(p => p.qualifiedName === qualifiedName);
-    const values = getCategoricalValues(parameter?.type);
+    const values = getCategoricalValues(parameter);
     return !!values && !values.some(v => v.value === ordinal);
   }
 

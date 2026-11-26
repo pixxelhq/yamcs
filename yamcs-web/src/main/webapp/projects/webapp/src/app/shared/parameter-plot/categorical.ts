@@ -1,4 +1,5 @@
-import { ParameterType } from '@yamcs/webapp-sdk';
+import { Parameter, utils } from '@yamcs/webapp-sdk';
+import { NamedParameterType } from './NamedParameterType';
 
 export interface CategoricalValue {
   value: number;
@@ -6,14 +7,21 @@ export interface CategoricalValue {
 }
 
 /**
- * Value↔label table for a categorical (enum or boolean) parameter type, used
+ * Value↔label table for a categorical (enum or boolean) parameter, used
  * to render ordinals as labels on the Y-axis, legend and on-chart key.
+ *
+ * For an aggregate or array member (parameter.path set), the type of that
+ * member is used rather than the type of the containing parameter.
  *
  * Enum ordinals are serialized as strings by the MDB API, so they are coerced.
  * Booleans get a synthetic 0/1 table from the type's zero/one string values.
  * Returns undefined for any other type.
  */
-export function getCategoricalValues(type?: ParameterType): CategoricalValue[] | undefined {
+export function getCategoricalValues(parameter?: NamedParameterType): CategoricalValue[] | undefined {
+  if (!parameter?.type) {
+    return undefined;
+  }
+  const type = utils.getParameterTypeForPath(parameter as Parameter);
   if (!type) {
     return undefined;
   }

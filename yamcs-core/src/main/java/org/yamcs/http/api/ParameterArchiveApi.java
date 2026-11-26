@@ -69,6 +69,7 @@ import org.yamcs.xtce.BooleanParameterType;
 import org.yamcs.xtce.EnumeratedParameterType;
 import org.yamcs.xtce.ParameterType;
 import org.yamcs.xtce.ValueEnumeration;
+import org.yamcs.xtce.util.AggregateTypeUtil;
 import org.yamcs.mdb.Mdb;
 
 import com.google.protobuf.Empty;
@@ -200,8 +201,12 @@ public class ParameterArchiveApi extends AbstractParameterArchiveApi<Context> {
         // Enums additionally need the label->ordinal table, because the columnar retrieval path delivers String labels
         // where the plot needs numeric ordinals. Booleans arrive as BOOLEAN values on both paths and need no table.
         // Raw values of an enum or boolean parameter are plain integers and need none of this.
-        if (!useRawValue && pid.getPath() == null) {
+        // Aggregate/array members (e.g. an enum member of a status struct) are resolved to the member's own type.
+        if (!useRawValue) {
             ParameterType ptype = pid.getParameter().getParameterType();
+            if (ptype != null && pid.getPath() != null) {
+                ptype = AggregateTypeUtil.getMemberType(ptype, pid.getPath());
+            }
             if (ptype instanceof EnumeratedParameterType enumType) {
                 Map<String, Integer> labelToOrdinal = new HashMap<>();
                 for (ValueEnumeration ve : enumType.getValueEnumerationList()) {

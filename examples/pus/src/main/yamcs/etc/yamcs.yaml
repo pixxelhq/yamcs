@@ -18,6 +18,7 @@ secretKey: "changeme"
 
 yamcs-web:
   tag: "Example: pus"
+  extra: {}
 
 buckets:
   - name: cfdpUp

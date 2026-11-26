@@ -76,7 +76,7 @@ public class PusSimulator extends AbstractSimulator {
     @Override
     protected void doStart() {
         executor = new ScheduledThreadPoolExecutor(1);
-        executor.scheduleAtFixedRate(() -> sendTimePacket(), 0, 4, TimeUnit.SECONDS);
+        // executor.scheduleAtFixedRate(() -> sendTimePacket(), 0, 4, TimeUnit.SECONDS);
 
         executor.scheduleAtFixedRate(() -> sendFlightPacket(), 0, 200, TimeUnit.MILLISECONDS);
         executor.scheduleAtFixedRate(() -> sendHkTm(), 0, 1000, TimeUnit.MILLISECONDS);

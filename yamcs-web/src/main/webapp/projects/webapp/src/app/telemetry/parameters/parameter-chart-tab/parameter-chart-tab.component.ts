@@ -155,7 +155,7 @@ export class ParameterChartTabComponent implements OnInit, OnDestroy {
 
     const enumKeys = [];
     for (const trace of this.traces) {
-      const values = getCategoricalValues(trace.parameter.type);
+      const values = getCategoricalValues(trace.parameter);
       if (values) {
         enumKeys.push({ name: trace.parameter.name, color: trace.color, values });
       }

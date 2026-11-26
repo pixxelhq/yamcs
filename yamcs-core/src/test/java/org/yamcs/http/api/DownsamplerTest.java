@@ -128,6 +128,25 @@ public class DownsamplerTest {
         assertTrue(Double.isNaN(samples.get(2).avg));
     }
 
+    /**
+     * The parameter archive stores enum eng-values in a StringValueSegment, which yields a STRING-typed ValueArray.
+     */
+    @Test
+    public void testCategoricalColumnarEnumLabelsFromArchive() {
+        Downsampler sampler = new Downsampler(0, 30, 3);
+        sampler.enableCategoricalMode(Map.of("IDLE", 0, "ARMED", 3));
+
+        long[] timestamps = { 1, 11, 21 };
+        ValueArray engValues = new ValueArray(new String[] { "IDLE", "ARMED", "UNKNOWN" });
+        sampler.accept(new ParameterValueArray(timestamps, engValues, null, null));
+
+        List<Sample> samples = sampler.collect();
+        assertEquals(3, samples.size());
+        assertEquals(0, samples.get(0).avg, 1e-10);
+        assertEquals(3, samples.get(1).avg, 1e-10);
+        assertTrue(Double.isNaN(samples.get(2).avg));
+    }
+
     @Test
     public void testColumnarBoolean() {
         Downsampler sampler = new Downsampler(0, 30, 3);

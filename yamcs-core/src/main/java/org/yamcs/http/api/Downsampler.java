@@ -188,6 +188,16 @@ public class Downsampler implements Consumer<ParameterValueArray> {
                 process(timestamps[i], lv[i], expireMillis);
             }
             break;
+        case STRING:
+            // The parameter archive stores enum eng-values in a StringValueSegment, so they come back typed STRING,
+            // not ENUMERATED. Only treat them as enum labels when a label->ordinal table was provided.
+            if (enumLabelToOrdinal == null) {
+                for (int i = 0; i < n; i++) {
+                    process(timestamps[i], Double.NaN, expireMillis);
+                }
+                break;
+            }
+            // fall through
         case ENUMERATED:
             // Columnar enum eng-values are String labels, not ordinals. Resolve via the MDB label->ordinal map.
             for (int i = 0; i < n; i++) {

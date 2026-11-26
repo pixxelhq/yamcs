@@ -9,4 +9,6 @@ import { ParameterType } from '@yamcs/webapp-sdk';
 export interface NamedParameterType {
   qualifiedName: string;
   type?: ParameterType;
+  // Aggregate/array member path (as returned by the MDB API), if any
+  path?: string[];
 }

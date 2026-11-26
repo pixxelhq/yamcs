@@ -547,7 +547,7 @@ export class ParameterPlotComponent implements AfterViewInit, OnDestroy {
 
     for (const parameter of this.parameters) {
       const config = this.parameterConfig.get(parameter.qualifiedName)!;
-      const categoricalValues = getCategoricalValues(parameter.type);
+      const categoricalValues = getCategoricalValues(parameter);
       for (const cv of categoricalValues ?? []) {
         this.labelByOrdinal.set(cv.value, cv.label);
       }
