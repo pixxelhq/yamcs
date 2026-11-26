@@ -1,8 +1,9 @@
 # PUS ST[11] — Time-based scheduling
 
 Ground scheduling support consists of XTCE
-commands/reports and optional TC[11,4] wrapping in `PusCommandPostprocessor`. The on-board
-scheduler is emulated by `simulator/.../Pus11Service.java`.
+commands/reports, optional TC[11,4] wrapping in `PusCommandPostprocessor`, and an optional ground
+mirror of the on-board schedule, `Pus11ScheduleTracker`. The on-board scheduler is emulated by
+`simulator/.../Pus11Service.java`.
 
 ## Current sources
 
@@ -10,6 +11,12 @@ scheduler is emulated by `simulator/.../Pus11Service.java`.
 - [PusCommandPostprocessor](../yamcs-core/src/main/java/org/yamcs/pus/PusCommandPostprocessor.java)
 - [pus11.xml](../examples/pus/src/main/yamcs/mdb/pus11.xml) and [base verifiers](../examples/pus/src/main/yamcs/mdb/pus.xml)
 - [Pus11Service](../simulator/src/main/java/org/yamcs/simulator/pus/Pus11Service.java)
+- [Pus11ScheduleTracker](../yamcs-core/src/main/java/org/yamcs/pus/Pus11ScheduleTracker.java),
+  [Pus11Schedule](../yamcs-core/src/main/java/org/yamcs/pus/Pus11Schedule.java),
+  [Pus11SummaryReport](../yamcs-core/src/main/java/org/yamcs/pus/Pus11SummaryReport.java),
+  [TmGapReconcileTrigger](../yamcs-core/src/main/java/org/yamcs/pus/TmGapReconcileTrigger.java),
+  [Pus11WrapperParser](../yamcs-core/src/main/java/org/yamcs/pus/Pus11WrapperParser.java)
+- [Design plan and open issues](../docs/superpowers/plans/2026-10-22-time-tag-queue.md)
 - [Postprocessor tests](../yamcs-core/src/test/java/org/yamcs/pus/PusCommandPostprocessorTest.java)
   and [scheduler tests](../simulator/src/test/java/org/yamcs/simulator/pus/Pus11ServiceTest.java)
 
@@ -89,6 +96,35 @@ rejects deletion of groups containing activities. Earlier claims that groups are
 only are obsolete. Due activities are removed even when a disabling gate prevents release;
 disabling the scheduler is therefore not a queue-preserving pause.
 
+## Ground schedule tracker
+
+`Pus11ScheduleTracker` is an instance service (configuration in the
+[postprocessor manual](../docs/server-manual/links/command-postprocessor/pus.rst), "Schedule tracker").
+
+- **Insert.** For each command with `pus11ScheduleAt`, `onInsert` parses `pus11Binary` with
+  `Pus11WrapperParser`, using the `Pus11WrapperLayout` of the TC link's postprocessor, and adds a
+  PENDING entry to `Pus11Schedule`. The release time is converted to ground time once, at insert.
+  `CommandComplete` OK makes it SCHEDULED; any other result removes it.
+- **Status.** Each entry's state is published to command history as the `pus11-release`
+  acknowledgment (`SCHEDULED`, `DISABLED`, `TIMEOUT`), separate from `CommandComplete`, which only
+  means the insert was accepted.
+- **Drop flag.** TM[11,19] and TM[11,27] status reports set a drop reason on live entries whose
+  sub-schedule or group is disabled (`Pus11Schedule.subScheduleStatus` / `groupStatus`).
+- **Sweep.** `Pus11Schedule.sweep` marks entries past release time + `releaseGrace` PRESUMED_GONE.
+- **Reconcile.** `TmGapReconcileTrigger` detects a pass from a TM gap; `requestReconcile` sends
+  TC[11,17]; `Pus11SummaryReport` collects the TM[11,13] packets by CCSDS sequence flags and
+  `Pus11Schedule.reconcile` replaces the live entries with the on-board ones.
+- **Sequence counts.** With `persistSeqCount`, `CcsdsSeqCountFiller` saves its counters through
+  `MementoSeqCountStore` so a restart does not reuse request IDs still in the on-board schedule.
+
+Known issues (details and TODO list in the
+[plan, §9](../docs/superpowers/plans/2026-10-22-time-tag-queue.md#9-review-findings-and-todo-2026-11-26)):
+release acknowledgments are not read, so released commands end as TIMEOUT; paged TM[11,13]
+reports from the simulator (`page_number`/`total_pages`) are not assembled; any TM[11,13],
+including by-ID or by-filter reports, is applied as the full schedule; the inner request ID uses
+the wrapper's source ID; manual INSERT_ACTIVITIES, deletes and shifts are not tracked; the model
+is not persisted across restarts.
+
 ## Checks and remaining limitations
 
 Start the [example](pus_native_arch.md#build-and-verification), create/enable the required group
@@ -107,5 +143,5 @@ postprocessor.
 Several repeated report fields use ordinary XML dynamic references. Their instance policy
 must be checked for differing counts/embedded lengths; see the [aggregate guide](aggregate_member_value.md).
 Yamcs command queues are ground pre-release queues, not an authoritative mirror of the
-spacecraft schedule. No ground schedule persistence or reconciliation is established by
-these packet definitions.
+spacecraft schedule. The packet definitions alone establish no ground schedule; that is
+the job of `Pus11ScheduleTracker` (see above), which reconciles but does not persist it.

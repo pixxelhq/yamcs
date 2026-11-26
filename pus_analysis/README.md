@@ -50,7 +50,7 @@ The aggregate-member feature supports array counts and binary lengths from an ea
 | [ST[05]](pus05.md) | Event reports and native Yamcs event conversion |
 | [ST[06]](pus06.md) | Proposal only; not registered or implemented |
 | [ST[09]](pus09.md) | Time rate control and APID-zero time reports |
-| [ST[11]](pus11.md) | Ground wrapping and Java on-board scheduler |
+| [ST[11]](pus11.md) | Ground wrapping, ground schedule tracker, and Java on-board scheduler |
 | [ST[12]](pus12.md) | Parameter monitoring sample and live-client checks |
 | [ST[13]](pus13.md) | Fragment transfer, explicit last-part length convention |
 | [ST[14]](pus14.md) | APFCC, HK/diagnostic and event forwarding |

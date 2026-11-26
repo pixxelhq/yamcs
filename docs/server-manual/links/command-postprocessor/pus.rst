@@ -83,9 +83,9 @@ pus11Crc (boolean)
 
 spareBytes (integer)
     Number of zero spare bytes written after the source id of the generated ``TC[11,4]`` and
-    ``TC[22,4]`` commands, before the sub-schedule id. ``0`` or ``4``. The schedule tracker reads
-    ``TC[11,4]`` commands with the same layout, so a manual ``INSERT_ACTIVITIES`` sent on this link
-    must carry the same spare bytes. Default: ``0``.
+    ``TC[22,4]`` commands, before the sub-schedule id. ``0`` or ``4``. The schedule tracker parses
+    the ``TC[11,4]`` wrappers it tracks with the same layout, and the on-board parser expects it, so
+    a manual ``INSERT_ACTIVITIES`` sent on this link must carry the same spare bytes. Default: ``0``.
 
 pus11Apid (integer)
     APID (0-2047) of the generated ``TC[11,4]`` commands, i.e. the on-board application process
@@ -206,9 +206,28 @@ schedule, and reconciles it with the spacecraft. It is configured as a service o
             aosSettle: 30        # seconds after the first TM packet of a pass before the request
             tmStream: tm_realtime
 
-``releaseGrace``, ``sweepInterval``, ``tcLink`` and ``processor`` are as described above; ``reconcile``
-defaults to the values shown. The TC(11,4) layout must come from a ``PusCommandPostprocessor`` with
-``pus11`` configured.
+releaseGrace (integer)
+    Seconds after its release time before an unconfirmed entry is presumed gone. Default: ``300``.
+
+sweepInterval (integer)
+    Seconds between checks for entries past ``releaseGrace``. Default: ``10``.
+
+tcLink (string)
+    The TC link whose ``PusCommandPostprocessor`` gives the TC(11,4) layout. Optional when exactly one
+    link has ``pus11Apid`` configured.
+
+processor (string)
+    The processor that decodes the status and summary reports. Default: ``realtime``.
+
+subScheduleStatus, groupStatus (map)
+    The status report parameters used to flag disabled sub-schedules and groups, with ``parameter``,
+    ``idMember`` and ``statusMember`` keys. Defaults: ``/PUS11/status_report`` and
+    ``/PUS11/group_status_report``.
+
+reconcile (map)
+    ``enabled``, ``aosGap``, ``aosSettle`` and ``tmStream``, with the defaults shown above.
+
+The TC(11,4) layout must come from a ``PusCommandPostprocessor`` with ``pus11Apid`` set.
 
 The status of each scheduled command is published in the command history as the ``pus11-release``
 acknowledgment, separate from ``CommandComplete``:
@@ -216,8 +235,9 @@ acknowledgment, separate from ``CommandComplete``:
 * ``SCHEDULED``: the command is on board, released at the time in the message;
 * ``DISABLED``: it will be dropped at its release time, because its sub-schedule or group is
   reported disabled (TM(11,19) / TM(11,27));
-* ``TIMEOUT``: it is presumed gone (no release acknowledgment ``releaseGrace`` seconds after its
-  release time), or it was not on board at a reconcile before its release time.
+* ``TIMEOUT``: it is presumed gone (not confirmed ``releaseGrace`` seconds after its release time),
+  or it was not on board at a reconcile before its release time. Release acknowledgments are not
+  read yet, so a command that was released also ends with ``TIMEOUT``.
 
 Reconcile: the tracker requests the complete on-board schedule with ``TC[11,17]``, and reads the
 ``TM[11,13]`` summary report back. The report replaces the model's live entries:
@@ -241,8 +261,16 @@ Limits:
   as partial; whether the spacecraft splits reports this way is to be confirmed;
 * the release times of the ground model come from the time correlation at insert. The on-board
   value can differ from it by a millisecond, which is logged when the release time is replaced;
-* manual ``INSERT_ACTIVITIES`` with more than one activity, and deletes or shifts by filter, are not
-  tracked between reconciles yet;
+* only commands sent with ``pus11ScheduleAt`` are tracked. Manual ``INSERT_ACTIVITIES``, deletes and
+  time shifts are not tracked between reconciles yet;
+* every ``TM[11,13]`` is applied as the complete schedule, including reports that answer a
+  by-ID or by-filter request (``TC[11,12]``, ``TC[11,14]``). Request summary reports only through the
+  tracker until this is fixed;
+* the simulator pages ``TM[11,13]`` with a page number and page count in the TM spare field. The
+  tracker uses only the CCSDS sequence flags, so a paged report is applied page by page and
+  entries on other pages are reported as dropped;
+* the model is kept in memory only. After a restart, entries on board are reconciled as unknown
+  and no longer linked to their commands;
 * the status reports are as fresh as the last report received;
 * there is no API or web page for the model yet.
 
