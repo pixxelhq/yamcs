@@ -211,6 +211,7 @@ public abstract class AbstractTcTmParamLink extends AbstractLink
         commandHistoryPublisher.publishAck(commandId, AcknowledgeSent_KEY, getCurrentTime(), AckStatus.OK);
     }
 
+    // PIXXEL: exposes the postprocessor so Pus11ScheduleTracker can read its TC(11,4) wrapper layout
     /** the postprocessor turning commands into binary, null until {@link #init} */
     public CommandPostprocessor getCommandPostprocessor() {
         return cmdPostProcessor;

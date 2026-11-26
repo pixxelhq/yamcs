@@ -215,6 +215,7 @@ public class PusCommandPostprocessor extends AbstractCommandPostProcessor {
                         "Cannot find a time correlation service with name " + tcoServiceName);
             }
         }
+        // PIXXEL: seq filler built by createSeqFiller() so persistSeqCount can attach a memento store
         seqFiller = createSeqFiller(yamcsInstance, config, link);
 
         if (config.containsKey("pus11")) {
@@ -576,6 +577,7 @@ public class PusCommandPostprocessor extends AbstractCommandPostProcessor {
 
         if (tcoService == null) {
             // no time correlation: encode the release time against the configured timeEncoding.epoch
+            // PIXXEL: epoch shift moved to Pus11WrapperLayout so the tracker decodes with the same rules
             offset += timeEncoder.encode(getPus11WrapperLayout().shiftToEpoch(scheduleTime), scheduleTcPacket, offset);
         } else {
             long obt = tcoService.getObt(scheduleTime);
@@ -798,6 +800,7 @@ public class PusCommandPostprocessor extends AbstractCommandPostProcessor {
         return 12 + spareBytes + subScheduleIdBytes + groupIdBytes + tagLength + (crc ? 2 : 0);
     }
 
+    // PIXXEL: accessors and createSeqFiller() below are used by Pus11ScheduleTracker and persistSeqCount
     /** true if this postprocessor can wrap commands into TC(11,4), i.e. {@code pus11Apid} is configured */
     public boolean isPus11Enabled() {
         return pus11Apid >= 0;

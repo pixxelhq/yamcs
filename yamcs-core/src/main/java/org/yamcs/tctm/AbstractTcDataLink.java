@@ -89,6 +89,7 @@ public abstract class AbstractTcDataLink extends AbstractLink implements TcDataL
         }
     }
 
+    // PIXXEL: exposes the postprocessor so Pus11ScheduleTracker can read its TC(11,4) wrapper layout
     /** the postprocessor turning commands into binary, null until {@link #init} */
     public CommandPostprocessor getCommandPostprocessor() {
         return cmdPostProcessor;

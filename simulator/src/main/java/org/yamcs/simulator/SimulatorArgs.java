@@ -171,8 +171,10 @@ public class SimulatorArgs {
     @Parameter(names = "--encryption-args", description = "Arguments to pass to the SDLS implementation")
     public String encryptionArgs;
 
+    // PIXXEL: lets SimulatorCommander stop the simulator when Yamcs is killed
     @Parameter(names = "--exit-with-parent", description = "Exit when the process that started the simulator exits")
     public boolean exitWithParent;
+
     public static class MdbPathSplitter implements IParameterSplitter {
         @Override
         public List<String> split(String path) {

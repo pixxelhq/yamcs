@@ -18,6 +18,7 @@ import org.yamcs.utils.ByteArrayUtils;
  * written to the store before the sequence count is returned, so they survive a restart.
  */
 public class CcsdsSeqCountFiller {
+    // PIXXEL: optional SeqCountStore (Counters) persists the counters across restarts (persistSeqCount)
     private static final int SEQ_MODULO = 1 << 14;
 
     // Named shared counters - keyed by name then by APID

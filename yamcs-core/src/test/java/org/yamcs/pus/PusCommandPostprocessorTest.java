@@ -1,6 +1,11 @@
 package org.yamcs.pus;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.yamcs.utils.StringConverter.hexStringToArray;
 
 import java.util.Arrays;
@@ -184,8 +189,8 @@ public class PusCommandPostprocessorTest {
                 attr("pus11SubScheduleId", ValueHelper.newValue(3)),
                 attr("pus11GroupId", ValueHelper.newValue(7))));
 
-        assertFalse(hist.attrs.containsKey("pus11-subschedule-id"));
-        assertFalse(hist.attrs.containsKey("pus11-group-id"));
+        assertTrue(!hist.attrs.containsKey("pus11-subschedule-id"));
+        assertTrue(!hist.attrs.containsKey("pus11-group-id"));
     }
 
     @Test
@@ -285,10 +290,10 @@ public class PusCommandPostprocessorTest {
                 attr("pus22SubScheduleId", ValueHelper.newValue(3)),
                 attr("pus22GroupId", ValueHelper.newValue(7))));
 
-        assertFalse(hist.attrs.containsKey("pus22-subschedule-id"));
-        assertFalse(hist.attrs.containsKey("pus22-group-id"));
-        assertInstanceOf(Integer.class, hist.attrs.get("pus22Apid"));
-        assertInstanceOf(Integer.class, hist.attrs.get("pus22CcsdsSeqCount"));
+        assertTrue(!hist.attrs.containsKey("pus22-subschedule-id"));
+        assertTrue(!hist.attrs.containsKey("pus22-group-id"));
+        assertTrue(hist.attrs.get("pus22Apid") instanceof Integer);
+        assertTrue(hist.attrs.get("pus22CcsdsSeqCount") instanceof Integer);
     }
 
     // Scheduling configuration, history and validation

@@ -27,6 +27,9 @@ clean: ## mvn clean (all modules)
 build: ## Install all modules, skip tests
 	@$(MVN) install $(SKIP_TESTS)
 
+.PHONY: build-skip-test
+build-skip-test: build ## Alias of build (kept for CONTRIBUTING.md)
+
 .PHONY: build-test
 build-test: ## Install all modules, run all tests, list failures at end
 	@$(call RUN_TESTS,install)

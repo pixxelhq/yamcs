@@ -112,6 +112,7 @@ public class CucTimeEncoder implements TimeEncoder {
         return (offset - offset0);
     }
 
+    // PIXXEL: field widths exposed so Pus11WrapperLayout can decode the release time it encodes
     public int getBasicTimeBytes() {
         return basicTimeBytes;
     }
